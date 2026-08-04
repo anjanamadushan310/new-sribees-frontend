@@ -46,6 +46,7 @@ interface ProductFormValues {
     slug: string;
     sku?: string;
     category_id?: string;
+    subcategory_id?: string;
     description?: string;
     short_description?: string;
     price: number;
@@ -73,6 +74,15 @@ const ProductForm: React.FC = () => {
         queryFn: categoriesApi.list,
     });
 
+    // The backend returns one flat list; the hierarchy is carried by
+    // parent_category_id. Top-level rows are the Category dropdown, and the
+    // children of the selected one are the Sub-category dropdown.
+    const rootCategories = categories.filter((c) => !c.parent_category_id);
+    const selectedCategoryId = Form.useWatch('category_id', form);
+    const subcategories = categories.filter(
+        (c) => c.parent_category_id && c.parent_category_id === selectedCategoryId
+    );
+
     const { data: product, isLoading: loadingProduct } = useQuery({
         queryKey: ['admin', 'product', id],
         queryFn: () => productsApi.getById(id!),
@@ -86,7 +96,8 @@ const ProductForm: React.FC = () => {
                 name: product.name,
                 slug: product.slug,
                 sku: product.sku ?? undefined,
-                category_id: product.category?.category_id,
+                category_id: product.category_id ?? undefined,
+                subcategory_id: product.subcategory_id ?? undefined,
                 description: product.description ?? undefined,
                 short_description: product.short_description ?? undefined,
                 price: product.price,
@@ -148,6 +159,7 @@ const ProductForm: React.FC = () => {
                 slug: (values.slug || slugify(values.name)).trim(),
                 sku: values.sku?.trim() || null,
                 category_id: values.category_id || null,
+                subcategory_id: values.subcategory_id || null,
                 description: values.description?.trim() || null,
                 short_description: values.short_description?.trim() || null,
                 price: values.price,
@@ -270,7 +282,39 @@ const ProductForm: React.FC = () => {
                                     allowClear
                                     showSearch
                                     optionFilterProp="label"
-                                    options={categories.map((c) => ({
+                                    // Changing the parent invalidates any sub-category
+                                    // chosen under the old one — the backend rejects a
+                                    // mismatched pair, so clear it rather than submit it.
+                                    onChange={() => form.setFieldValue('subcategory_id', undefined)}
+                                    options={rootCategories.map((c) => ({
+                                        label: c.name,
+                                        value: c.category_id,
+                                    }))}
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Sub-category"
+                                name="subcategory_id"
+                                extra={
+                                    !selectedCategoryId
+                                        ? 'Select a category first.'
+                                        : subcategories.length === 0
+                                          ? 'This category has no sub-categories yet.'
+                                          : undefined
+                                }
+                            >
+                                <Select
+                                    placeholder={
+                                        selectedCategoryId
+                                            ? 'Select a sub-category'
+                                            : 'Select a category first'
+                                    }
+                                    allowClear
+                                    showSearch
+                                    optionFilterProp="label"
+                                    disabled={!selectedCategoryId || subcategories.length === 0}
+                                    options={subcategories.map((c) => ({
                                         label: c.name,
                                         value: c.category_id,
                                     }))}

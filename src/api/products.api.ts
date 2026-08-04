@@ -23,7 +23,9 @@ export interface ProductCategoryRef {
     image_url?: string | null;
 }
 
-// Product as returned by the admin list/detail endpoints
+// Product as returned by the admin list/detail endpoints.
+// `price` / `stock_quantity` are the GLOBAL template values here — the admin
+// catalog has no branch context. Per-branch prices live in the Inventory API.
 export interface AdminProduct {
     product_id: string;
     name: string;
@@ -36,7 +38,10 @@ export interface AdminProduct {
     stock_quantity: number;
     is_active: boolean;
     is_featured: boolean;
+    category_id: string | null;
+    subcategory_id: string | null;
     category: ProductCategoryRef | null;
+    subcategory: ProductCategoryRef | null;
     images: ProductImage[];
     created_at?: string | null;
     updated_at?: string | null;
@@ -53,6 +58,8 @@ export interface ProductPayload {
     compare_at_price?: number | null;
     cost_price?: number | null;
     category_id?: string | null;
+    // Must be a child of category_id — the backend rejects a mismatched pair.
+    subcategory_id?: string | null;
     stock_quantity?: number;
     low_stock_threshold?: number;
     is_active?: boolean;
@@ -64,6 +71,7 @@ export interface ProductListParams {
     limit?: number;
     search?: string;
     category_id?: string;
+    subcategory_id?: string;
     is_active?: boolean;
     sort_by?: 'created_at' | 'price' | 'name' | 'view_count';
     sort_order?: 'asc' | 'desc';

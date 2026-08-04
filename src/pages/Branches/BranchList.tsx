@@ -3,11 +3,16 @@
  * Ant Design table with a create/edit modal, backed by TanStack Query against
  * /api/v1/admin/branches.
  *
- * The form aligns with the hyper-local architecture: Province → District are
- * dependent dropdowns (canonical SL geography), and "Coverage Areas" is a
- * multi-select of Post Offices sourced from the master directory
- * (/admin/locations) for the selected district. Selected post offices are sent
- * as `coverage_post_offices` and the backend syncs PostOfficeBranchMapping.
+ * Province → District are dependent dropdowns describing where the branch
+ * physically IS. They do NOT constrain what it DELIVERS to: "Coverage Areas" is
+ * a multi-select over the entire national Post Office directory
+ * (/admin/locations), because a branch near a district border routinely serves
+ * post offices on the other side of it. The selected district only decides
+ * ordering — its post offices are grouped at the top, with every other district
+ * grouped beneath.
+ *
+ * Selected post offices are sent as `coverage_post_offices: string[]` and the
+ * backend syncs PostOfficeBranchMapping.
  */
 import React, { useState } from 'react';
 import {
@@ -76,11 +81,14 @@ const BranchList: React.FC = () => {
         queryFn: branchesApi.list,
     });
 
-    // Post Offices available for the currently-selected district (master list).
+    // The ENTIRE national Post Office directory — deliberately not filtered by the
+    // branch's district. A branch near a district border routinely delivers across
+    // it, so coverage is a logistics decision, not a consequence of the branch's
+    // own address. The district only decides how the list is *ordered* below.
     const { data: postOffices = [], isFetching: poLoading } = useQuery({
-        queryKey: ['admin', 'locations', districtValue],
-        queryFn: () => locationsApi.list({ district: districtValue, active_only: true }),
-        enabled: modalOpen && !!districtValue,
+        queryKey: ['admin', 'locations', 'all'],
+        queryFn: () => locationsApi.list({ active_only: true }),
+        enabled: modalOpen,
     });
 
     const invalidate = () => {
@@ -148,14 +156,13 @@ const BranchList: React.FC = () => {
         form.resetFields();
     };
 
-    // When province changes the district (and thus coverage) no longer applies.
+    // Province still gates District — a district only exists inside its province.
+    // Coverage is deliberately NOT cleared: post offices are no longer scoped to
+    // the branch's district, so a cross-border selection must survive an edit to
+    // the branch's own address. Wiping it here is what forced admins back into
+    // single-district coverage.
     const onProvinceChange = () => {
-        form.setFieldsValue({ district: undefined, coverage_post_offices: [] });
-    };
-
-    // When district changes, the previous coverage selection is out of scope.
-    const onDistrictChange = () => {
-        form.setFieldsValue({ coverage_post_offices: [] });
+        form.setFieldsValue({ district: undefined });
     };
 
     const handleSubmit = async () => {
@@ -194,10 +201,54 @@ const BranchList: React.FC = () => {
         ...districtsForProvince(provinceValue),
         editing?.district,
     ]).map((d) => ({ label: d, value: d }));
-    const postOfficeOptions = postOffices.map((po) => ({
-        label: po.post_office,
-        value: po.post_office,
-    }));
+    // Coverage options, grouped so the common case is one click away without
+    // hiding the rest of the country:
+    //   1. the branch's own district (the 90% case) pinned to the top, then
+    //   2. "Other Districts" — every remaining post office, for border deliveries.
+    //
+    // Out-of-district entries carry their district in the label ("Panadura ·
+    // Kalutara") so an admin can tell them apart and can search by district name.
+    // The *value* stays the bare post-office name, so the `coverage_post_offices:
+    // string[]` payload is byte-for-byte unchanged.
+    const postOfficeOptions = React.useMemo(() => {
+        if (postOffices.length === 0) return [];
+
+        const inDistrict = districtValue
+            ? postOffices.filter((po) => po.district === districtValue)
+            : [];
+        const others = districtValue
+            ? postOffices.filter((po) => po.district !== districtValue)
+            : postOffices;
+
+        const groups: {
+            label: string;
+            options: { label: string; value: string }[];
+        }[] = [];
+
+        if (inDistrict.length > 0) {
+            groups.push({
+                label: districtValue as string,
+                options: inDistrict.map((po) => ({
+                    label: po.post_office,
+                    value: po.post_office,
+                })),
+            });
+        }
+
+        if (others.length > 0) {
+            groups.push({
+                // With no district chosen there is nothing to contrast against,
+                // so the whole directory is simply one list.
+                label: districtValue ? 'Other Districts' : 'All Post Offices',
+                options: others.map((po) => ({
+                    label: `${po.post_office} · ${po.district}`,
+                    value: po.post_office,
+                })),
+            });
+        }
+
+        return groups;
+    }, [postOffices, districtValue]);
 
     const columns: ColumnsType<Branch> = [
         {
@@ -384,12 +435,13 @@ const BranchList: React.FC = () => {
                     <Form.Item
                         label="City / District"
                         name="district"
-                        extra="Maps to the branch's district."
+                        extra="Where the branch physically sits. It does not limit coverage — it just floats this district's post offices to the top of the list below."
                     >
                         <Select
                             placeholder={provinceValue ? 'Select district' : 'Select a province first'}
                             options={districtOptions}
-                            onChange={onDistrictChange}
+                            // No onChange handler: changing the district now only
+                            // re-groups the coverage list, it never clears it.
                             disabled={!provinceValue}
                             allowClear
                             showSearch
@@ -402,23 +454,29 @@ const BranchList: React.FC = () => {
                         name="coverage_post_offices"
                         extra={
                             districtValue
-                                ? 'Post offices this branch delivers to. Manage the master list in Settings → Delivery Zones.'
-                                : 'Select a district to choose its post offices.'
+                                ? `Post offices this branch delivers to. ${districtValue} is listed first, but you can select from any district — border branches often deliver across one. Manage the master list in Settings → Delivery Zones.`
+                                : 'Post offices this branch delivers to, from anywhere in the country. Pick a district above to float its post offices to the top.'
                         }
                     >
                         <Select
                             mode="multiple"
-                            placeholder={districtValue ? 'Select post offices' : 'Select a district first'}
+                            placeholder="Search and select post offices"
                             options={postOfficeOptions}
-                            disabled={!districtValue}
+                            // Never gated on district: coverage is independent of
+                            // the branch's own address.
                             loading={poLoading}
                             allowClear
                             showSearch
+                            // Searches the label of every option in BOTH groups —
+                            // antd matches within groups, so an out-of-district
+                            // post office is reachable by typing its name (or its
+                            // district, which is part of the label).
                             optionFilterProp="label"
+                            maxTagCount="responsive"
                             notFoundContent={
                                 poLoading
                                     ? 'Loading…'
-                                    : 'No post offices for this district yet — add them in Settings → Delivery Zones.'
+                                    : 'No post offices in the directory yet — add them in Settings → Delivery Zones.'
                             }
                         />
                     </Form.Item>
