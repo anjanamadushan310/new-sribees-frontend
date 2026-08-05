@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Local environment files. Vite inlines every VITE_* value into the client
+# bundle, so nothing secret belongs here either way — but an untracked .env is
+# what stops a real key from being committed the day someone adds one.
+# Copy .env.example instead.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
