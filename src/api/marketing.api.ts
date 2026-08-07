@@ -17,6 +17,12 @@ export interface MarketingProduct {
     discount_percentage: number | null;
     global_discount_percentage: number | null;
     effective_discount: number | null;
+    /** This branch's override (null = inherit). */
+    cashback_percentage: number | null;
+    /** The product-wide rate set by a Super Admin (null = platform default). */
+    global_cashback_percentage: number | null;
+    /** What a customer in this branch actually earns, after the fallback. */
+    effective_cashback: number;
     is_on_sale: boolean;
     is_active: boolean;
     stock_quantity: number;
@@ -41,6 +47,7 @@ export interface MarketingProductListResult {
 export interface MarketingInventoryUpdatePayload {
     // null clears the local override -> falls back to the product's global value.
     discount_percentage?: number | null;
+    cashback_percentage?: number | null;
     is_on_sale?: boolean;
 }
 
@@ -74,6 +81,9 @@ interface ProductListWire {
             discountPercentage: number | null;
             globalDiscountPercentage: number | null;
             effectiveDiscount: number | null;
+            cashbackPercentage: number | null;
+            globalCashbackPercentage: number | null;
+            effectiveCashback: number;
             isOnSale: boolean;
             isActive: boolean;
             stockQuantity: number;
@@ -113,6 +123,9 @@ export const marketingApi = {
                 discount_percentage: p.discountPercentage,
                 global_discount_percentage: p.globalDiscountPercentage,
                 effective_discount: p.effectiveDiscount,
+                cashback_percentage: p.cashbackPercentage,
+                global_cashback_percentage: p.globalCashbackPercentage,
+                effective_cashback: p.effectiveCashback,
                 is_on_sale: p.isOnSale,
                 is_active: p.isActive,
                 stock_quantity: p.stockQuantity,

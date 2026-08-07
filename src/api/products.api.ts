@@ -38,6 +38,11 @@ export interface AdminProduct {
     stock_quantity: number;
     is_active: boolean;
     is_featured: boolean;
+    /**
+     * Global cashback % across all branches. null = platform default rate.
+     * A branch's Marketing Manager can override it per product.
+     */
+    cashback_percentage?: number | null;
     category_id: string | null;
     subcategory_id: string | null;
     category: ProductCategoryRef | null;
@@ -64,6 +69,8 @@ export interface ProductPayload {
     low_stock_threshold?: number;
     is_active?: boolean;
     is_featured?: boolean;
+    /** null clears the product-wide rate, falling back to the platform default. */
+    cashback_percentage?: number | null;
 }
 
 export interface ProductListParams {

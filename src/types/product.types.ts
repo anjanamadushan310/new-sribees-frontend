@@ -76,6 +76,11 @@ export interface Product {
     low_stock_threshold: number;
     is_active: boolean;
     is_featured: boolean;
+    /**
+     * Global cashback % across all branches. null = use the platform rate.
+     * A branch can override this per product from Quick Sale.
+     */
+    cashback_percentage?: number | null;
     has_variants: boolean;
     weight?: number;
     weight_unit?: string;
@@ -103,6 +108,8 @@ export interface ProductFormData {
     low_stock_threshold: number;
     is_active: boolean;
     is_featured: boolean;
+    /** Global cashback % across all branches; null clears it back to the platform rate. */
+    cashback_percentage?: number | null;
     has_variants: boolean;
     weight?: number;
     weight_unit?: string;

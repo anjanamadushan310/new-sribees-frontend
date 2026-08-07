@@ -274,14 +274,13 @@ const AppRouter: React.FC = () => {
                             }
                         />
 
-                        {/* Home Banners — Branch Managers curate their own branch's carousel */}
+                        {/* Home Banners — Marketing Managers curate their branch's carousel */}
                         <Route
                             path="banners"
                             element={
                                 <RoleRoute
                                     allowedRoles={[
                                         AdminRole.SUPER_ADMIN,
-                                        AdminRole.BRANCH_MANAGER,
                                         AdminRole.MARKETING_MANAGER,
                                     ]}
                                 >

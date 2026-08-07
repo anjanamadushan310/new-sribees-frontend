@@ -54,6 +54,7 @@ interface ProductFormValues {
     stock_quantity?: number;
     is_active: boolean;
     is_featured: boolean;
+    cashback_percentage?: number | null;
 }
 
 const ProductForm: React.FC = () => {
@@ -105,6 +106,7 @@ const ProductForm: React.FC = () => {
                 stock_quantity: product.stock_quantity,
                 is_active: product.is_active,
                 is_featured: product.is_featured,
+                cashback_percentage: product.cashback_percentage ?? undefined,
             });
             const loaded: GalleryImage[] = product.images
                 .slice()
@@ -167,6 +169,9 @@ const ProductForm: React.FC = () => {
                 stock_quantity: values.stock_quantity ?? 0,
                 is_active: values.is_active,
                 is_featured: values.is_featured,
+                // Empty means "no product-wide rate" — send null so the server
+                // clears it and the platform rate applies again.
+                cashback_percentage: values.cashback_percentage ?? null,
             };
 
             const saved = isEdit
@@ -360,6 +365,20 @@ const ProductForm: React.FC = () => {
                                     style={{ width: '100%' }}
                                     prefix="Rs"
                                     placeholder="0.00"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Cashback (%)"
+                                name="cashback_percentage"
+                                extra="Applies in every branch. Leave empty to use the platform default rate. A branch's Marketing Manager can override this per product from Quick Sale."
+                            >
+                                <InputNumber
+                                    min={0}
+                                    max={100}
+                                    style={{ width: '100%' }}
+                                    placeholder="Platform default"
+                                    suffix="%"
                                 />
                             </Form.Item>
 

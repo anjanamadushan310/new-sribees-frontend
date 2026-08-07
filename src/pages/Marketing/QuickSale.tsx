@@ -68,11 +68,17 @@ const discountCell = (item: MarketingProduct) => {
     );
 };
 
+interface QuickSaleFormValues {
+    discount_percentage?: number | null;
+    cashback_percentage?: number | null;
+    is_on_sale: boolean;
+}
+
 const QuickSale: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const { isSuperAdmin } = usePermissions();
-    const [form] = Form.useForm<{ discount_percentage?: number | null; is_on_sale: boolean }>();
+    const [form] = Form.useForm<QuickSaleFormValues>();
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -130,6 +136,7 @@ const QuickSale: React.FC = () => {
         setEditing(item);
         form.setFieldsValue({
             discount_percentage: item.discount_percentage,
+            cashback_percentage: item.cashback_percentage,
             is_on_sale: item.is_on_sale,
         });
     };
@@ -140,7 +147,10 @@ const QuickSale: React.FC = () => {
         updateMutation.mutate({
             productId: editing.product_id,
             payload: {
+                // Empty clears this branch's override, so the product-wide
+                // value (and then the platform rate) applies again.
                 discount_percentage: values.discount_percentage ?? null,
+                cashback_percentage: values.cashback_percentage ?? null,
                 is_on_sale: values.is_on_sale,
             },
         });
@@ -170,6 +180,17 @@ const QuickSale: React.FC = () => {
             key: 'discount',
             width: 130,
             render: (_, record) => discountCell(record),
+        },
+        {
+            title: 'Cashback',
+            key: 'cashback',
+            width: 130,
+            render: (_, record) => (
+                <Space size={4}>
+                    <Text strong>{record.effective_cashback}%</Text>
+                    {record.cashback_percentage !== null && <Tag color="gold">Local</Tag>}
+                </Space>
+            ),
         },
         {
             title: 'Quick Sale',
@@ -340,6 +361,23 @@ const QuickSale: React.FC = () => {
                                 extra="Leave empty to inherit the product's global discount."
                             >
                                 <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Branch Cashback (%)"
+                                name="cashback_percentage"
+                                extra={
+                                    editing.global_cashback_percentage !== null
+                                        ? `Leave empty to inherit this product's ${editing.global_cashback_percentage}% cashback.`
+                                        : 'Leave empty to inherit the platform default cashback rate.'
+                                }
+                            >
+                                <InputNumber
+                                    min={0}
+                                    max={100}
+                                    style={{ width: '100%' }}
+                                    placeholder={`Inherited: ${editing.effective_cashback}%`}
+                                />
                             </Form.Item>
 
                             <Form.Item
