@@ -228,14 +228,17 @@ const AppRouter: React.FC = () => {
                             } 
                         />
 
-                        {/* Analytics - Manager and above */}
-                        <Route 
-                            path="analytics" 
+                        {/* Analytics — mirrors the server guard on
+                            /admin/analytics/*: super_admin + branch_manager only.
+                            Any wider list here just lets a role reach a page
+                            whose every request comes back 403. */}
+                        <Route
+                            path="analytics"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER]}>
                                     <Analytics />
                                 </RoleRoute>
-                            } 
+                            }
                         />
                         <Route 
                             path="analytics/watchlist" 

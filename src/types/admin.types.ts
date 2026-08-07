@@ -88,7 +88,9 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
         { resource: 'dashboard', action: 'read' },
         { resource: 'products', action: 'read' },
         { resource: 'customers', action: 'read' },
-        { resource: 'analytics', action: 'read' },
+        // No 'analytics': /admin/analytics/* is server-side restricted to
+        // super_admin and branch_manager. Granting it here only puts an
+        // Analytics item in the sidebar that opens onto a wall of 403s.
         { resource: 'watchlist', action: 'read' },
         { resource: 'marketing', action: '*' },
         { resource: 'banners', action: '*' },
@@ -113,7 +115,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
         { resource: 'categories', action: 'create' },
         { resource: 'categories', action: 'read' },
         { resource: 'categories', action: 'update' },
-        { resource: 'analytics', action: 'read' },
+        // No 'analytics' — same reason as Marketing Manager above. Stock-side
+        // reporting for this role lives under Inventory, not Analytics.
         { resource: 'transfers', action: 'create' },
         { resource: 'transfers', action: 'read' },
         { resource: 'transfers', action: 'update' },

@@ -1,133 +1,90 @@
 /**
  * Dashboard Home (Module 7.1)
- * Branch-scoped, data-driven landing page: KPI cards + 30-day revenue chart.
- * Super Admins get a Branch filter; Branch Managers see only their branch
- * (enforced server-side via inject_branch_filter).
+ *
+ * The landing page: what happened lately, is it better or worse than before,
+ * and is anything on fire. Deliberately narrower than Analytics & Reports —
+ * headline KPIs, the revenue trend, the branch league table, and the two
+ * operational alerts (low stock, orders not moving). Everything else lives one
+ * click away on the report.
+ *
+ * Branch isolation is enforced server-side via `inject_branch_filter`: Super
+ * Admins see the whole network and get a branch filter; every other role
+ * receives only their own branch's rows regardless of what this page asks for.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Alert, Button, Card, Col, Row, Space, Typography } from 'antd';
 import {
-    Row,
-    Col,
-    Card,
-    Statistic,
-    Select,
-    Skeleton,
-    Alert,
-    Space,
-    Typography,
-    Empty,
-} from 'antd';
-import {
+    ArrowRightOutlined,
     DollarOutlined,
     ShoppingCartOutlined,
     TeamOutlined,
     WarningOutlined,
 } from '@ant-design/icons';
-import {
-    AreaChart,
-    Area,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-} from 'recharts';
-import dayjs from 'dayjs';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
+
 import { analyticsApi } from '../../api/analytics.api';
-import type { SalesPoint } from '../../api/analytics.api';
-import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import {
+    AnalyticsFilters,
+    BranchPerformanceTable,
+    KpiCard,
+    RevenueTrendChart,
+} from '../../components/analytics';
+import { apiErrorMessage, mergeSeries } from '../../utils/analytics';
+import { formatLKR, formatNumber, formatPercent } from '../../utils/format';
+import { PRIMARY, SERIES, STATUS } from '../../utils/chartTheme';
 
 const { Title, Text } = Typography;
 
-const formatLKR = (value: number): string =>
-    new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(
-        value ?? 0
-    );
-
-// Compact axis labels: Rs 12k, Rs 1.2M …
-const compactLKR = (value: number): string => {
-    if (value >= 1_000_000) return `Rs ${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `Rs ${Math.round(value / 1_000)}k`;
-    return `Rs ${value}`;
-};
-
-const ChartTooltip: React.FC<any> = ({ active, payload, label }) => {
-    if (!active || !payload || !payload.length) return null;
-    const point = payload[0].payload as SalesPoint;
-    return (
-        <div
-            style={{
-                background: 'rgba(0,0,0,0.8)',
-                color: '#fff',
-                padding: '8px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-            }}
-        >
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                {dayjs(label).format('MMM DD, YYYY')}
-            </div>
-            <div>Revenue: {formatLKR(point.revenue)}</div>
-            <div>Orders: {point.orders}</div>
-        </div>
-    );
-};
+/** Statuses that mean the order is still waiting on someone. */
+const OPEN_STATUSES = new Set(['pending', 'confirmed', 'processing']);
 
 const DashboardHome: React.FC = () => {
     const { isSuperAdmin } = usePermissions();
+    const navigate = useNavigate();
+    const [days, setDays] = useState(30);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
 
-    const { data: branches = [] } = useQuery({
-        queryKey: ['admin', 'branches'],
-        queryFn: branchesApi.list,
-        enabled: isSuperAdmin,
-    });
+    const query = useMemo(() => ({ days, branchId }), [days, branchId]);
+    const key = ['admin', 'analytics', days, branchId ?? 'all'] as const;
 
     const summaryQuery = useQuery({
-        queryKey: ['admin', 'analytics', 'summary', branchId],
-        queryFn: () => analyticsApi.summary(branchId),
+        queryKey: [...key, 'summary'],
+        queryFn: () => analyticsApi.summary(query),
     });
-
     const salesQuery = useQuery({
-        queryKey: ['admin', 'analytics', 'sales', branchId],
-        queryFn: () => analyticsApi.sales(branchId, 30),
+        queryKey: [...key, 'sales'],
+        queryFn: () => analyticsApi.sales(query, true),
+    });
+    const branchesQuery = useQuery({
+        queryKey: ['admin', 'analytics', days, 'branches'],
+        queryFn: () => analyticsApi.branches(days),
+    });
+    const statusQuery = useQuery({
+        queryKey: [...key, 'order-status'],
+        queryFn: () => analyticsApi.orderStatus(query),
     });
 
     const summary = summaryQuery.data;
-    const series = salesQuery.data?.series ?? [];
+    const current = summary?.current;
+    const trendRows = useMemo(
+        () => mergeSeries(salesQuery.data?.series ?? [], salesQuery.data?.previous_series),
+        [salesQuery.data]
+    );
 
-    const kpis = [
-        {
-            title: 'Total Revenue',
-            value: summary?.total_revenue ?? 0,
-            render: (v: number) => formatLKR(v),
-            icon: <DollarOutlined />,
-            color: '#52c41a',
-        },
-        {
-            title: 'Total Orders',
-            value: summary?.total_orders ?? 0,
-            render: (v: number) => v.toLocaleString(),
-            icon: <ShoppingCartOutlined />,
-            color: '#1890ff',
-        },
-        {
-            title: 'Active Customers (30d)',
-            value: summary?.active_customers ?? 0,
-            render: (v: number) => v.toLocaleString(),
-            icon: <TeamOutlined />,
-            color: '#722ed1',
-        },
-        {
-            title: 'Low Stock Alerts',
-            value: summary?.low_stock_alerts ?? 0,
-            render: (v: number) => v.toLocaleString(),
-            icon: <WarningOutlined />,
-            color: '#fa8c16',
-        },
-    ];
+    const openOrders = useMemo(
+        () =>
+            (statusQuery.data?.statuses ?? [])
+                .filter((s) => OPEN_STATUSES.has(s.status))
+                .reduce((sum, s) => sum + s.orders, 0),
+        [statusQuery.data]
+    );
+
+    const firstError = [summaryQuery, salesQuery, branchesQuery, statusQuery].find(
+        (q) => q.isError
+    );
 
     return (
         <div>
@@ -141,98 +98,159 @@ const DashboardHome: React.FC = () => {
                     marginBottom: 20,
                 }}
             >
-                <Title level={3} style={{ margin: 0 }}>
-                    Dashboard
-                </Title>
-                {isSuperAdmin && (
-                    <Space>
-                        <Text type="secondary">Branch:</Text>
-                        <Select
-                            placeholder="All Branches"
-                            style={{ width: 240 }}
-                            allowClear
-                            value={branchId}
-                            onChange={setBranchId}
-                            options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
-                        />
-                    </Space>
-                )}
+                <div>
+                    <Title level={3} style={{ margin: 0 }}>
+                        Dashboard
+                    </Title>
+                    {summary && (
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                            {dayjs(summary.range.start_date).format('MMM D, YYYY')} –{' '}
+                            {dayjs(summary.range.end_date).format('MMM D, YYYY')}
+                            {!summary.scope.is_super_admin && ' · your branch only'}
+                        </Text>
+                    )}
+                </div>
+                <AnalyticsFilters
+                    days={days}
+                    onDaysChange={setDays}
+                    showBranchFilter={isSuperAdmin}
+                    branchId={branchId}
+                    onBranchChange={setBranchId}
+                />
             </div>
 
-            {(summaryQuery.isError || salesQuery.isError) && (
+            {firstError && (
                 <Alert
                     type="error"
                     showIcon
                     style={{ marginBottom: 16 }}
-                    message="Failed to load analytics"
-                    description={
-                        (summaryQuery.error as any)?.response?.data?.detail ||
-                        (salesQuery.error as any)?.response?.data?.detail ||
-                        'Please try again.'
-                    }
+                    message="Failed to load dashboard data"
+                    description={apiErrorMessage(firstError.error)}
                 />
             )}
 
-            {/* KPI Cards */}
+            {/* KPI cards. Each carries its period-over-period delta — a bare
+                number tells you nothing about whether to act on it. */}
             <Row gutter={[16, 16]}>
-                {kpis.map((kpi) => (
-                    <Col xs={24} sm={12} lg={6} key={kpi.title}>
-                        <Card>
-                            {summaryQuery.isLoading ? (
-                                <Skeleton active paragraph={false} title={{ width: '80%' }} />
-                            ) : (
-                                <Statistic
-                                    title={kpi.title}
-                                    value={kpi.value}
-                                    formatter={(v) => kpi.render(Number(v))}
-                                    prefix={<span style={{ color: kpi.color }}>{kpi.icon}</span>}
-                                />
-                            )}
-                        </Card>
-                    </Col>
-                ))}
+                <Col xs={24} sm={12} xl={6}>
+                    <KpiCard
+                        title="Revenue"
+                        value={formatLKR(current?.revenue)}
+                        icon={<DollarOutlined />}
+                        accent={SERIES[5]}
+                        loading={summaryQuery.isLoading}
+                        delta={summary?.deltas.revenue}
+                        deltaCaption={`vs previous ${days} days`}
+                        footnote={`${formatLKR(summary?.total_revenue)} all time`}
+                        hint="Paid orders only, excluding cancelled and refunded ones."
+                    />
+                </Col>
+                <Col xs={24} sm={12} xl={6}>
+                    <KpiCard
+                        title="Orders"
+                        value={formatNumber(current?.orders)}
+                        icon={<ShoppingCartOutlined />}
+                        accent={PRIMARY}
+                        loading={summaryQuery.isLoading}
+                        delta={summary?.deltas.orders}
+                        deltaCaption={`vs previous ${days} days`}
+                        footnote={
+                            statusQuery.data
+                                ? `${formatNumber(openOrders)} still open · ${formatPercent(
+                                      statusQuery.data.fulfilment_rate
+                                  )} delivered`
+                                : undefined
+                        }
+                        hint="Every order placed in the period, whatever its status."
+                    />
+                </Col>
+                <Col xs={24} sm={12} xl={6}>
+                    <KpiCard
+                        title="Active customers"
+                        value={formatNumber(current?.customers)}
+                        icon={<TeamOutlined />}
+                        accent={SERIES[4]}
+                        loading={summaryQuery.isLoading}
+                        delta={summary?.deltas.customers}
+                        deltaCaption={`vs previous ${days} days`}
+                        footnote={`${formatNumber(summary?.new_customers)} first-time`}
+                        hint="Distinct customers who placed at least one order in the period."
+                    />
+                </Col>
+                <Col xs={24} sm={12} xl={6}>
+                    <KpiCard
+                        title="Low stock alerts"
+                        value={formatNumber(summary?.low_stock_alerts)}
+                        icon={<WarningOutlined />}
+                        accent={STATUS.warning}
+                        loading={summaryQuery.isLoading}
+                        footnote="Products at or below their reorder threshold"
+                        hint="Counted live from branch inventory, not over the selected period."
+                    />
+                </Col>
             </Row>
 
-            {/* Revenue chart */}
-            <Card title="Revenue — Last 30 Days" style={{ marginTop: 16 }}>
-                {salesQuery.isLoading ? (
-                    <Skeleton active paragraph={{ rows: 6 }} />
-                ) : series.length === 0 ? (
-                    <Empty description="No sales data for this period" />
-                ) : (
-                    <ResponsiveContainer width="100%" height={340}>
-                        <AreaChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#52c41a" stopOpacity={0.35} />
-                                    <stop offset="95%" stopColor="#52c41a" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis
-                                dataKey="date"
-                                tickFormatter={(d) => dayjs(d).format('MMM DD')}
-                                interval="preserveStartEnd"
-                                minTickGap={28}
-                                tick={{ fontSize: 12 }}
-                            />
-                            <YAxis
-                                tickFormatter={(v) => compactLKR(Number(v))}
-                                width={64}
-                                tick={{ fontSize: 12 }}
-                            />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Area
-                                type="monotone"
-                                dataKey="revenue"
-                                stroke="#52c41a"
-                                strokeWidth={2}
-                                fill="url(#revFill)"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                )}
-            </Card>
+            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                <Col xs={24} xl={16}>
+                    <Card
+                        title={`Revenue — last ${days} days`}
+                        extra={
+                            <Button
+                                type="link"
+                                size="small"
+                                onClick={() => navigate('/analytics')}
+                            >
+                                Full report <ArrowRightOutlined />
+                            </Button>
+                        }
+                    >
+                        <RevenueTrendChart
+                            rows={trendRows}
+                            loading={salesQuery.isLoading}
+                            metric="revenue"
+                            height={320}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={24} xl={8}>
+                    <Card title={`Orders — last ${days} days`}>
+                        {/* Its own plot, not a second axis on the revenue chart:
+                            two scales on one grid imply a correlation the data
+                            never claimed. */}
+                        <RevenueTrendChart
+                            rows={trendRows}
+                            loading={salesQuery.isLoading}
+                            metric="orders"
+                            height={320}
+                        />
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* The whole network at a glance — the reason a Super Admin opens
+                this page rather than a single branch's report. */}
+            <div style={{ marginTop: 16, marginBottom: 8 }}>
+                <BranchPerformanceTable
+                    data={branchesQuery.data?.branches ?? []}
+                    loading={branchesQuery.isLoading}
+                    days={days}
+                    highlightBranchId={branchId}
+                    onSelectBranch={
+                        isSuperAdmin
+                            ? (id) => setBranchId(id === branchId ? undefined : id)
+                            : undefined
+                    }
+                    unassigned={branchesQuery.data?.unassigned ?? null}
+                />
+            </div>
+
+            {isSuperAdmin && (
+                <Space style={{ marginBottom: 8 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                        Click any branch row to scope this page to it.
+                    </Text>
+                </Space>
+            )}
         </div>
     );
 };
