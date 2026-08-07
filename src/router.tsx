@@ -30,6 +30,7 @@ const CategoryList = lazy(() => import('./pages/Categories/CategoryList'));
 
 // Marketing
 const CouponList = lazy(() => import('./pages/Marketing/CouponList'));
+const QuickSale = lazy(() => import('./pages/Marketing/QuickSale'));
 
 // Orders
 const OrderList = lazy(() => import('./pages/Orders/OrderList'));
@@ -258,6 +259,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.MARKETING_MANAGER]}>
                                     <CouponList />
+                                </RoleRoute>
+                            }
+                        />
+
+                        {/* Marketing — Quick Sale (Super Admin + Marketing Manager) */}
+                        <Route
+                            path="quick-sale"
+                            element={
+                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.MARKETING_MANAGER]}>
+                                    <QuickSale />
                                 </RoleRoute>
                             }
                         />

@@ -17,6 +17,7 @@ import {
     TeamOutlined,
     ApartmentOutlined,
     GiftOutlined,
+    ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -101,6 +102,11 @@ const AdminLayout: React.FC = () => {
             key: '/coupons',
             icon: <GiftOutlined />,
             label: 'Coupons',
+        },
+        {
+            key: '/quick-sale',
+            icon: <ThunderboltOutlined />,
+            label: 'Quick Sale',
         },
         {
             key: '/branches',
