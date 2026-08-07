@@ -31,6 +31,7 @@ const CategoryList = lazy(() => import('./pages/Categories/CategoryList'));
 // Marketing
 const CouponList = lazy(() => import('./pages/Marketing/CouponList'));
 const QuickSale = lazy(() => import('./pages/Marketing/QuickSale'));
+const BannerList = lazy(() => import('./pages/Marketing/BannerList'));
 
 // Orders
 const OrderList = lazy(() => import('./pages/Orders/OrderList'));
@@ -269,6 +270,22 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.MARKETING_MANAGER]}>
                                     <QuickSale />
+                                </RoleRoute>
+                            }
+                        />
+
+                        {/* Home Banners — Branch Managers curate their own branch's carousel */}
+                        <Route
+                            path="banners"
+                            element={
+                                <RoleRoute
+                                    allowedRoles={[
+                                        AdminRole.SUPER_ADMIN,
+                                        AdminRole.BRANCH_MANAGER,
+                                        AdminRole.MARKETING_MANAGER,
+                                    ]}
+                                >
+                                    <BannerList />
                                 </RoleRoute>
                             }
                         />

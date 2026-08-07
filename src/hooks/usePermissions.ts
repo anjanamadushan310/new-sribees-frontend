@@ -114,6 +114,7 @@ export const usePermissions = () => {
             '/watchlist': { resource: 'watchlist', action: 'read' },
             '/coupons': { resource: 'marketing', action: 'read' },
             '/quick-sale': { resource: 'marketing', action: 'read' },
+            '/banners': { resource: 'banners', action: 'read' },
             '/users': { resource: 'users', action: 'read' },
             '/branches': { resource: 'branches', action: 'read' },
             '/settings': { resource: 'settings', action: 'read' },

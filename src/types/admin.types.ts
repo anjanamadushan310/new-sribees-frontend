@@ -37,7 +37,10 @@ export type Resource =
     | 'reviews'
     | 'categories'
     | 'transfers'
-    | 'marketing';
+    | 'marketing'
+    // Home-screen banners. Separate from 'marketing' so a Branch Manager can
+    // curate their own carousel without also gaining Coupons and Quick Sale.
+    | 'banners';
 
 // Action types
 export type Action = 'create' | 'read' | 'update' | 'delete' | '*';
@@ -82,6 +85,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
         { resource: 'transfers', action: 'create' },
         { resource: 'transfers', action: 'read' },
         { resource: 'settings', action: 'read' },
+        { resource: 'banners', action: '*' },
     ],
     [AdminRole.MARKETING_MANAGER]: [
         { resource: 'dashboard', action: 'read' },
@@ -90,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
         { resource: 'analytics', action: 'read' },
         { resource: 'watchlist', action: 'read' },
         { resource: 'marketing', action: '*' },
+        { resource: 'banners', action: '*' },
     ],
     [AdminRole.CUSTOMER_SUPPORT]: [
         { resource: 'dashboard', action: 'read' },
