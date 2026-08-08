@@ -49,6 +49,7 @@ const BranchAnalytics = lazy(() => import('./pages/Analytics/BranchAnalytics'));
 // Users & Branches (Super Admin only)
 const AdminUserList = lazy(() => import('./pages/Users/AdminUserList'));
 const BranchList = lazy(() => import('./pages/Branches/BranchList'));
+const PartnerList = lazy(() => import('./pages/Partners/PartnerList'));
 
 // Customers
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
@@ -313,13 +314,23 @@ const AppRouter: React.FC = () => {
                         />
 
                         {/* Branches - Super Admin only */}
-                        <Route 
-                            path="branches" 
+                        <Route
+                            path="branches"
                             element={
                                 <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <BranchList />
                                 </RoleRoute>
-                            } 
+                            }
+                        />
+
+                        {/* Partners - Super Admin only (professional referral team) */}
+                        <Route
+                            path="partners"
+                            element={
+                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <PartnerList />
+                                </RoleRoute>
+                            }
                         />
 
                         {/* Settings */}

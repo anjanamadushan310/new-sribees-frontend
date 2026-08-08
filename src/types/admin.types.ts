@@ -38,7 +38,8 @@ export type Resource =
     | 'categories'
     | 'transfers'
     | 'marketing'
-    | 'banners';
+    | 'banners'
+    | 'partners';
 
 // Action types
 export type Action = 'create' | 'read' | 'update' | 'delete' | '*';

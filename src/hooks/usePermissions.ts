@@ -117,6 +117,7 @@ export const usePermissions = () => {
             '/banners': { resource: 'banners', action: 'read' },
             '/users': { resource: 'users', action: 'read' },
             '/branches': { resource: 'branches', action: 'read' },
+            '/partners': { resource: 'partners', action: 'read' },
             '/settings': { resource: 'settings', action: 'read' },
             '/transfers': { resource: 'transfers', action: 'read' },
         };

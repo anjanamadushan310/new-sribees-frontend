@@ -125,6 +125,11 @@ const AdminLayout: React.FC = () => {
             label: 'Admin Users',
         },
         {
+            key: '/partners',
+            icon: <TeamOutlined />,
+            label: 'Partners',
+        },
+        {
             key: '/settings',
             icon: <SettingOutlined />,
             label: 'Settings',
