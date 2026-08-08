@@ -21,8 +21,9 @@ import {
     Spin,
     App,
     Typography,
+    Space,
 } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
@@ -49,6 +50,7 @@ interface ProductFormValues {
     subcategory_id?: string;
     description?: string;
     short_description?: string;
+    search_keywords?: string;
     price: number;
     compare_at_price?: number;
     stock_quantity?: number;
@@ -101,6 +103,7 @@ const ProductForm: React.FC = () => {
                 subcategory_id: product.subcategory_id ?? undefined,
                 description: product.description ?? undefined,
                 short_description: product.short_description ?? undefined,
+                search_keywords: product.search_keywords ?? undefined,
                 price: product.price,
                 compare_at_price: product.compare_at_price ?? undefined,
                 stock_quantity: product.stock_quantity,
@@ -164,6 +167,7 @@ const ProductForm: React.FC = () => {
                 subcategory_id: values.subcategory_id || null,
                 description: values.description?.trim() || null,
                 short_description: values.short_description?.trim() || null,
+                search_keywords: values.search_keywords?.trim() || null,
                 price: values.price,
                 compare_at_price: values.compare_at_price ?? null,
                 stock_quantity: values.stock_quantity ?? 0,
@@ -191,6 +195,38 @@ const ProductForm: React.FC = () => {
         },
         onError: (err: any) =>
             message.error(err.response?.data?.detail || 'Failed to save product.'),
+    });
+
+    const suggestKeywordsMutation = useMutation({
+        mutationFn: async () => {
+            const values = form.getFieldsValue();
+            if (!values.name?.trim()) {
+                throw new Error('Enter a product name first.');
+            }
+            const categoryName = rootCategories.find(
+                (c) => c.category_id === values.category_id
+            )?.name;
+            return productsApi.suggestKeywords({
+                name: values.name,
+                description: values.description,
+                short_description: values.short_description,
+                category: categoryName,
+            });
+        },
+        onSuccess: (suggested) => {
+            const existing = form.getFieldValue('search_keywords')?.trim();
+            form.setFieldValue(
+                'search_keywords',
+                existing ? `${existing}, ${suggested}` : suggested
+            );
+            message.success('Suggested keywords added — review before saving.');
+        },
+        onError: (err: any) =>
+            message.error(
+                err.response?.data?.detail ||
+                    err.message ||
+                    'Could not get AI keyword suggestions.'
+            ),
     });
 
     if (isEdit && loadingProduct) {
@@ -264,6 +300,29 @@ const ProductForm: React.FC = () => {
 
                             <Form.Item label="Description" name="description">
                                 <TextArea rows={5} placeholder="Full product description" />
+                            </Form.Item>
+
+                            <Form.Item
+                                label={
+                                    <Space>
+                                        Search Keywords
+                                        <Button
+                                            size="small"
+                                            icon={<ThunderboltOutlined />}
+                                            loading={suggestKeywordsMutation.isPending}
+                                            onClick={() => suggestKeywordsMutation.mutate()}
+                                        >
+                                            Suggest with AI
+                                        </Button>
+                                    </Space>
+                                }
+                                name="search_keywords"
+                                extra="Sinhala/Tamil/Singlish/Tamilish alternate names, common misspellings — helps customers find this product however they search. Never shown to customers."
+                            >
+                                <TextArea
+                                    rows={2}
+                                    placeholder="e.g. kesel, කෙසෙල්, வாழைப்பழம், ambul kesel"
+                                />
                             </Form.Item>
                         </Card>
 

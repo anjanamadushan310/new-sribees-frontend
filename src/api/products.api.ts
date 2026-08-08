@@ -32,6 +32,8 @@ export interface AdminProduct {
     slug: string;
     description?: string | null;
     short_description?: string | null;
+    /** Sinhala/Tamil/Singlish alternate names, common misspellings — search only, never displayed. */
+    search_keywords?: string | null;
     sku?: string | null;
     price: number;
     compare_at_price?: number | null;
@@ -58,6 +60,7 @@ export interface ProductPayload {
     slug: string;
     description?: string | null;
     short_description?: string | null;
+    search_keywords?: string | null;
     sku?: string | null;
     price: number;
     compare_at_price?: number | null;
@@ -145,6 +148,27 @@ export const productsApi = {
 
     remove: async (id: string): Promise<void> => {
         await apiClient.delete(`/admin/products/${id}`);
+    },
+
+    /**
+     * AI-assisted search keyword suggestions (Sinhala/Tamil/Singlish/
+     * Tamilish). Takes draft form fields directly, so it works before the
+     * product is saved too. Throws if GEMINI_API_KEY isn't configured.
+     */
+    suggestKeywords: async (payload: {
+        name: string;
+        description?: string | null;
+        short_description?: string | null;
+        category?: string | null;
+    }): Promise<string> => {
+        // Current Gemini flash models "think" before answering, which can
+        // run past the client's default 30s timeout for this prompt shape.
+        const res = await apiClient.post<{ data: { suggested_keywords: string } }>(
+            '/admin/products/suggest-keywords',
+            payload,
+            { timeout: 60000 }
+        );
+        return res.data.data.suggested_keywords;
     },
 
     // --- Images -------------------------------------------------------------
