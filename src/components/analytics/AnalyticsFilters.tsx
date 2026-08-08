@@ -37,12 +37,13 @@ export const AnalyticsFilters: React.FC<Props> = ({
     });
 
     return (
-        <Space wrap size={16}>
+        <Space wrap size={16} data-testid="analytics-filters">
             {showBranchFilter && (
                 <Space size={8}>
                     <Text type="secondary">Branch:</Text>
                     <Select
                         placeholder="All branches"
+                        data-testid="branch-filter"
                         style={{ width: 220 }}
                         allowClear
                         loading={isLoading}
@@ -56,6 +57,7 @@ export const AnalyticsFilters: React.FC<Props> = ({
                 </Space>
             )}
             <Segmented
+                data-testid="period-filter"
                 options={PERIOD_OPTIONS}
                 value={days}
                 onChange={(v) => onDaysChange(Number(v))}

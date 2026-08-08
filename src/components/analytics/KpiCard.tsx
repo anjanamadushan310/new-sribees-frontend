@@ -13,6 +13,9 @@ import type { Delta } from '../../api/analytics.api';
 
 const { Text } = Typography;
 
+/** "Avg order value" -> "avg-order-value" */
+const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 interface DeltaTagProps {
     /** null = no baseline (the previous period was zero), not "0% change". */
     value: Delta;
@@ -25,7 +28,7 @@ interface DeltaTagProps {
 export const DeltaTag: React.FC<DeltaTagProps> = ({ value, inverted = false, caption }) => {
     if (value === null || value === undefined) {
         return (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12 }} data-testid="delta-none">
                 <MinusOutlined /> No prior period to compare
             </Text>
         );
@@ -39,7 +42,7 @@ export const DeltaTag: React.FC<DeltaTagProps> = ({ value, inverted = false, cap
     const Icon = flat ? MinusOutlined : value > 0 ? ArrowUpOutlined : ArrowDownOutlined;
 
     return (
-        <Text style={{ fontSize: 12, color: colour }}>
+        <Text style={{ fontSize: 12, color: colour }} data-testid="delta">
             <Icon /> {Math.abs(value).toFixed(1)}%{' '}
             {caption && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -77,7 +80,9 @@ export const KpiCard: React.FC<KpiCardProps> = ({
     footnote,
     hint,
 }) => (
-    <Card size="small" style={{ height: '100%' }}>
+    // The testid keys off the title, so an E2E assertion names the metric it
+    // means rather than an index that silently shifts when a card is added.
+    <Card size="small" style={{ height: '100%' }} data-testid={`kpi-${slug(title)}`}>
         {loading ? (
             <Skeleton active paragraph={{ rows: 1, width: '60%' }} title={{ width: '80%' }} />
         ) : (

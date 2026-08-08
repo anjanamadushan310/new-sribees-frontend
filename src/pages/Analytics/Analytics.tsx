@@ -242,7 +242,11 @@ const Analytics: React.FC = () => {
             key: 'last_order_at',
             width: 130,
             render: (v: string | null) =>
-                v ? dayjs(v).format('MMM D, YYYY') : <Text type="secondary">—</Text>,
+                // Take the UTC calendar date off the ISO string rather than
+                // letting dayjs shift it into the viewer's zone: the period
+                // header above is a UTC range, and a "last order" dated after
+                // the range ends reads as a bug.
+                v ? dayjs(v.slice(0, 10)).format('MMM D, YYYY') : <Text type="secondary">—</Text>,
         },
     ];
 
@@ -250,7 +254,7 @@ const Analytics: React.FC = () => {
     const statusTotal = statusQuery.data?.total_orders ?? 0;
 
     return (
-        <div>
+        <div data-testid="analytics-page">
             <div
                 style={{
                     display: 'flex',
@@ -406,7 +410,7 @@ const Analytics: React.FC = () => {
 
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 <Col xs={24} xl={10}>
-                    <Card title="Revenue by category">
+                    <Card title="Revenue by category" data-testid="category-mix">
                         {categoriesQuery.isLoading ? (
                             <Skeleton active paragraph={{ rows: 6 }} />
                         ) : categorySlices.length === 0 ? (
@@ -478,6 +482,7 @@ const Analytics: React.FC = () => {
 
                 <Col xs={24} xl={14}>
                     <Card
+                        data-testid="order-fulfilment"
                         title="Order fulfilment"
                         extra={
                             statusQuery.data && (
@@ -571,7 +576,7 @@ const Analytics: React.FC = () => {
 
             <Row gutter={[16, 16]} style={{ marginTop: 16, marginBottom: 8 }}>
                 <Col xs={24} xl={12}>
-                    <Card title="Top selling products">
+                    <Card title="Top selling products" data-testid="top-products">
                         {productsQuery.isLoading ? (
                             <Skeleton active paragraph={{ rows: 6 }} />
                         ) : (productsQuery.data?.length ?? 0) === 0 ? (
@@ -588,7 +593,7 @@ const Analytics: React.FC = () => {
                     </Card>
                 </Col>
                 <Col xs={24} xl={12}>
-                    <Card title="Top customers">
+                    <Card title="Top customers" data-testid="top-customers">
                         {customersQuery.isLoading ? (
                             <Skeleton active paragraph={{ rows: 6 }} />
                         ) : (customersQuery.data?.length ?? 0) === 0 ? (

@@ -87,7 +87,7 @@ const DashboardHome: React.FC = () => {
     );
 
     return (
-        <div>
+        <div data-testid="dashboard-page">
             <div
                 style={{
                     display: 'flex',

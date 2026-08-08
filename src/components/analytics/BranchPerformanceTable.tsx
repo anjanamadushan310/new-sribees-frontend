@@ -77,10 +77,15 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'name',
             key: 'name',
             fixed: 'left',
-            width: 200,
+            width: 170,
             render: (name: string, row) => (
                 <div>
-                    <div style={{ fontWeight: 600 }}>{name}</div>
+                    <div style={{ fontWeight: 600 }}>
+                        {name}
+                        {!row.is_active && (
+                            <Tag style={{ marginLeft: 6 }}>Inactive</Tag>
+                        )}
+                    </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                         {row.code}
                         {row.district ? ` · ${row.district}` : ''}
@@ -93,7 +98,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'revenue',
             key: 'revenue',
             align: 'right',
-            width: 150,
+            width: 130,
             sorter: (a, b) => a.revenue - b.revenue,
             defaultSortOrder: 'descend',
             render: (v: number) => <Text strong>{formatLKR(v)}</Text>,
@@ -102,7 +107,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             title: 'Share',
             dataIndex: 'revenue_share',
             key: 'revenue_share',
-            width: 150,
+            width: 120,
             sorter: (a, b) => a.revenue_share - b.revenue_share,
             render: (v: number) => (
                 <Progress
@@ -117,7 +122,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             title: <Tooltip title={`Revenue vs the previous ${days} days`}>Trend</Tooltip>,
             dataIndex: 'revenue_change',
             key: 'revenue_change',
-            width: 130,
+            width: 110,
             sorter: (a, b) => (a.revenue_change ?? 0) - (b.revenue_change ?? 0),
             render: (_: unknown, row) => <DeltaTag value={row.revenue_change} />,
         },
@@ -126,7 +131,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'orders',
             key: 'orders',
             align: 'right',
-            width: 100,
+            width: 90,
             sorter: (a, b) => a.orders - b.orders,
             render: formatNumber,
         },
@@ -135,16 +140,16 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'avg_order_value',
             key: 'avg_order_value',
             align: 'right',
-            width: 130,
+            width: 115,
             sorter: (a, b) => a.avg_order_value - b.avg_order_value,
             render: (v: number) => formatLKR(v),
         },
         {
-            title: 'Customers',
+            title: <Tooltip title="Distinct customers who ordered in this period">Buyers</Tooltip>,
             dataIndex: 'customers',
             key: 'customers',
             align: 'right',
-            width: 110,
+            width: 90,
             sorter: (a, b) => a.customers - b.customers,
             render: formatNumber,
         },
@@ -153,7 +158,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'items_sold',
             key: 'items_sold',
             align: 'right',
-            width: 110,
+            width: 95,
             sorter: (a, b) => a.items_sold - b.items_sold,
             render: formatNumber,
         },
@@ -162,7 +167,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'units_on_hand',
             key: 'units_on_hand',
             align: 'right',
-            width: 130,
+            width: 105,
             sorter: (a, b) => a.units_on_hand - b.units_on_hand,
             render: (v: number, row) => (
                 <div>
@@ -178,7 +183,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             dataIndex: 'low_stock_alerts',
             key: 'low_stock_alerts',
             align: 'right',
-            width: 110,
+            width: 95,
             sorter: (a, b) => a.low_stock_alerts - b.low_stock_alerts,
             render: (v: number) =>
                 v > 0 ? (
@@ -189,14 +194,6 @@ export const BranchPerformanceTable: React.FC<Props> = ({
                 ) : (
                     <Text type="secondary">—</Text>
                 ),
-        },
-        {
-            title: 'Status',
-            dataIndex: 'is_active',
-            key: 'is_active',
-            width: 100,
-            render: (active: boolean) =>
-                active ? <Tag color="success">Active</Tag> : <Tag>Inactive</Tag>,
         },
     ];
 
@@ -212,6 +209,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
 
     return (
         <Card
+            data-testid="branch-performance"
             title="Branch performance"
             extra={
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -223,7 +221,7 @@ export const BranchPerformanceTable: React.FC<Props> = ({
                 <Empty description="No branches configured yet" />
             ) : (
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} xl={9}>
+                    <Col xs={24} xl={6}>
                         {hasRevenue ? (
                             <ResponsiveContainer width="100%" height={Math.max(220, data.length * 46)}>
                                 <BarChart
@@ -272,15 +270,16 @@ export const BranchPerformanceTable: React.FC<Props> = ({
                             <Empty description="No revenue in this period" />
                         )}
                     </Col>
-                    <Col xs={24} xl={15}>
+                    <Col xs={24} xl={18}>
                         <Table<BranchPerformance>
                             columns={columns}
                             dataSource={data}
                             rowKey="branch_id"
                             size="small"
                             pagination={false}
-                            scroll={{ x: 1200 }}
+                            scroll={{ x: 1000 }}
                             onRow={(row) => ({
+                                'data-testid': `branch-row-${row.code}`,
                                 onClick: () => onSelectBranch?.(row.branch_id),
                                 style: onSelectBranch ? { cursor: 'pointer' } : undefined,
                             })}
