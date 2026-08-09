@@ -1,33 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Tabs, Form, Input, Button, message } from 'antd';
 import type { TabsProps } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
+import { authApi } from '../../api/auth.api';
+import { apiErrorMessage } from '../../utils/analytics';
 import DeliveryZones from './DeliveryZones';
 
 const Settings: React.FC = () => {
     const [profileForm] = Form.useForm();
     const [passwordForm] = Form.useForm();
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [savingPassword, setSavingPassword] = useState(false);
     const user = useAuthStore((s) => s.user);
+    const updateUser = useAuthStore((s) => s.updateUser);
     const isSuperAdmin = user?.role === AdminRole.SUPER_ADMIN;
 
-    const handleProfileUpdate = async (_values: any) => {
+    const handleProfileUpdate = async (values: { name: string }) => {
+        setSavingProfile(true);
         try {
-            // TODO: replace with real API call to update profile
+            const updated = await authApi.updateProfile(values.name.trim());
+            updateUser(updated);
             message.success('Profile updated successfully');
         } catch (error) {
-            message.error('Failed to update profile');
+            message.error(apiErrorMessage(error));
+        } finally {
+            setSavingProfile(false);
         }
     };
 
-    const handlePasswordChange = async (_values: any) => {
+    const handlePasswordChange = async (values: { currentPassword: string; newPassword: string }) => {
+        setSavingPassword(true);
         try {
-            // TODO: replace with real API call to change password
-            message.success('Password changed successfully');
+            await authApi.changePassword(values.currentPassword, values.newPassword);
+            message.success('Password changed successfully — other sessions have been signed out');
             passwordForm.resetFields();
         } catch (error) {
-            message.error('Failed to change password');
+            message.error(apiErrorMessage(error));
+        } finally {
+            setSavingPassword(false);
         }
     };
 
@@ -43,7 +55,6 @@ const Settings: React.FC = () => {
                     initialValues={{
                         name: user?.full_name ?? 'Admin User',
                         email: user?.email ?? '',
-                        phone: '',
                     }}
                     style={{ maxWidth: 600 }}
                 >
@@ -66,12 +77,8 @@ const Settings: React.FC = () => {
                         <Input prefix={<UserOutlined />} placeholder="Email" disabled />
                     </Form.Item>
 
-                    <Form.Item label="Phone" name="phone">
-                        <Input placeholder="Phone Number" />
-                    </Form.Item>
-
                     <Form.Item>
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" loading={savingProfile}>
                             Update Profile
                         </Button>
                     </Form.Item>
@@ -127,7 +134,7 @@ const Settings: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item>
-                        <Button type="primary" htmlType="submit">
+                        <Button type="primary" htmlType="submit" loading={savingPassword}>
                             Change Password
                         </Button>
                     </Form.Item>

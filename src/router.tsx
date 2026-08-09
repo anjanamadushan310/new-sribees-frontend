@@ -18,7 +18,8 @@ import Login from './pages/Auth/Login';
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard/index.page'));
 const DashboardHome = lazy(() => import('./pages/Dashboard/DashboardHome'));
-const ManagerDashboard = lazy(() => import('./pages/Dashboard/ManagerDashboard'));
+const MarketingDashboard = lazy(() => import('./pages/Dashboard/MarketingDashboard'));
+const InventoryDashboard = lazy(() => import('./pages/Dashboard/InventoryDashboard'));
 const StaffDashboard = lazy(() => import('./pages/Dashboard/StaffDashboard'));
 
 // Products
@@ -131,9 +132,9 @@ const DashboardRouter: React.FC = () => {
         case AdminRole.BRANCH_MANAGER:
             return <DashboardHome />;
         case AdminRole.MARKETING_MANAGER:
-            return <ManagerDashboard />;
+            return <MarketingDashboard />;
         case AdminRole.INVENTORY_MANAGER:
-            return <ManagerDashboard />;
+            return <InventoryDashboard />;
         case AdminRole.CUSTOMER_SUPPORT:
             return <StaffDashboard />;
         default:

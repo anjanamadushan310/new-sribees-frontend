@@ -92,4 +92,18 @@ export const authApi = {
             // Session may already be gone; nothing to do.
         }
     },
+
+    updateProfile: async (fullName: string): Promise<AdminUser> => {
+        const response = await apiClient.put<AdminProfileWire>('/admin/auth/profile', {
+            full_name: fullName,
+        });
+        return mapAdminWire(response.data.admin);
+    },
+
+    changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+        await apiClient.post('/admin/auth/change-password', {
+            current_password: currentPassword,
+            new_password: newPassword,
+        });
+    },
 };

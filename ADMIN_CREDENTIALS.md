@@ -22,9 +22,9 @@ One account per role, plus a manager for each of the five seeded branches.
 | `manager.galle@sribeesonline.lk` | Branch Manager | Galle Fort (GLE) |
 | `manager.negombo@sribeesonline.lk` | Branch Manager | Negombo Beach (NGB) |
 | `manager.kurunegala@sribeesonline.lk` | Branch Manager | Kurunegala Hub (KUR) |
-| `marketing@sribeesonline.lk` | Marketing Manager | Network-wide |
-| `inventory@sribeesonline.lk` | Inventory Manager | Network-wide |
-| `support@sribeesonline.lk` | Customer Support | Network-wide |
+| `marketing@sribeesonline.lk` | Marketing Manager | Colombo Main (CMB) |
+| `inventory@sribeesonline.lk` | Inventory Manager | Colombo Main (CMB) |
+| `support@sribeesonline.lk` | Customer Support | Negombo Beach (NGB) — the only branches with live order volume are NGB and KUR |
 
 A Branch Manager is always assigned a branch. The server rejects a scoped admin
 with no branch, so such an account could sign in and then fail on every
