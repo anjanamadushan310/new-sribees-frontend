@@ -100,6 +100,12 @@ jobs:
           APP_ENV: development
           DEBUG: 'true'
           SECRET_KEY: e2e-only-not-a-real-secret
+          # settings.py defaults media_root to /app/media, which only exists
+          # inside the Docker image (WORKDIR /app). Running uvicorn directly
+          # on the runner from ./backend, that path doesn't exist and isn't
+          # creatable (root-owned), so startup fails before /health ever
+          # responds. Point it at a directory this job can actually create.
+          MEDIA_ROOT: ./media
         run: |
           # On boot the app runs SQLAlchemy create_all(), which creates the
           # tables the SQL migrations then ALTER and populate. Same order as
