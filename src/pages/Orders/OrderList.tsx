@@ -1,6 +1,10 @@
 /**
  * Order Management (Module 7.3)
- * Branch-scoped order list with status + (super-admin) branch filters.
+ * Branch-scoped order list with status + branch filters. Branch isolation
+ * happens server-side: Branch Manager sees only their own branch; Super
+ * Admin and Customer Support are unscoped (a support agent has to be able
+ * to look up any customer's order, not just the branch they're listed
+ * under) and get the branch column + filter to tell orders apart.
  * Row click / View opens the OrderDetails drawer. TanStack Query against
  * /api/v1/admin/orders.
  */
@@ -16,7 +20,7 @@ import {
     ORDER_STATUSES,
 } from '../../api/orders.api';
 import type { OrderListItem, OrderStatus } from '../../api/orders.api';
-import { branchesApi } from '../../api/branches.api';
+import { transfersApi } from '../../api/transfers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import OrderDetails, { statusTag } from './OrderDetails';
 
@@ -27,7 +31,8 @@ const formatLKR = (value: number): string =>
 
 const OrderList: React.FC = () => {
     const { message } = App.useApp();
-    const { isSuperAdmin } = usePermissions();
+    const { isSuperAdmin, isSupport } = usePermissions();
+    const isNetworkWide = isSuperAdmin || isSupport;
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -38,9 +43,9 @@ const OrderList: React.FC = () => {
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     const { data: branches = [] } = useQuery({
-        queryKey: ['admin', 'branches'],
-        queryFn: branchesApi.list,
-        enabled: isSuperAdmin,
+        queryKey: ['admin', 'transfers', 'branches'],
+        queryFn: transfersApi.branches,
+        enabled: isNetworkWide,
     });
 
     const { data, isLoading, isError, error } = useQuery({
@@ -60,7 +65,10 @@ const OrderList: React.FC = () => {
         message.error((error as any)?.response?.data?.detail || 'Failed to load orders.');
     }
 
-    const showBranchColumn = data?.scope.is_super_admin ?? isSuperAdmin;
+    // The API's `scope.is_super_admin` only reflects the literal role, but
+    // Customer Support is unscoped too (see admin_orders.py) — derive this
+    // from the permission model, not that one flag.
+    const showBranchColumn = isNetworkWide;
 
     const openDrawer = (id: string) => {
         setOpenOrderId(id);

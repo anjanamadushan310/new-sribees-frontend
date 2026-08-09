@@ -1,10 +1,11 @@
 /**
  * Staff Dashboard — Customer Support view.
  *
- * A working queue for the branch's live orders. Every number and row here
- * comes from /api/v1/admin/orders, which is branch-scoped on the server —
- * a Customer Support admin only ever sees their own branch's orders, so no
- * branch filtering happens client-side.
+ * A working queue for every branch's live orders. Customer Support is
+ * unscoped on the server (see admin_orders.py / inject_branch_filter) — a
+ * support agent has to be able to help with any customer's order, not just
+ * the branch they're nominally listed under — so this shows the whole
+ * network, with each order tagged by branch.
  */
 import React, { useMemo, useState } from 'react';
 import { Card, Row, Col, Statistic, List, Spin, Alert, Tag, Space, Typography, Badge, Button, Empty, Segmented, App } from 'antd';
@@ -16,6 +17,7 @@ import {
     UserOutlined,
     ArrowRightOutlined,
     EyeOutlined,
+    ShopOutlined,
 } from '@ant-design/icons';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
@@ -148,8 +150,7 @@ const StaffDashboard: React.FC = () => {
                     Welcome, {user?.full_name?.split(' ')[0] || 'Staff'}! 👋
                 </Title>
                 <Text type="secondary">
-                    {user?.branch_name ? `${user.branch_name} • ` : ''}
-                    {dayjs().format('dddd, MMMM D')}
+                    All Branches • {dayjs().format('dddd, MMMM D')}
                 </Text>
             </div>
 
@@ -226,6 +227,11 @@ const StaffDashboard: React.FC = () => {
                                                     </Text>
                                                     <Tag color={meta.color}>{meta.label}</Tag>
                                                 </Space>
+                                                {order.branch_name && (
+                                                    <Tag icon={<ShopOutlined />} color="default">
+                                                        {order.branch_name}
+                                                    </Tag>
+                                                )}
                                                 <Text type="secondary">
                                                     {order.created_at ? dayjs(order.created_at).fromNow() : '—'} ·{' '}
                                                     {order.item_count} items
