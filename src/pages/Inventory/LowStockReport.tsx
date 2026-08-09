@@ -1,223 +1,150 @@
 /**
- * Low Stock Report Page
- * Shows comprehensive low stock report across branches
+ * Low Stock Report Page (Module 7.5a)
+ *
+ * Every row comes from /api/v1/admin/inventory?low_stock_only=true, which is
+ * branch-scoped on the server — a Branch/Inventory Manager only ever sees
+ * their own branch's alerts, a Super Admin sees the network and can narrow
+ * with the branch filter. "Request Transfer" creates a real pending
+ * /api/v1/admin/transfers row (see StockTransfers.tsx for the approve →
+ * ship → complete lifecycle).
  */
-
-import React, { useEffect, useState } from 'react';
-import { 
-    Card, 
-    Row, 
-    Col, 
-    Statistic, 
-    Table, 
-    Spin, 
-    Alert, 
-    Select, 
-    Tag, 
-    Progress, 
-    Space, 
+import React, { useMemo, useState } from 'react';
+import {
+    Card,
+    Row,
+    Col,
+    Statistic,
+    Table,
+    Alert,
+    Select,
+    Tag,
+    Progress,
+    Space,
     Typography,
     Button,
     Input,
     Modal,
     Form,
-    message,
+    InputNumber,
+    App,
 } from 'antd';
 import {
     WarningOutlined,
     ExclamationCircleOutlined,
     ShopOutlined,
-    InboxOutlined,
     SendOutlined,
     ReloadOutlined,
-    DownloadOutlined,
 } from '@ant-design/icons';
-import { useAuthStore } from '../../store/authStore';
-import { useBranchStore } from '../../store/branchStore';
-import { AdminRole } from '../../types/admin.types';
-import type { LowStockAlert } from '../../types/branch.types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePermissions } from '../../hooks/usePermissions';
+import { inventoryApi } from '../../api/inventory.api';
+import type { InventoryItem } from '../../api/inventory.api';
+import { transfersApi } from '../../api/transfers.api';
+import { apiErrorMessage } from '../../utils/analytics';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
 
+type Severity = 'critical' | 'warning';
+
+/** <=25% of threshold is a "we might run out today" alert; the rest is "reorder soon". */
+const severityOf = (item: InventoryItem): Severity =>
+    item.stock_quantity === 0 || item.stock_quantity / Math.max(item.low_stock_threshold, 1) <= 0.25
+        ? 'critical'
+        : 'warning';
+
+const SEVERITY_CONFIG: Record<Severity, { color: string; icon: React.ReactNode; label: string }> = {
+    critical: { color: '#ff4d4f', icon: <ExclamationCircleOutlined />, label: 'Critical' },
+    warning: { color: '#faad14', icon: <WarningOutlined />, label: 'Warning' },
+};
+
 const LowStockReportPage: React.FC = () => {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedBranch, setSelectedBranch] = useState<string>('all');
-    const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const { isSuperAdmin } = usePermissions();
+
+    const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
+    const [selectedSeverity, setSelectedSeverity] = useState<Severity | 'all'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-    const [selectedAlert, setSelectedAlert] = useState<LowStockAlert | null>(null);
-
-    const [alerts, setAlerts] = useState<LowStockAlert[]>([]);
-    const [stats, setStats] = useState({
-        critical: 0,
-        warning: 0,
-        total: 0,
-    });
-
-    const user = useAuthStore((state) => state.user);
-    const { branches } = useBranchStore();
-    const isSuperAdmin = user?.role === AdminRole.SUPER_ADMIN;
-
+    const [selectedAlert, setSelectedAlert] = useState<InventoryItem | null>(null);
     const [transferForm] = Form.useForm();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Mock data - in production, fetch from API
-            const mockAlerts: LowStockAlert[] = [
-                {
-                    inventory_id: '1',
-                    branch_id: '44444444-4444-4444-4444-444444444444',
-                    branch_name: 'Colombo Central',
-                    product_id: 'p1',
-                    product_name: 'Organic Ceylon Tea 500g',
-                    product_sku: 'TEA-500G-01',
-                    variant_name: 'Premium Blend',
-                    current_stock: 3,
-                    threshold: 20,
-                    severity: 'critical',
-                },
-                {
-                    inventory_id: '2',
-                    branch_id: '44444444-4444-4444-4444-444444444444',
-                    branch_name: 'Colombo Central',
-                    product_id: 'p2',
-                    product_name: 'Fresh Coconut Oil 1L',
-                    product_sku: 'OIL-1L-02',
-                    variant_name: 'Extra Virgin',
-                    current_stock: 5,
-                    threshold: 25,
-                    severity: 'critical',
-                },
-                {
-                    inventory_id: '3',
-                    branch_id: '55555555-5555-5555-5555-555555555555',
-                    branch_name: 'Kandy City',
-                    product_id: 'p3',
-                    product_name: 'Basmati Rice 5kg',
-                    product_sku: 'RICE-5KG-03',
-                    variant_name: 'Long Grain',
-                    current_stock: 8,
-                    threshold: 30,
-                    severity: 'warning',
-                },
-                {
-                    inventory_id: '4',
-                    branch_id: '55555555-5555-5555-5555-555555555555',
-                    branch_name: 'Kandy City',
-                    product_id: 'p4',
-                    product_name: 'Cinnamon Sticks Premium',
-                    product_sku: 'CINN-100G-04',
-                    variant_name: '100g Pack',
-                    current_stock: 12,
-                    threshold: 25,
-                    severity: 'warning',
-                },
-                {
-                    inventory_id: '5',
-                    branch_id: '66666666-6666-6666-6666-666666666666',
-                    branch_name: 'Galle Fort',
-                    product_id: 'p5',
-                    product_name: 'Cardamom Pods',
-                    product_sku: 'CARD-50G-05',
-                    variant_name: '50g Premium',
-                    current_stock: 15,
-                    threshold: 20,
-                    severity: 'warning',
-                },
-                {
-                    inventory_id: '6',
-                    branch_id: '44444444-4444-4444-4444-444444444444',
-                    branch_name: 'Colombo Central',
-                    product_id: 'p6',
-                    product_name: 'Mango Chutney 350g',
-                    product_sku: 'CHUT-350G-06',
-                    variant_name: 'Spicy',
-                    current_stock: 18,
-                    threshold: 25,
-                    severity: 'warning',
-                },
-            ];
-
-            setAlerts(mockAlerts);
-
-            // Calculate stats
-            const critical = mockAlerts.filter(a => a.severity === 'critical').length;
-            const warning = mockAlerts.filter(a => a.severity === 'warning').length;
-            setStats({ critical, warning, total: mockAlerts.length });
-
-        } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to load low stock data';
-            console.error('Low stock error:', err);
-            setError(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const getSeverityConfig = (severity: LowStockAlert['severity']) => {
-        switch (severity) {
-            case 'critical':
-                return { color: '#ff4d4f', icon: <ExclamationCircleOutlined />, label: 'Critical' };
-            case 'warning':
-                return { color: '#faad14', icon: <WarningOutlined />, label: 'Warning' };
-            default:
-                return { color: '#1890ff', icon: <InboxOutlined />, label: 'Low' };
-        }
-    };
-
-    // Filter alerts
-    const filteredAlerts = alerts.filter(alert => {
-        const matchesBranch = selectedBranch === 'all' || alert.branch_id === selectedBranch;
-        const matchesSeverity = selectedSeverity === 'all' || alert.severity === selectedSeverity;
-        const matchesSearch = searchQuery === '' || 
-            alert.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            alert.variant_name?.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesBranch && matchesSeverity && matchesSearch;
+    // Unrestricted list (id/name/code only) so a Branch/Inventory Manager
+    // can pick a source branch too, not just Super Admin — /admin/branches
+    // itself is Super Admin only.
+    const { data: branches = [] } = useQuery({
+        queryKey: ['admin', 'transfers', 'branches'],
+        queryFn: transfersApi.branches,
     });
 
-    // Handle transfer request
-    const handleRequestTransfer = (alert: LowStockAlert) => {
+    const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
+        queryKey: ['admin', 'inventory', 'low-stock-report', selectedBranch],
+        queryFn: () =>
+            inventoryApi.list({
+                low_stock_only: true,
+                limit: 100,
+                branch_id: isSuperAdmin ? selectedBranch : undefined,
+            }),
+    });
+    const alerts = useMemo(() => data?.items ?? [], [data]);
+
+    const filteredAlerts = useMemo(
+        () =>
+            alerts.filter((item) => {
+                const severity = severityOf(item);
+                if (selectedSeverity !== 'all' && severity !== selectedSeverity) return false;
+                if (searchQuery && !item.product_name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                return true;
+            }),
+        [alerts, selectedSeverity, searchQuery]
+    );
+
+    const stats = useMemo(() => {
+        const critical = alerts.filter((a) => severityOf(a) === 'critical').length;
+        return { total: alerts.length, critical, warning: alerts.length - critical };
+    }, [alerts]);
+
+    const createTransfer = useMutation({
+        mutationFn: transfersApi.create,
+        onSuccess: () => {
+            message.success('Stock transfer request submitted');
+            setIsTransferModalOpen(false);
+            transferForm.resetFields();
+            queryClient.invalidateQueries({ queryKey: ['admin', 'transfers'] });
+        },
+        onError: (err) => message.error(apiErrorMessage(err)),
+    });
+
+    const handleRequestTransfer = (alert: InventoryItem) => {
         setSelectedAlert(alert);
         transferForm.setFieldsValue({
-            product: `${alert.product_name} (${alert.variant_name})`,
-            fromBranch: '',
-            quantity: alert.threshold - alert.current_stock,
+            product: alert.product_name,
+            from_branch_id: undefined,
+            quantity: Math.max(alert.low_stock_threshold - alert.stock_quantity, 1),
         });
         setIsTransferModalOpen(true);
     };
 
     const handleSubmitTransfer = () => {
         transferForm.validateFields().then((values) => {
-            console.log('Transfer request:', values);
-            message.success('Stock transfer request submitted');
-            setIsTransferModalOpen(false);
-            transferForm.resetFields();
+            if (!selectedAlert) return;
+            createTransfer.mutate({
+                from_branch_id: values.from_branch_id,
+                to_branch_id: selectedAlert.branch_id,
+                product_id: selectedAlert.product_id,
+                quantity: values.quantity,
+            });
         });
     };
 
-    // Table columns
     const columns = [
         {
             title: 'Severity',
             key: 'severity',
             width: 100,
-            filters: [
-                { text: 'Critical', value: 'critical' },
-                { text: 'Warning', value: 'warning' },
-                { text: 'Low', value: 'low' },
-            ],
-            onFilter: (value: React.Key | boolean, record: LowStockAlert) => record.severity === value,
-            render: (_: unknown, record: LowStockAlert) => {
-                const config = getSeverityConfig(record.severity);
+            render: (_: unknown, record: InventoryItem) => {
+                const config = SEVERITY_CONFIG[severityOf(record)];
                 return (
                     <Tag color={config.color} icon={config.icon}>
                         {config.label}
@@ -228,46 +155,44 @@ const LowStockReportPage: React.FC = () => {
         {
             title: 'Product',
             key: 'product',
-            render: (record: LowStockAlert) => (
-                <Space orientation="vertical" size={0}>
+            render: (record: InventoryItem) => (
+                <Space direction="vertical" size={0}>
                     <Text strong>{record.product_name}</Text>
-                    {record.variant_name && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>{record.variant_name}</Text>
-                    )}
+                    {record.sku && <Text type="secondary" style={{ fontSize: 12 }}>{record.sku}</Text>}
                 </Space>
             ),
         },
-        {
-            title: 'Branch',
-            dataIndex: 'branch_name',
-            key: 'branch_name',
-            filters: branches.map(b => ({ text: b.name, value: b.branch_id })),
-            onFilter: (value: React.Key | boolean, record: LowStockAlert) => record.branch_id === value,
-            render: (name: string) => (
-                <Space>
-                    <ShopOutlined />
-                    {name}
-                </Space>
-            ),
-        },
+        ...(isSuperAdmin
+            ? [
+                  {
+                      title: 'Branch',
+                      dataIndex: 'branch_name',
+                      key: 'branch_name',
+                      render: (name: string) => (
+                          <Space>
+                              <ShopOutlined />
+                              {name}
+                          </Space>
+                      ),
+                  },
+              ]
+            : []),
         {
             title: 'Stock Level',
             key: 'stock',
-            sorter: (a: LowStockAlert, b: LowStockAlert) => 
-                (a.current_stock / a.threshold) - (b.current_stock / b.threshold),
-            render: (record: LowStockAlert) => {
-                const percentage = Math.round((record.current_stock / record.threshold) * 100);
+            render: (record: InventoryItem) => {
+                const percentage = Math.round((record.stock_quantity / Math.max(record.low_stock_threshold, 1)) * 100);
                 return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Progress 
+                        <Progress
                             percent={percentage}
                             size="small"
-                            status={percentage <= 25 ? 'exception' : percentage <= 50 ? 'normal' : 'success'}
+                            status={percentage <= 25 ? 'exception' : 'normal'}
                             style={{ width: 100 }}
                             format={() => ''}
                         />
-                        <Text strong>{record.current_stock}</Text>
-                        <Text type="secondary">/ {record.threshold}</Text>
+                        <Text strong>{record.stock_quantity}</Text>
+                        <Text type="secondary">/ {record.low_stock_threshold}</Text>
                     </div>
                 );
             },
@@ -276,42 +201,24 @@ const LowStockReportPage: React.FC = () => {
             title: 'Needed',
             key: 'needed',
             width: 100,
-            render: (record: LowStockAlert) => (
-                <Tag color="red">
-                    +{record.threshold - record.current_stock}
-                </Tag>
+            render: (record: InventoryItem) => (
+                <Tag color="red">+{Math.max(record.low_stock_threshold - record.stock_quantity, 0)}</Tag>
             ),
         },
         {
             title: 'Actions',
             key: 'actions',
             width: 150,
-            render: (record: LowStockAlert) => (
-                <Space>
-                    <Button 
-                        type="primary" 
-                        size="small" 
-                        icon={<SendOutlined />}
-                        onClick={() => handleRequestTransfer(record)}
-                    >
-                        Transfer
-                    </Button>
-                </Space>
+            render: (record: InventoryItem) => (
+                <Button type="primary" size="small" icon={<SendOutlined />} onClick={() => handleRequestTransfer(record)}>
+                    Transfer
+                </Button>
             ),
         },
     ];
 
-    if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-                <Spin size="large" tip="Loading low stock report..." />
-            </div>
-        );
-    }
-
     return (
         <div style={{ padding: '24px' }}>
-            {/* Header */}
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                 <div>
                     <Title level={2} style={{ margin: 0 }}>
@@ -322,54 +229,33 @@ const LowStockReportPage: React.FC = () => {
                     </Title>
                     <Text type="secondary">Monitor and manage inventory levels across branches</Text>
                 </div>
-                <Space wrap>
-                    <Button icon={<ReloadOutlined />} onClick={fetchData}>
-                        Refresh
-                    </Button>
-                    <Button icon={<DownloadOutlined />}>
-                        Export
-                    </Button>
-                </Space>
+                <Button icon={<ReloadOutlined />} onClick={() => refetch()} loading={isRefetching}>
+                    Refresh
+                </Button>
             </div>
 
-            {error && (
-                <Alert message={error} type="warning" showIcon closable style={{ marginBottom: '24px' }} />
+            {isError && (
+                <Alert message={apiErrorMessage(error)} type="error" showIcon closable style={{ marginBottom: '24px' }} />
             )}
 
-            {/* Stats Cards */}
             <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 <Col xs={12} sm={6}>
                     <Card>
-                        <Statistic
-                            title="Total Alerts"
-                            value={stats.total}
-                            prefix={<WarningOutlined style={{ color: '#8c8c8c' }} />}
-                        />
+                        <Statistic title="Total Alerts" value={stats.total} loading={isLoading} prefix={<WarningOutlined style={{ color: '#8c8c8c' }} />} />
                     </Card>
                 </Col>
                 <Col xs={12} sm={6}>
                     <Card style={{ borderLeft: '4px solid #ff4d4f' }}>
-                        <Statistic
-                            title="Critical"
-                            value={stats.critical}
-                            valueStyle={{ color: '#ff4d4f' }}
-                            prefix={<ExclamationCircleOutlined />}
-                        />
+                        <Statistic title="Critical" value={stats.critical} loading={isLoading} styles={{ content: { color: '#ff4d4f' } }} prefix={<ExclamationCircleOutlined />} />
                     </Card>
                 </Col>
                 <Col xs={12} sm={8}>
                     <Card style={{ borderLeft: '4px solid #faad14' }}>
-                        <Statistic
-                            title="Warning"
-                            value={stats.warning}
-                            valueStyle={{ color: '#faad14' }}
-                            prefix={<WarningOutlined />}
-                        />
+                        <Statistic title="Warning" value={stats.warning} loading={isLoading} styles={{ content: { color: '#faad14' } }} prefix={<WarningOutlined />} />
                     </Card>
                 </Col>
             </Row>
 
-            {/* Filters */}
             <Card style={{ marginBottom: '24px' }}>
                 <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
                     <Space wrap>
@@ -382,28 +268,24 @@ const LowStockReportPage: React.FC = () => {
                         />
                         {isSuperAdmin && (
                             <Select
+                                placeholder="All branches"
                                 value={selectedBranch}
                                 onChange={setSelectedBranch}
                                 style={{ width: 180 }}
-                            >
-                                <Select.Option value="all">All Branches</Select.Option>
-                                {branches.map((branch) => (
-                                    <Select.Option key={branch.branch_id} value={branch.branch_id}>
-                                        {branch.name}
-                                    </Select.Option>
-                                ))}
-                            </Select>
+                                allowClear
+                                options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                            />
                         )}
                         <Select
                             value={selectedSeverity}
                             onChange={setSelectedSeverity}
                             style={{ width: 150 }}
-                        >
-                            <Select.Option value="all">All Severity</Select.Option>
-                            <Select.Option value="critical">Critical</Select.Option>
-                            <Select.Option value="warning">Warning</Select.Option>
-                            <Select.Option value="low">Low</Select.Option>
-                        </Select>
+                            options={[
+                                { label: 'All Severity', value: 'all' },
+                                { label: 'Critical', value: 'critical' },
+                                { label: 'Warning', value: 'warning' },
+                            ]}
+                        />
                     </Space>
                     <Text type="secondary">
                         Showing {filteredAlerts.length} of {alerts.length} alerts
@@ -411,20 +293,16 @@ const LowStockReportPage: React.FC = () => {
                 </Space>
             </Card>
 
-            {/* Alerts Table */}
             <Card>
                 <Table
                     dataSource={filteredAlerts}
                     columns={columns}
-                    rowKey="id"
+                    rowKey="inventory_id"
+                    loading={isLoading}
                     pagination={{ pageSize: 20 }}
-                    rowClassName={(record) => 
-                        record.severity === 'critical' ? 'ant-table-row-danger' : ''
-                    }
                 />
             </Card>
 
-            {/* Transfer Request Modal */}
             <Modal
                 title={
                     <Space>
@@ -434,6 +312,7 @@ const LowStockReportPage: React.FC = () => {
                 }
                 open={isTransferModalOpen}
                 onOk={handleSubmitTransfer}
+                confirmLoading={createTransfer.isPending}
                 onCancel={() => setIsTransferModalOpen(false)}
                 okText="Submit Request"
             >
@@ -442,29 +321,24 @@ const LowStockReportPage: React.FC = () => {
                         <Input disabled />
                     </Form.Item>
                     <Form.Item
-                        name="fromBranch"
+                        name="from_branch_id"
                         label="Transfer From"
-                        rules={[{ required: true, message: 'Select source branch' }]}
+                        rules={[{ required: true, message: 'Select the source branch' }]}
+                        extra={selectedAlert ? `Receiving into ${selectedAlert.branch_name}` : undefined}
                     >
-                        <Select placeholder="Select source branch">
-                            {branches
-                                .filter(b => b.branch_id !== selectedAlert?.branch_id)
-                                .map((branch) => (
-                                    <Select.Option key={branch.branch_id} value={branch.branch_id}>
-                                        {branch.name}
-                                    </Select.Option>
-                                ))}
-                        </Select>
+                        <Select
+                            placeholder="Select source branch"
+                            options={branches
+                                .filter((b) => b.branch_id !== selectedAlert?.branch_id)
+                                .map((b) => ({ label: b.name, value: b.branch_id }))}
+                        />
                     </Form.Item>
                     <Form.Item
                         name="quantity"
                         label="Quantity"
-                        rules={[{ required: true, message: 'Enter quantity' }]}
+                        rules={[{ required: true, message: 'Enter a quantity' }]}
                     >
-                        <Input type="number" min={1} />
-                    </Form.Item>
-                    <Form.Item name="notes" label="Notes">
-                        <Input.TextArea rows={3} placeholder="Optional notes..." />
+                        <InputNumber min={1} style={{ width: '100%' }} />
                     </Form.Item>
                 </Form>
             </Modal>
