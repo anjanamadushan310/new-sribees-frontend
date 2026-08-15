@@ -22,6 +22,7 @@ import {
     App,
     Typography,
     Space,
+    Tabs,
 } from 'antd';
 import { ArrowLeftOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -44,12 +45,18 @@ const slugify = (text: string): string =>
 
 interface ProductFormValues {
     name: string;
+    name_si?: string;
+    name_ta?: string;
     slug: string;
     sku?: string;
     category_id?: string;
     subcategory_id?: string;
     description?: string;
+    description_si?: string;
+    description_ta?: string;
     short_description?: string;
+    short_description_si?: string;
+    short_description_ta?: string;
     search_keywords?: string;
     price: number;
     compare_at_price?: number;
@@ -97,12 +104,18 @@ const ProductForm: React.FC = () => {
             setSlugTouched(true);
             form.setFieldsValue({
                 name: product.name,
+                name_si: product.name_si ?? undefined,
+                name_ta: product.name_ta ?? undefined,
                 slug: product.slug,
                 sku: product.sku ?? undefined,
                 category_id: product.category_id ?? undefined,
                 subcategory_id: product.subcategory_id ?? undefined,
                 description: product.description ?? undefined,
+                description_si: product.description_si ?? undefined,
+                description_ta: product.description_ta ?? undefined,
                 short_description: product.short_description ?? undefined,
+                short_description_si: product.short_description_si ?? undefined,
+                short_description_ta: product.short_description_ta ?? undefined,
                 search_keywords: product.search_keywords ?? undefined,
                 price: product.price,
                 compare_at_price: product.compare_at_price ?? undefined,
@@ -161,12 +174,21 @@ const ProductForm: React.FC = () => {
         mutationFn: async (values: ProductFormValues) => {
             const payload: ProductPayload = {
                 name: values.name.trim(),
+                // Blank translations are sent as null, not "", so the backend
+                // treats them as absent and the customer app falls back to the
+                // English copy instead of rendering an empty name.
+                name_si: values.name_si?.trim() || null,
+                name_ta: values.name_ta?.trim() || null,
                 slug: (values.slug || slugify(values.name)).trim(),
                 sku: values.sku?.trim() || null,
                 category_id: values.category_id || null,
                 subcategory_id: values.subcategory_id || null,
                 description: values.description?.trim() || null,
+                description_si: values.description_si?.trim() || null,
+                description_ta: values.description_ta?.trim() || null,
                 short_description: values.short_description?.trim() || null,
+                short_description_si: values.short_description_si?.trim() || null,
+                short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
                 price: values.price,
                 compare_at_price: values.compare_at_price ?? null,
@@ -258,20 +280,124 @@ const ProductForm: React.FC = () => {
                 <Row gutter={16}>
                     <Col xs={24} lg={16}>
                         <Card title="Details" style={{ marginBottom: 16 }}>
-                            <Form.Item
-                                label="Name"
-                                name="name"
-                                rules={[{ required: true, message: 'Name is required' }]}
-                            >
-                                <Input
-                                    placeholder="e.g. Organic Whole Milk 1L"
-                                    onChange={(e) => {
-                                        if (!slugTouched) {
-                                            form.setFieldValue('slug', slugify(e.target.value));
-                                        }
-                                    }}
-                                />
-                            </Form.Item>
+                            {/* One tab per language. English is the fallback
+                                every other language degrades to, so it is the
+                                only one that is required; Sinhala and Tamil can
+                                be filled in later without blocking the save.
+                                Panes stay mounted (destroyInactiveTabPane is
+                                off by default) so a validation error on a tab
+                                the admin isn't looking at still blocks submit
+                                instead of failing silently. */}
+                            <Tabs
+                                defaultActiveKey="en"
+                                tabBarExtraContent={
+                                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                        Sinhala/Tamil optional — blank falls back to English
+                                    </Typography.Text>
+                                }
+                                items={[
+                                    {
+                                        key: 'en',
+                                        label: 'English',
+                                        children: (
+                                            <>
+                                                <Form.Item
+                                                    label="Name"
+                                                    name="name"
+                                                    rules={[{ required: true, message: 'Name is required' }]}
+                                                >
+                                                    <Input
+                                                        placeholder="e.g. Organic Whole Milk 1L"
+                                                        onChange={(e) => {
+                                                            if (!slugTouched) {
+                                                                form.setFieldValue(
+                                                                    'slug',
+                                                                    slugify(e.target.value)
+                                                                );
+                                                            }
+                                                        }}
+                                                    />
+                                                </Form.Item>
+                                                <Form.Item
+                                                    label="Short Description"
+                                                    name="short_description"
+                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                >
+                                                    <TextArea
+                                                        rows={2}
+                                                        placeholder="One-line summary shown in listings"
+                                                    />
+                                                </Form.Item>
+                                                <Form.Item label="Description" name="description">
+                                                    <TextArea rows={5} placeholder="Full product description" />
+                                                </Form.Item>
+                                            </>
+                                        ),
+                                    },
+                                    {
+                                        key: 'si',
+                                        label: 'සිංහල',
+                                        children: (
+                                            <>
+                                                <Form.Item
+                                                    label="Name (Sinhala)"
+                                                    name="name_si"
+                                                    rules={[{ max: 255, message: 'Max 255 characters' }]}
+                                                >
+                                                    <Input placeholder="උදා. නැවුම් කිරි (ලීටර් 1)" />
+                                                </Form.Item>
+                                                <Form.Item
+                                                    label="Short Description (Sinhala)"
+                                                    name="short_description_si"
+                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                >
+                                                    <TextArea
+                                                        rows={2}
+                                                        placeholder="ලැයිස්තුවේ පෙන්වන එක් පේළියක සාරාංශය"
+                                                    />
+                                                </Form.Item>
+                                                <Form.Item
+                                                    label="Description (Sinhala)"
+                                                    name="description_si"
+                                                >
+                                                    <TextArea rows={5} placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය" />
+                                                </Form.Item>
+                                            </>
+                                        ),
+                                    },
+                                    {
+                                        key: 'ta',
+                                        label: 'தமிழ்',
+                                        children: (
+                                            <>
+                                                <Form.Item
+                                                    label="Name (Tamil)"
+                                                    name="name_ta"
+                                                    rules={[{ max: 255, message: 'Max 255 characters' }]}
+                                                >
+                                                    <Input placeholder="எ.கா. புதிய பால் (1 லி)" />
+                                                </Form.Item>
+                                                <Form.Item
+                                                    label="Short Description (Tamil)"
+                                                    name="short_description_ta"
+                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                >
+                                                    <TextArea
+                                                        rows={2}
+                                                        placeholder="பட்டியலில் காட்டப்படும் ஒரு வரி சுருக்கம்"
+                                                    />
+                                                </Form.Item>
+                                                <Form.Item
+                                                    label="Description (Tamil)"
+                                                    name="description_ta"
+                                                >
+                                                    <TextArea rows={5} placeholder="முழு தயாரிப்பு விவரம்" />
+                                                </Form.Item>
+                                            </>
+                                        ),
+                                    },
+                                ]}
+                            />
 
                             <Form.Item
                                 label="Slug"
@@ -288,18 +414,6 @@ const ProductForm: React.FC = () => {
                                     placeholder="organic-whole-milk-1l"
                                     onChange={() => setSlugTouched(true)}
                                 />
-                            </Form.Item>
-
-                            <Form.Item
-                                label="Short Description"
-                                name="short_description"
-                                rules={[{ max: 500, message: 'Max 500 characters' }]}
-                            >
-                                <TextArea rows={2} placeholder="One-line summary shown in listings" />
-                            </Form.Item>
-
-                            <Form.Item label="Description" name="description">
-                                <TextArea rows={5} placeholder="Full product description" />
                             </Form.Item>
 
                             <Form.Item

@@ -20,6 +20,7 @@ import {
     Alert,
     App,
     Typography,
+    Tabs,
 } from 'antd';
 import {
     PlusOutlined,
@@ -144,8 +145,12 @@ const CategoryList: React.FC = () => {
         setImageUrl(record.image_url ?? null);
         form.setFieldsValue({
             name: record.name,
+            name_si: record.name_si ?? '',
+            name_ta: record.name_ta ?? '',
             slug: record.slug,
             description: record.description ?? '',
+            description_si: record.description_si ?? '',
+            description_ta: record.description_ta ?? '',
             parent_category_id: record.parent_category_id ?? null,
             is_active: record.is_active,
         });
@@ -181,6 +186,12 @@ const CategoryList: React.FC = () => {
             name: values.name.trim(),
             slug: (values.slug || slugify(values.name)).trim(),
             description: values.description?.trim() || null,
+            // Blank translations go as null, not "", so the backend treats them
+            // as absent and customers fall back to the English copy.
+            name_si: values.name_si?.trim() || null,
+            name_ta: values.name_ta?.trim() || null,
+            description_si: values.description_si?.trim() || null,
+            description_ta: values.description_ta?.trim() || null,
             // The kind is the source of truth, not whatever is left in the
             // fields: a top-level category never sends a parent, and a
             // sub-category never sends an image (the API rejects that pairing).
@@ -442,20 +453,83 @@ const CategoryList: React.FC = () => {
                         </Form.Item>
                     )}
 
-                    <Form.Item
-                        label="Name"
-                        name="name"
-                        rules={[{ required: true, message: 'Name is required' }]}
-                    >
-                        <Input
-                            placeholder="e.g. Fresh Fruits"
-                            onChange={(e) => {
-                                if (!slugTouched) {
-                                    form.setFieldValue('slug', slugify(e.target.value));
-                                }
-                            }}
-                        />
-                    </Form.Item>
+                    {/* One tab per language. English is the fallback every
+                        other language degrades to, so it is the only required
+                        one; Sinhala and Tamil can be added later. */}
+                    <Tabs
+                        defaultActiveKey="en"
+                        tabBarExtraContent={
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                Sinhala/Tamil optional — blank falls back to English
+                            </Typography.Text>
+                        }
+                        items={[
+                            {
+                                key: 'en',
+                                label: 'English',
+                                children: (
+                                    <>
+                                        <Form.Item
+                                            label="Name"
+                                            name="name"
+                                            rules={[{ required: true, message: 'Name is required' }]}
+                                        >
+                                            <Input
+                                                placeholder="e.g. Fresh Fruits"
+                                                onChange={(e) => {
+                                                    if (!slugTouched) {
+                                                        form.setFieldValue(
+                                                            'slug',
+                                                            slugify(e.target.value)
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        </Form.Item>
+                                        <Form.Item label="Description" name="description">
+                                            <Input.TextArea rows={3} placeholder="Optional description" />
+                                        </Form.Item>
+                                    </>
+                                ),
+                            },
+                            {
+                                key: 'si',
+                                label: 'සිංහල',
+                                children: (
+                                    <>
+                                        <Form.Item
+                                            label="Name (Sinhala)"
+                                            name="name_si"
+                                            rules={[{ max: 100, message: 'Max 100 characters' }]}
+                                        >
+                                            <Input placeholder="උදා. නැවුම් පලතුරු" />
+                                        </Form.Item>
+                                        <Form.Item label="Description (Sinhala)" name="description_si">
+                                            <Input.TextArea rows={3} placeholder="විස්තරය (අත්‍යවශ්‍ය නොවේ)" />
+                                        </Form.Item>
+                                    </>
+                                ),
+                            },
+                            {
+                                key: 'ta',
+                                label: 'தமிழ்',
+                                children: (
+                                    <>
+                                        <Form.Item
+                                            label="Name (Tamil)"
+                                            name="name_ta"
+                                            rules={[{ max: 100, message: 'Max 100 characters' }]}
+                                        >
+                                            <Input placeholder="எ.கா. புதிய பழங்கள்" />
+                                        </Form.Item>
+                                        <Form.Item label="Description (Tamil)" name="description_ta">
+                                            <Input.TextArea rows={3} placeholder="விவரம் (விருப்பத்தேர்வு)" />
+                                        </Form.Item>
+                                    </>
+                                ),
+                            },
+                        ]}
+                    />
 
                     <Form.Item
                         label="Slug"
@@ -473,10 +547,6 @@ const CategoryList: React.FC = () => {
                             placeholder="fresh-fruits"
                             onChange={() => setSlugTouched(true)}
                         />
-                    </Form.Item>
-
-                    <Form.Item label="Description" name="description">
-                        <Input.TextArea rows={3} placeholder="Optional description" />
                     </Form.Item>
 
                     <Form.Item label="Active" name="is_active" valuePropName="checked">

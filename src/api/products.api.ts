@@ -28,10 +28,24 @@ export interface ProductCategoryRef {
 // catalog has no branch context. Per-branch prices live in the Inventory API.
 export interface AdminProduct {
     product_id: string;
+    /**
+     * English copy. Customer apps fall back to these whenever the requested
+     * language has no translation, so they are always populated.
+     */
     name: string;
     slug: string;
     description?: string | null;
     short_description?: string | null;
+    /**
+     * Per-language translations, returned raw by the admin detail endpoint so
+     * every language is editable on one form. null = not translated yet.
+     */
+    name_si?: string | null;
+    name_ta?: string | null;
+    description_si?: string | null;
+    description_ta?: string | null;
+    short_description_si?: string | null;
+    short_description_ta?: string | null;
     /** Sinhala/Tamil/Singlish alternate names, common misspellings — search only, never displayed. */
     search_keywords?: string | null;
     sku?: string | null;
@@ -60,6 +74,14 @@ export interface ProductPayload {
     slug: string;
     description?: string | null;
     short_description?: string | null;
+    // Send null (not "") to clear a translation, so the backend treats it as
+    // absent and customers fall back to the English copy.
+    name_si?: string | null;
+    name_ta?: string | null;
+    description_si?: string | null;
+    description_ta?: string | null;
+    short_description_si?: string | null;
+    short_description_ta?: string | null;
     search_keywords?: string | null;
     sku?: string | null;
     price: number;

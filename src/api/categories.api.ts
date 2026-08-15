@@ -15,9 +15,18 @@ import apiClient from './client';
  */
 export interface Category {
     category_id: string;
+    /** English copy — what customers see when their language has no translation. */
     name: string;
     slug: string;
     description?: string | null;
+    /**
+     * Per-language translations, returned raw by the admin endpoints so every
+     * language is editable on one form. null = not translated yet.
+     */
+    name_si?: string | null;
+    name_ta?: string | null;
+    description_si?: string | null;
+    description_ta?: string | null;
     image_url?: string | null;
     parent_category_id?: string | null;
     is_active: boolean;
@@ -30,6 +39,12 @@ export interface CategoryPayload {
     name: string;
     slug: string;
     description?: string | null;
+    // Send null (not "") to clear a translation, so the backend treats it as
+    // absent and customers fall back to the English copy.
+    name_si?: string | null;
+    name_ta?: string | null;
+    description_si?: string | null;
+    description_ta?: string | null;
     /** Top-level categories only — the API rejects an image on a sub-category. */
     image_url?: string | null;
     parent_category_id?: string | null;
