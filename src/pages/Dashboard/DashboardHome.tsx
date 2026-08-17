@@ -53,6 +53,9 @@ const OPEN_STATUSES = new Set([
     'return_approved',
 ]);
 
+/** The two terminal-but-not-delivered statuses — money given back or never taken. */
+const VOID_STATUSES = new Set(['cancelled', 'refunded']);
+
 const DashboardHome: React.FC = () => {
     const { isSuperAdmin } = usePermissions();
     const navigate = useNavigate();
@@ -90,6 +93,14 @@ const DashboardHome: React.FC = () => {
         () =>
             (statusQuery.data?.statuses ?? [])
                 .filter((s) => OPEN_STATUSES.has(s.status))
+                .reduce((sum, s) => sum + s.orders, 0),
+        [statusQuery.data]
+    );
+
+    const cancelledOrRefundedOrders = useMemo(
+        () =>
+            (statusQuery.data?.statuses ?? [])
+                .filter((s) => VOID_STATUSES.has(s.status))
                 .reduce((sum, s) => sum + s.orders, 0),
         [statusQuery.data]
     );
@@ -168,9 +179,9 @@ const DashboardHome: React.FC = () => {
                         deltaCaption={`vs previous ${days} days`}
                         footnote={
                             statusQuery.data
-                                ? `${formatNumber(openOrders)} still open · ${formatPercent(
-                                      statusQuery.data.fulfilment_rate
-                                  )} delivered`
+                                ? `${formatPercent(statusQuery.data.fulfilment_rate)} delivered · ${formatNumber(
+                                      openOrders
+                                  )} open · ${formatNumber(cancelledOrRefundedOrders)} cancelled`
                                 : undefined
                         }
                         hint="Every order placed in the period, whatever its status."

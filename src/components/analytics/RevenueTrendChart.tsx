@@ -58,6 +58,7 @@ const TrendTooltip: React.FC<ChartTooltipProps<TrendRow> & { metric: Metric }> =
             </div>
             <div>
                 <span style={{ color: PRIMARY }}>●</span> This period: {fmt(current)}
+                {row.isPartial && ' (in progress — today isn’t over yet)'}
             </div>
             {prior !== undefined && (
                 <div>
@@ -94,10 +95,33 @@ export const RevenueTrendChart: React.FC<Props> = ({
     const tickFormatter = metric === 'revenue' ? compactLKR : (v: number) => formatNumber(v);
     const gradientId = `fill-${metric}`;
 
+    // Today's bucket is still filling up, not a real drop — draw it as a
+    // dashed tail off the solid series instead of letting the last point read
+    // as a crash. Only the trailing point ever qualifies (see is_partial on
+    // the /sales endpoint), so anything else is ignored defensively.
+    //
+    // `solidKey`/`partialKey` exist only for the chart to split its line on —
+    // `row.revenue` / `row.orders` stay untouched so the tooltip still shows
+    // today's real (partial) figure instead of a blank.
+    const solidKey = `${key}Solid`;
+    const partialKey = `${key}Partial`;
+    const partialIndex = rows.findIndex((r) => r.isPartial);
+    const hasPartial = partialIndex === rows.length - 1 && partialIndex > 0;
+    const chartRows = rows.map((r, i) => {
+        const value = r[key];
+        if (hasPartial && i === partialIndex) {
+            return { ...r, [solidKey]: undefined, [partialKey]: value };
+        }
+        if (hasPartial && i === partialIndex - 1) {
+            return { ...r, [solidKey]: value, [partialKey]: value };
+        }
+        return { ...r, [solidKey]: value };
+    });
+
     return (
         <>
             <ResponsiveContainer width="100%" height={height}>
-                <AreaChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <AreaChart data={chartRows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                     <defs>
                         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={PRIMARY} stopOpacity={0.28} />
@@ -137,19 +161,34 @@ export const RevenueTrendChart: React.FC<Props> = ({
                     )}
                     <Area
                         type="monotone"
-                        dataKey={key}
+                        dataKey={solidKey}
                         name="This period"
                         stroke={PRIMARY}
                         strokeWidth={2}
                         fill={`url(#${gradientId})`}
                         activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff' }}
+                        connectNulls={false}
                     />
+                    {hasPartial && (
+                        <Line
+                            type="monotone"
+                            dataKey={partialKey}
+                            name="Today (in progress)"
+                            stroke={PRIMARY}
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff' }}
+                            legendType="none"
+                        />
+                    )}
                 </AreaChart>
             </ResponsiveContainer>
-            {hasComparison && (
+            {(hasComparison || hasPartial) && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                    Days are aligned by position, so day 1 of this period sits above day 1 of the
-                    previous one.
+                    {hasComparison &&
+                        'Days are aligned by position, so day 1 of this period sits above day 1 of the previous one. '}
+                    {hasPartial && "Today's bar is still filling up — shown dashed until the day ends."}
                 </Text>
             )}
         </>

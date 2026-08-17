@@ -179,6 +179,25 @@ export const BranchPerformanceTable: React.FC<Props> = ({
             ),
         },
         {
+            title: <Tooltip title="Share of this branch's orders that ended cancelled or refunded">Cancelled</Tooltip>,
+            dataIndex: 'cancellation_rate',
+            key: 'cancellation_rate',
+            align: 'right',
+            width: 110,
+            sorter: (a, b) => a.cancellation_rate - b.cancellation_rate,
+            render: (v: number, row) =>
+                row.cancelled_orders > 0 ? (
+                    <div>
+                        <div>{formatPercent(v)}</div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                            {formatNumber(row.cancelled_orders)} order(s)
+                        </Text>
+                    </div>
+                ) : (
+                    <Text type="secondary">—</Text>
+                ),
+        },
+        {
             title: 'Low stock',
             dataIndex: 'low_stock_alerts',
             key: 'low_stock_alerts',

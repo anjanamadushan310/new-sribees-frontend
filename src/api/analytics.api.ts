@@ -67,6 +67,8 @@ export interface SalesPoint {
     date: string; // ISO date (YYYY-MM-DD)
     revenue: number;
     orders: number;
+    /** True only for today's bucket in the current series — the day isn't over yet. */
+    is_partial?: boolean;
 }
 
 export interface SalesSeries {
@@ -91,6 +93,9 @@ export interface BranchPerformance {
     customers: number;
     items_sold: number;
     avg_order_value: number;
+    cancelled_orders: number;
+    /** Percentage of this branch's orders that ended cancelled or refunded. */
+    cancellation_rate: number;
     previous_revenue: number;
     revenue_change: Delta;
     /** Percentage of network revenue in this window. */

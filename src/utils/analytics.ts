@@ -19,10 +19,12 @@ export interface TrendRow {
     date: string;
     revenue: number;
     orders: number;
+    /** Today's bucket, still filling up — not a real drop. */
+    isPartial?: boolean;
     prevDate?: string;
     prevRevenue?: number;
     prevOrders?: number;
-    [key: string]: string | number | undefined;
+    [key: string]: string | number | boolean | undefined;
 }
 
 /**
@@ -37,6 +39,7 @@ export const mergeSeries = (series: SalesPoint[], previous?: SalesPoint[]): Tren
         date: p.date,
         revenue: p.revenue,
         orders: p.orders,
+        isPartial: p.is_partial,
         prevDate: previous?.[i]?.date,
         prevRevenue: previous?.[i]?.revenue,
         prevOrders: previous?.[i]?.orders,
