@@ -429,7 +429,7 @@ const BranchInventory: React.FC = () => {
                                     min={0}
                                     step={0.01}
                                     style={{ width: '100%' }}
-                                    prefix="Rs"
+                                    prefix="LKR"
                                     placeholder={`${editing.global_price}`}
                                 />
                             </Form.Item>
@@ -533,7 +533,7 @@ const BranchInventory: React.FC = () => {
                             min={0}
                             step={0.01}
                             style={{ width: '100%' }}
-                            prefix="Rs"
+                            prefix="LKR"
                             placeholder="Use global price"
                         />
                     </Form.Item>

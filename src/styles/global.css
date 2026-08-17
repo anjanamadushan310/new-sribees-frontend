@@ -15,3 +15,21 @@ body {
 #root {
     min-height: 100vh;
 }
+
+/*
+ * The `* { margin: 0; padding: 0 }` reset above strips antd's own internal
+ * spacing too, which is what antd's pagination row relies on to center the
+ * "Total N items" text against the page-number buttons and the size-changer
+ * select — without this it renders a line higher. Scoped to just the
+ * pagination row rather than undoing the reset globally.
+ */
+.ant-pagination {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ant-pagination-total-text {
+    display: flex;
+    align-items: center;
+}

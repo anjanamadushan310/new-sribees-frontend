@@ -524,13 +524,20 @@ const ProductForm: React.FC = () => {
                             <Form.Item
                                 label="Base Price (LKR)"
                                 name="price"
-                                rules={[{ required: true, message: 'Price is required' }]}
+                                rules={[
+                                    { required: true, message: 'Price is required' },
+                                    {
+                                        type: 'number',
+                                        min: 0.01,
+                                        message: 'Price must be greater than 0',
+                                    },
+                                ]}
                             >
                                 <InputNumber
-                                    min={0}
+                                    min={0.01}
                                     step={0.01}
                                     style={{ width: '100%' }}
-                                    prefix="Rs"
+                                    prefix="LKR"
                                     placeholder="0.00"
                                 />
                             </Form.Item>
@@ -544,7 +551,7 @@ const ProductForm: React.FC = () => {
                                     min={0}
                                     step={0.01}
                                     style={{ width: '100%' }}
-                                    prefix="Rs"
+                                    prefix="LKR"
                                     placeholder="0.00"
                                 />
                             </Form.Item>
