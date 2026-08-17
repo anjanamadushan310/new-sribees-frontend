@@ -38,8 +38,20 @@ import { PRIMARY, SERIES, STATUS } from '../../utils/chartTheme';
 
 const { Title, Text } = Typography;
 
-/** Statuses that mean the order is still waiting on someone. */
-const OPEN_STATUSES = new Set(['pending', 'confirmed', 'processing']);
+/**
+ * Statuses that mean the order is still waiting on someone — i.e. every
+ * status except the three terminal ones (delivered, cancelled, refunded).
+ * Must stay in sync with OrderStatus in fastapi_backend/app/models/order.py.
+ */
+const OPEN_STATUSES = new Set([
+    'pending',
+    'confirmed',
+    'processing',
+    'shipped',
+    'out_for_delivery',
+    'return_requested',
+    'return_approved',
+]);
 
 const DashboardHome: React.FC = () => {
     const { isSuperAdmin } = usePermissions();
