@@ -454,7 +454,11 @@ const ProductForm: React.FC = () => {
 
                     <Col xs={24} lg={8}>
                         <Card title="Organization" style={{ marginBottom: 16 }}>
-                            <Form.Item label="Category" name="category_id">
+                            <Form.Item
+                                label="Category"
+                                name="category_id"
+                                rules={[{ required: true, message: 'Category is required' }]}
+                            >
                                 <Select
                                     placeholder="Select a category"
                                     allowClear
@@ -499,7 +503,11 @@ const ProductForm: React.FC = () => {
                                 />
                             </Form.Item>
 
-                            <Form.Item label="SKU" name="sku">
+                            <Form.Item
+                                label="SKU"
+                                name="sku"
+                                rules={[{ required: true, whitespace: true, message: 'SKU is required' }]}
+                            >
                                 <Input placeholder="e.g. MILK-ORG-1L" />
                             </Form.Item>
 
