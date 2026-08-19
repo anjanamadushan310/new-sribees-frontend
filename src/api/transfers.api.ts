@@ -94,12 +94,15 @@ interface TransferListWire {
 
 export const transfersApi = {
     /**
-     * Every active branch's id/name/code, for the From/To pickers. Open to
-     * any role that can reach this router — `/admin/branches` itself is
-     * Super Admin only.
+     * Every active branch's id/name/code, for the From/To pickers and the
+     * Orders branch filter. Open to any signed-in admin regardless of role —
+     * `/admin/branches` itself is Super Admin only. Lives on the generic
+     * admin router (`/admin/branch-options`), not this one, since callers
+     * outside the transfers feature (Customer Support on Orders) need it too
+     * and this router is restricted to super_admin/branch_manager/inventory_manager.
      */
     branches: async (): Promise<TransferBranchOption[]> => {
-        const res = await apiClient.get<Wire<{ branches: TransferBranchOption[] }>>('/admin/transfers/branches');
+        const res = await apiClient.get<Wire<{ branches: TransferBranchOption[] }>>('/admin/branch-options');
         return res.data.data.branches;
     },
 

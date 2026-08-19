@@ -130,7 +130,7 @@ const AdminLayout: React.FC = () => {
             label: 'Partners',
         },
         {
-            key: '/settings',
+            key: '/settings-group',
             icon: <SettingOutlined />,
             label: 'Settings',
             children: [
