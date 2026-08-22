@@ -33,11 +33,16 @@ const AdminLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout, updateUser } = useAuthStore();
-    const { canAccessRoute, role, isSuperAdmin, isInventory, isSupport } = usePermissions();
-    // Catalog (Products & Categories) is limited to Super Admin + Inventory Manager.
-    const canManageCatalog = isSuperAdmin || isInventory;
-    // Customers is limited to Super Admin + Customer Support.
-    const canManageCustomers = isSuperAdmin || isSupport;
+    const { canAccessRoute, can, role, isStaff } = usePermissions();
+    // Catalog (Products & Categories) and Customers nav visibility follow the
+    // same permission check as the route itself (router.tsx), not a fixed
+    // role list — otherwise a staff account delegated e.g. products:read
+    // could open /products by URL but never see it in the sidebar.
+    const canManageCatalog = can('products', 'read');
+    const canManageCustomers = can('customers', 'read');
+    // Staff management: every base role can have staff — everyone except a
+    // staff account itself (mirrors the server's require_base_role_admin gate).
+    const canManageStaff = !isStaff;
     const {
         token: { colorBgContainer, borderRadiusLG },
     } = theme.useToken();
@@ -125,6 +130,11 @@ const AdminLayout: React.FC = () => {
             label: 'Admin Users',
         },
         {
+            key: '/staff',
+            icon: <TeamOutlined />,
+            label: 'My Staff',
+        },
+        {
             key: '/partners',
             icon: <TeamOutlined />,
             label: 'Partners',
@@ -166,9 +176,12 @@ const AdminLayout: React.FC = () => {
             if (item.key === '/customers') {
                 return canManageCustomers;
             }
+            if (item.key === '/staff') {
+                return canManageStaff;
+            }
             return canAccessRoute(item.key);
         });
-    }, [allMenuItems, canAccessRoute, canManageCatalog, canManageCustomers]);
+    }, [allMenuItems, canAccessRoute, canManageCatalog, canManageCustomers, canManageStaff]);
 
     const handleMenuClick: MenuProps['onClick'] = (e) => {
         navigate(e.key);
@@ -227,7 +240,7 @@ const AdminLayout: React.FC = () => {
                             <Tag color="blue">{user.branch_name}</Tag>
                         )}
                         {role && (
-                            <Tag color="green">{ROLE_NAMES[role] ?? role}</Tag>
+                            <Tag color="green">{user?.role_name || ROLE_NAMES[role] || role}</Tag>
                         )}
                         <span>Welcome, {user?.full_name || 'Admin'}</span>
                         <LogoutOutlined

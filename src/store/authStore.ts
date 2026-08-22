@@ -5,8 +5,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AdminRole, ROLE_PERMISSIONS } from '../types/admin.types';
-import type { Resource, Action } from '../types/admin.types';
+import { AdminRole } from '../types/admin.types';
+import type { Resource, Action, PermissionGrant } from '../types/admin.types';
 
 // User interface
 interface User {
@@ -14,10 +14,16 @@ interface User {
     email: string;
     full_name: string;
     role: AdminRole;
+    role_name?: string;
     branch_id?: string;
     branch_name?: string;
     is_active?: boolean;
     avatar_url?: string;
+    // Effective (resource, action) grants, resolved server-side on
+    // login/profile. The authoritative source for hasPermission() below —
+    // covers staff accounts, which have no entry in the static
+    // ROLE_PERMISSIONS map.
+    permissions: PermissionGrant[];
 }
 
 export interface AuthTokens {
@@ -104,18 +110,10 @@ export const useAuthStore = create<AuthState>()(
             hasPermission: (resource: Resource, action: Action) => {
                 const user = get().user;
                 if (!user) return false;
-
-                const permissions = ROLE_PERMISSIONS[user.role] || [];
-
-                return permissions.some((perm) => {
-                    // Check for wildcard permissions
-                    if (perm.resource === '*' && perm.action === '*') return true;
-                    if (perm.resource === '*' && perm.action === action) return true;
-                    if (perm.resource === resource && perm.action === '*') return true;
-
-                    // Exact match
-                    return perm.resource === resource && perm.action === action;
-                });
+                // Super Admin's effective set is the full delegatable catalog
+                // (seeded that way server-side), so a plain membership check
+                // already covers it — no wildcard case to special-case here.
+                return user.permissions.some((p) => p.resource === resource && p.action === action);
             },
 
             isSuperAdmin: () => {

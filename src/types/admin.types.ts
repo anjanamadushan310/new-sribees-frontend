@@ -11,15 +11,29 @@ export const AdminRole = {
     MARKETING_MANAGER: 'marketing_manager',
     INVENTORY_MANAGER: 'inventory_manager',
     CUSTOMER_SUPPORT: 'customer_support',
+    STAFF: 'staff',
 } as const;
 
 export type AdminRole = typeof AdminRole[keyof typeof AdminRole];
 
-// All roles the backend recognizes; anything else must not pass the login gate
-export const VALID_ADMIN_ROLES: readonly AdminRole[] = Object.values(AdminRole);
+// The 5 original roles — every one of them can create delegated staff
+// beneath themselves (see pages/Staff/StaffList.tsx). STAFF itself is
+// excluded: staff accounts can never create further staff.
+export const BASE_ADMIN_ROLES: readonly AdminRole[] = [
+    AdminRole.SUPER_ADMIN,
+    AdminRole.BRANCH_MANAGER,
+    AdminRole.MARKETING_MANAGER,
+    AdminRole.INVENTORY_MANAGER,
+    AdminRole.CUSTOMER_SUPPORT,
+];
+
+// Roles selectable when creating/editing a base-role admin via /users
+// (Super Admin only) — deliberately excludes STAFF, which is created via
+// /staff instead, with a delegated permission set rather than a fixed role.
+export const VALID_ADMIN_ROLES: readonly AdminRole[] = BASE_ADMIN_ROLES;
 
 export function isValidAdminRole(role: unknown): role is AdminRole {
-    return typeof role === 'string' && (VALID_ADMIN_ROLES as readonly string[]).includes(role);
+    return typeof role === 'string' && (Object.values(AdminRole) as readonly string[]).includes(role);
 }
 
 // Resource types for permissions
@@ -49,6 +63,9 @@ export interface AdminUser {
     email: string;
     full_name: string;
     role: AdminRole;
+    // Custom role display name for staff accounts (e.g. "Branch Manager
+    // Staff"); undefined for base-role admins — use ROLE_NAMES[role] then.
+    role_name?: string;
     branch_id?: string;
     branch_name?: string;
     is_active: boolean;
@@ -63,8 +80,24 @@ export interface Permission {
     action: Action;
 }
 
-// Role-based permissions configuration
-export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
+// A concrete (resource, action) grant as returned by the backend on
+// login/profile — no wildcards, unlike the static Permission/ROLE_PERMISSIONS
+// shape above. This is what authStore/usePermissions actually check against.
+export interface PermissionGrant {
+    resource: string;
+    action: string;
+}
+
+// Role-based permissions configuration.
+//
+// DOCUMENTATION ONLY as of the delegated-staff system (migration 037) — this
+// is the literal source the backend's permission catalog seed data
+// (fastapi_backend/app/core/permission_catalog.py, migrations/037) was
+// ported from, kept here so the two stay comparable at a glance. No runtime
+// authorization code should read this map anymore: effective permissions
+// come from the backend on login/profile (see authStore.ts `user.permissions`)
+// so that staff accounts — which have no fixed role here — are covered too.
+export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
     [AdminRole.SUPER_ADMIN]: [
         { resource: '*', action: '*' }, // Full access
     ],
@@ -124,13 +157,16 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     ],
 };
 
-// Role display names
+// Role display names. STAFF's entry is only a fallback for when a staff
+// admin's custom role_name (from AdminResponse.roleName) isn't available —
+// prefer that over this generic label wherever it's present.
 export const ROLE_NAMES: Record<AdminRole, string> = {
     [AdminRole.SUPER_ADMIN]: 'Super Admin',
     [AdminRole.BRANCH_MANAGER]: 'Branch Manager',
     [AdminRole.MARKETING_MANAGER]: 'Marketing Manager',
     [AdminRole.INVENTORY_MANAGER]: 'Inventory Manager',
     [AdminRole.CUSTOMER_SUPPORT]: 'Customer Support',
+    [AdminRole.STAFF]: 'Staff',
 };
 
 // Role colors for badges
@@ -140,6 +176,7 @@ export const ROLE_COLORS: Record<AdminRole, { bg: string; text: string }> = {
     [AdminRole.MARKETING_MANAGER]: { bg: '#dcfce7', text: '#16a34a' },
     [AdminRole.CUSTOMER_SUPPORT]: { bg: '#fef3c7', text: '#d97706' },
     [AdminRole.INVENTORY_MANAGER]: { bg: '#ede9fe', text: '#7c3aed' },
+    [AdminRole.STAFF]: { bg: '#e0e7ff', text: '#4338ca' },
 };
 
 // Navigation items by role
@@ -152,7 +189,7 @@ export interface NavItem {
     children?: NavItem[];
 }
 
-export const NAVIGATION_CONFIG: Record<AdminRole, string[]> = {
+export const NAVIGATION_CONFIG: Partial<Record<AdminRole, string[]>> = {
     [AdminRole.SUPER_ADMIN]: [
         'dashboard',
         'products',

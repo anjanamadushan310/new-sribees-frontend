@@ -5,28 +5,25 @@
 
 import { useMemo } from 'react';
 import { useAuthStore } from '../store/authStore';
-import type { Resource, Action } from '../types/admin.types';
-import { AdminRole, ROLE_PERMISSIONS } from '../types/admin.types';
+import type { Resource, Action, PermissionGrant } from '../types/admin.types';
+import { AdminRole } from '../types/admin.types';
 
-// Permission utility functions
-function checkPermission(role: AdminRole, resource: Resource | string, action: Action | string): boolean {
-    const permissions = ROLE_PERMISSIONS[role] || [];
-    
-    return permissions.some((perm) => {
-        if (perm.resource === '*' && perm.action === '*') return true;
-        if (perm.resource === '*' && perm.action === action) return true;
-        if (perm.resource === resource && perm.action === '*') return true;
-        return perm.resource === resource && perm.action === action;
-    });
+// Backend-driven permission checks: `permissions` is the admin's effective,
+// already-resolved (resource, action) set (see authStore.ts `user.permissions`,
+// populated from AdminResponse on login/profile). No wildcard matching here —
+// wildcards were expanded into concrete rows server-side (see
+// fastapi_backend/app/core/permission_catalog.py), so this is a plain
+// membership check that works the same way for base-role and staff admins.
+function checkPermission(
+    permissions: PermissionGrant[],
+    resource: Resource | string,
+    action: Action | string,
+): boolean {
+    return permissions.some((p) => p.resource === resource && p.action === action);
 }
 
-function checkAnyPermission(role: AdminRole, resource: Resource | string): boolean {
-    return (
-        checkPermission(role, resource, 'create') ||
-        checkPermission(role, resource, 'read') ||
-        checkPermission(role, resource, 'update') ||
-        checkPermission(role, resource, 'delete')
-    );
+function checkAnyPermission(permissions: PermissionGrant[], resource: Resource | string): boolean {
+    return permissions.some((p) => p.resource === resource);
 }
 
 export type DashboardType = 'admin' | 'manager' | 'marketing' | 'support' | 'inventory';
@@ -68,6 +65,7 @@ export const usePermissions = () => {
                 isMarketing: false,
                 isSupport: false,
                 isInventory: false,
+                isStaff: false,
                 
                 // Branch
                 branchId: undefined,
@@ -91,12 +89,14 @@ export const usePermissions = () => {
             };
         }
 
+        const permissions = user?.permissions ?? [];
+
         const hasPermission = (resource: string, action: string): boolean => {
-            return checkPermission(role, resource as Resource, action as Action);
+            return checkPermission(permissions, resource, action);
         };
 
-        const can = (resource: Resource, action: Action) => checkPermission(role, resource, action);
-        const canAny = (resource: Resource) => checkAnyPermission(role, resource);
+        const can = (resource: Resource, action: Action) => checkPermission(permissions, resource, action);
+        const canAny = (resource: Resource) => checkAnyPermission(permissions, resource);
         const canCreate = (resource: string) => hasPermission(resource, 'create');
         const canRead = (resource: string) => hasPermission(resource, 'read');
         const canUpdate = (resource: string) => hasPermission(resource, 'update');
@@ -134,6 +134,7 @@ export const usePermissions = () => {
         const isMarketing = role === AdminRole.MARKETING_MANAGER;
         const isSupport = role === AdminRole.CUSTOMER_SUPPORT;
         const isInventory = role === AdminRole.INVENTORY_MANAGER;
+        const isStaff = role === AdminRole.STAFF;
 
         // Branch access
         const requiresBranchIsolation = role === AdminRole.BRANCH_MANAGER;
@@ -172,7 +173,8 @@ export const usePermissions = () => {
             isMarketing,
             isSupport,
             isInventory,
-            
+            isStaff,
+
             // Branch
             branchId,
             requiresBranchIsolation,
@@ -193,7 +195,7 @@ export const usePermissions = () => {
             canEditProducts,
             canUpdateInventory,
         };
-    }, [user?.role, user?.branch_id]);
+    }, [user?.role, user?.branch_id, user?.permissions]);
 };
 
 export default usePermissions;

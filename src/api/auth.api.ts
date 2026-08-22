@@ -18,10 +18,12 @@ export interface AdminWire {
     email: string;
     fullName: string;
     role: AdminRole;
+    roleName?: string | null;
     branchId?: string | null;
     isActive: boolean;
     lastLogin?: string | null;
     createdAt?: string;
+    permissions: { resource: string; action: string }[];
 }
 
 interface AdminAuthWire {
@@ -45,8 +47,10 @@ export interface AdminUser {
     email: string;
     full_name: string;
     role: AdminRole;
+    role_name?: string;
     branch_id?: string;
     is_active?: boolean;
+    permissions: { resource: string; action: string }[];
 }
 
 export function mapAdminWire(admin: AdminWire): AdminUser {
@@ -55,8 +59,10 @@ export function mapAdminWire(admin: AdminWire): AdminUser {
         email: admin.email,
         full_name: admin.fullName,
         role: admin.role,
+        role_name: admin.roleName ?? undefined,
         branch_id: admin.branchId ?? undefined,
         is_active: admin.isActive,
+        permissions: admin.permissions ?? [],
     };
 }
 

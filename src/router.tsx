@@ -6,11 +6,12 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
-import { AdminRole, isValidAdminRole } from './types/admin.types';
+import { AdminRole, BASE_ADMIN_ROLES, isValidAdminRole } from './types/admin.types';
 import { Spin } from 'antd';
 
 // Layout
 import AdminLayout from './components/layout/AdminLayout';
+import { RoleGuard } from './components/guards/RoleGuard';
 
 // Auth Pages (eager load)
 import Login from './pages/Auth/Login';
@@ -51,6 +52,9 @@ const BranchAnalytics = lazy(() => import('./pages/Analytics/BranchAnalytics'));
 const AdminUserList = lazy(() => import('./pages/Users/AdminUserList'));
 const BranchList = lazy(() => import('./pages/Branches/BranchList'));
 const PartnerList = lazy(() => import('./pages/Partners/PartnerList'));
+
+// Staff — any base-role admin manages their own delegated staff
+const StaffList = lazy(() => import('./pages/Staff/StaffList'));
 
 // Customers
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
@@ -93,27 +97,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     // RBAC actually defines. Anything else goes back to the login screen.
     if (!isAuthenticated || !user || !isValidAdminRole(user.role)) {
         return <Navigate to="/login" replace />;
-    }
-
-    return <>{children}</>;
-};
-
-// Role-based Route Component
-interface RoleRouteProps {
-    children: React.ReactNode;
-    allowedRoles: AdminRole[];
-    fallbackPath?: string;
-}
-
-const RoleRoute: React.FC<RoleRouteProps> = ({ 
-    children, 
-    allowedRoles, 
-    fallbackPath = '/' 
-}) => {
-    const user = useAuthStore((state) => state.user);
-
-    if (!user || !allowedRoles.includes(user.role)) {
-        return <Navigate to={fallbackPath} replace />;
     }
 
     return <>{children}</>;
@@ -162,31 +145,33 @@ const AppRouter: React.FC = () => {
                         {/* Dashboard - Role-based */}
                         <Route index element={<DashboardRouter />} />
 
-                        {/* Catalog: Products & Categories — full CRUD limited to
-                            Super Admin + Inventory Manager (branch/marketing
-                            managers get restricted access in a later module). */}
+                        {/* Catalog: Products & Categories. Permission-gated (not
+                            role-gated) so a staff account delegated
+                            products/categories permissions can reach these too —
+                            matches the server, which now checks the same way via
+                            require_permission on any route migrated to it. */}
                         <Route
                             path="products"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'products', action: 'read' }}>
                                     <ProductList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
                         <Route
                             path="products/new"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'products', action: 'create' }}>
                                     <ProductForm />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
                         <Route
                             path="products/:id/edit"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'products', action: 'update' }}>
                                     <ProductForm />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
@@ -194,133 +179,147 @@ const AppRouter: React.FC = () => {
                         <Route
                             path="categories"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'categories', action: 'read' }}>
                                     <CategoryList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
                         {/* Orders */}
-                        {/* Order details open in a drawer from the list. */}
+                        {/* Order details open in a drawer from the list. Open to
+                            any authenticated admin — unchanged. */}
                         <Route path="orders" element={<OrderList />} />
 
-                        {/* Inventory - Manager and above */}
-                        <Route 
-                            path="inventory" 
+                        {/* Inventory */}
+                        <Route
+                            path="inventory"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'inventory', action: 'read' }}>
                                     <BranchInventory />
-                                </RoleRoute>
-                            } 
+                                </RoleGuard>
+                            }
                         />
-                        <Route 
-                            path="inventory/transfers" 
+                        <Route
+                            path="inventory/transfers"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'transfers', action: 'read' }}>
                                     <StockTransfers />
-                                </RoleRoute>
-                            } 
+                                </RoleGuard>
+                            }
                         />
-                        <Route 
-                            path="inventory/low-stock" 
+                        <Route
+                            path="inventory/low-stock"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER, AdminRole.INVENTORY_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'inventory', action: 'read' }}>
                                     <LowStockReport />
-                                </RoleRoute>
-                            } 
+                                </RoleGuard>
+                            }
                         />
 
                         {/* Analytics — mirrors the server guard on
-                            /admin/analytics/*: super_admin + branch_manager only.
-                            Any wider list here just lets a role reach a page
-                            whose every request comes back 403. */}
+                            /admin/analytics/*: super_admin + branch_manager only
+                            (analytics isn't in the delegatable catalog for the
+                            other 3 base roles either, see permission_catalog.py,
+                            so permission-gating and role-gating agree here). */}
                         <Route
                             path="analytics"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'analytics', action: 'read' }}>
                                     <Analytics />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
-                        <Route 
-                            path="analytics/watchlist" 
+                        <Route
+                            path="analytics/watchlist"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'watchlist', action: 'read' }}>
                                     <WatchlistAnalytics />
-                                </RoleRoute>
-                            } 
+                                </RoleGuard>
+                            }
                         />
-                        <Route 
-                            path="analytics/branch/:branchId?" 
+                        <Route
+                            path="analytics/branch/:branchId?"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'analytics', action: 'read' }}>
                                     <BranchAnalytics />
-                                </RoleRoute>
-                            } 
+                                </RoleGuard>
+                            }
                         />
 
-                        {/* Marketing — Coupons (Super Admin + Marketing Manager) */}
+                        {/* Marketing — Coupons */}
                         <Route
                             path="coupons"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.MARKETING_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'marketing', action: 'read' }}>
                                     <CouponList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
-                        {/* Marketing — Quick Sale (Super Admin + Marketing Manager) */}
+                        {/* Marketing — Quick Sale */}
                         <Route
                             path="quick-sale"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.MARKETING_MANAGER]}>
+                                <RoleGuard requiredPermission={{ resource: 'marketing', action: 'read' }}>
                                     <QuickSale />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
-                        {/* Home Banners — Marketing Managers curate their branch's carousel */}
+                        {/* Home Banners */}
                         <Route
                             path="banners"
                             element={
-                                <RoleRoute
-                                    allowedRoles={[
-                                        AdminRole.SUPER_ADMIN,
-                                        AdminRole.MARKETING_MANAGER,
-                                    ]}
-                                >
+                                <RoleGuard requiredPermission={{ resource: 'banners', action: 'read' }}>
                                     <BannerList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
-                        {/* Customers — Super Admin + Customer Support */}
+                        {/* Customers */}
                         <Route
                             path="customers"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.CUSTOMER_SUPPORT]}>
+                                <RoleGuard requiredPermission={{ resource: 'customers', action: 'read' }}>
                                     <CustomerList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
-                        {/* Users - Super Admin only (modal-based CRUD) */}
+                        {/* Staff — any base-role admin manages their own
+                            delegated staff. Role-gated, not permission-gated:
+                            "can I have staff at all" is a require_base_role_admin
+                            policy on the server, not a catalog permission — there
+                            is no 'staff:*' permission a role could hold. */}
+                        <Route
+                            path="staff"
+                            element={
+                                <RoleGuard allowedRoles={[...BASE_ADMIN_ROLES]}>
+                                    <StaffList />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Users - Super Admin only (modal-based CRUD over the 5
+                            base roles). Role-gated: 'users' is excluded from the
+                            delegatable catalog entirely, so no permission could
+                            ever grant this to a staff account. */}
                         <Route
                             path="users"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <AdminUserList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
-                        {/* Branches - Super Admin only */}
+                        {/* Branches - Super Admin only (same reasoning as Users) */}
                         <Route
                             path="branches"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <BranchList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
@@ -328,22 +327,22 @@ const AppRouter: React.FC = () => {
                         <Route
                             path="partners"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <PartnerList />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
                         {/* Settings */}
                         <Route path="settings" element={<Settings />} />
-                        
+
                         {/* App Settings - Super Admin only (Splash Video, etc.) */}
                         <Route
                             path="settings/app"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <AppSettings />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
 
@@ -351,9 +350,9 @@ const AppRouter: React.FC = () => {
                         <Route
                             path="settings/platform"
                             element={
-                                <RoleRoute allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <PlatformSettings />
-                                </RoleRoute>
+                                </RoleGuard>
                             }
                         />
                     </Route>
