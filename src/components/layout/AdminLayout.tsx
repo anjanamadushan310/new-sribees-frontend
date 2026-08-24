@@ -33,7 +33,7 @@ const AdminLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout, updateUser } = useAuthStore();
-    const { canAccessRoute, can, role, isStaff } = usePermissions();
+    const { canAccessRoute, can, role, isStaff, isSuperAdmin } = usePermissions();
     // Catalog (Products & Categories) and Customers nav visibility follow the
     // same permission check as the route itself (router.tsx), not a fixed
     // role list — otherwise a staff account delegated e.g. products:read
@@ -179,9 +179,21 @@ const AdminLayout: React.FC = () => {
             if (item.key === '/staff') {
                 return canManageStaff;
             }
+            // Base-role-exclusive pages: 'users'/'branches'/'partners' are
+            // deliberately excluded from the delegatable permission catalog
+            // (see permission_catalog.py EXCLUDED_RESOURCES) so they can
+            // never be granted to anyone, including Super Admin, via a
+            // permission. Route-gated to Super Admin only in router.tsx —
+            // this must match that, not the generic permission check below,
+            // or Super Admin's own nav items for them silently disappear
+            // (their effective permission set has no 'users'/'branches'/
+            // 'partners' entries either, by the same design).
+            if (item.key === '/users' || item.key === '/branches' || item.key === '/partners') {
+                return isSuperAdmin;
+            }
             return canAccessRoute(item.key);
         });
-    }, [allMenuItems, canAccessRoute, canManageCatalog, canManageCustomers, canManageStaff]);
+    }, [allMenuItems, canAccessRoute, canManageCatalog, canManageCustomers, canManageStaff, isSuperAdmin]);
 
     const handleMenuClick: MenuProps['onClick'] = (e) => {
         navigate(e.key);
