@@ -140,7 +140,7 @@ const Analytics: React.FC = () => {
         window.print();
     };
 
-    const downloadCSV = (headers: string[], rows: (string | number)[][], filename: string) => {
+    const downloadCSV = (headers: string[], rows: (string | number | boolean | null | undefined)[][], filename: string) => {
         const csvContent = [
             headers.join(','),
             ...rows.map(row => 
@@ -177,6 +177,41 @@ const Analytics: React.FC = () => {
             ['Items Sold', current.items_sold, formatDelta(summary?.deltas.items_sold)],
         ];
         downloadCSV(headers, rows, `analytics_kpis_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportSalesTrendCSV = () => {
+        const headers = ['Date', 'Revenue (LKR)', 'Orders Count', 'Previous Revenue (LKR)', 'Previous Orders'];
+        const rows = trendRows.map((r) => [
+            r.date,
+            r.revenue,
+            r.orders,
+            r.previous_revenue ?? 0,
+            r.previous_orders ?? 0,
+        ]);
+        downloadCSV(headers, rows, `sales_trend_chart_data_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportCategoriesCSV = () => {
+        const headers = ['Category ID', 'Category Name', 'Revenue (LKR)', 'Units Sold', 'Market Share (%)'];
+        const rows = categorySlices.map((c) => [
+            c.category_id,
+            c.name,
+            c.revenue,
+            c.units_sold,
+            c.share,
+        ]);
+        downloadCSV(headers, rows, `category_share_chart_data_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportOrderStatusCSV = () => {
+        const headers = ['Order Status', 'Orders Count', 'Share (%)', 'Revenue (LKR)'];
+        const rows = statusRows.map((s) => [
+            titleCase(s.status),
+            s.orders,
+            statusTotal ? ((s.orders / statusTotal) * 100).toFixed(1) + '%' : '0%',
+            s.revenue,
+        ]);
+        downloadCSV(headers, rows, `order_fulfilment_data_${dayjs().format('YYYYMMDD')}.csv`);
     };
 
     const handleExportProductsCSV = () => {
@@ -238,6 +273,24 @@ const Analytics: React.FC = () => {
             label: 'Export KPIs (CSV)',
             icon: <FileTextOutlined />,
             onClick: handleExportKpiCSV,
+        },
+        {
+            key: 'csv-sales-trend',
+            label: 'Export Sales Trend Chart Data (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportSalesTrendCSV,
+        },
+        {
+            key: 'csv-categories',
+            label: 'Export Category Share Data (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportCategoriesCSV,
+        },
+        {
+            key: 'csv-order-status',
+            label: 'Export Order Fulfilment Data (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportOrderStatusCSV,
         },
         {
             key: 'csv-products',
@@ -389,8 +442,8 @@ const Analytics: React.FC = () => {
 
     return (
         <div data-testid="analytics-page">
-            {/* Print-only Header */}
-            <div className="print-header">
+            {/* Print-only Header (Hidden on screen, visible only during PDF printing) */}
+            <div className="print-header" style={{ display: 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 style={{ margin: 0, color: '#1890ff', fontSize: 28 }}>SRIBEESonline</h1>
