@@ -219,6 +219,7 @@ const CustomerList: React.FC = () => {
             title: 'Actions',
             key: 'actions',
             width: 100,
+            fixed: 'right' as const,
             render: (_, record) => {
                 const items = [
                     {
