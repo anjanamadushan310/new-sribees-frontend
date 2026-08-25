@@ -186,6 +186,12 @@ const BranchInventory: React.FC = () => {
     const handleSave = async () => {
         const values = await form.validateFields();
         if (!editing) return;
+        const stock = values.stock_quantity ?? 0;
+        const reserved = values.reserved_quantity ?? 0;
+        if (stock < reserved) {
+            message.error(`Cannot set stock below reserved count of ${reserved}. Resolve pending orders first.`);
+            return;
+        }
         // Empty number inputs come back as undefined; send an explicit null so
         // the server clears the override instead of ignoring the field.
         const payload: InventoryUpdatePayload = {
@@ -257,11 +263,14 @@ const BranchInventory: React.FC = () => {
             key: 'available_quantity',
             align: 'right',
             width: 100,
-            render: (v: number) => (
-                <Text strong style={{ color: v > 0 ? '#389e0d' : '#cf1322' }}>
-                    {v}
-                </Text>
-            ),
+            render: (v: number) => {
+                const available = Math.max(0, v);
+                return (
+                    <Text strong style={{ color: available > 0 ? '#389e0d' : '#cf1322' }}>
+                        {available}
+                    </Text>
+                );
+            },
         },
         {
             title: 'Status',
@@ -451,7 +460,21 @@ const BranchInventory: React.FC = () => {
                             <Form.Item
                                 label="Stock Quantity"
                                 name="stock_quantity"
-                                rules={[{ required: true, message: 'Enter stock quantity' }]}
+                                dependencies={['reserved_quantity']}
+                                rules={[
+                                    { required: true, message: 'Enter stock quantity' },
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            const reserved = getFieldValue('reserved_quantity') || 0;
+                                            if (value !== undefined && value !== null && value < reserved) {
+                                                return Promise.reject(
+                                                    new Error(`Cannot set stock below reserved count of ${reserved}. Resolve pending orders first.`)
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    }),
+                                ]}
                             >
                                 <InputNumber min={0} style={{ width: '100%' }} />
                             </Form.Item>
