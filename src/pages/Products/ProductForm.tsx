@@ -247,8 +247,8 @@ const ProductForm: React.FC = () => {
         onError: (err: any) =>
             message.error(
                 err.response?.data?.detail ||
-                    err.message ||
-                    'Could not get AI keyword suggestions.'
+                err.message ||
+                'Could not get AI keyword suggestions.'
             ),
     });
 
@@ -267,8 +267,8 @@ const ProductForm: React.FC = () => {
         onError: (err: any) =>
             message.error(
                 err.response?.data?.detail ||
-                    err.message ||
-                    'Could not generate a unique SKU.'
+                err.message ||
+                'Could not generate a unique SKU.'
             ),
     });
 
@@ -297,7 +297,7 @@ const ProductForm: React.FC = () => {
                 layout="vertical"
                 onFinish={(values) => {
                     if ((values.stock_quantity === undefined || values.stock_quantity === null || values.stock_quantity <= 0) && values.is_active) {
-                        message.error('Stock quantity is 0, please deactivate the product before saving.');
+                        message.error('Stock quantity is 0, please inactivate the product before saving.');
                         return;
                     }
                     saveMutation.mutate(values);
@@ -509,8 +509,8 @@ const ProductForm: React.FC = () => {
                                     !selectedCategoryId
                                         ? 'Select a category first.'
                                         : subcategories.length === 0
-                                          ? 'This category has no sub-categories yet.'
-                                          : undefined
+                                            ? 'This category has no sub-categories yet.'
+                                            : undefined
                                 }
                             >
                                 <Select
