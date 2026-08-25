@@ -13,8 +13,10 @@
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
+    Button,
     Card,
     Col,
+    Dropdown,
     Empty,
     Progress,
     Row,
@@ -24,12 +26,16 @@ import {
     Tag,
     Typography,
 } from 'antd';
+import type { MenuProps } from 'antd';
 import {
     DollarOutlined,
     RiseOutlined,
     ShoppingCartOutlined,
     TeamOutlined,
     DropboxOutlined,
+    DownloadOutlined,
+    FilePdfOutlined,
+    FileTextOutlined,
 } from '@ant-design/icons';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
@@ -43,6 +49,7 @@ import {
     type TopProduct,
 } from '../../api/analytics.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useAuthStore } from '../../store/authStore';
 import {
     AnalyticsFilters,
     BranchPerformanceTable,
@@ -126,6 +133,133 @@ const Analytics: React.FC = () => {
 
     const summary = summaryQuery.data;
     const current = summary?.current;
+
+    const { user } = useAuthStore();
+
+    const handleExportPDF = () => {
+        window.print();
+    };
+
+    const downloadCSV = (headers: string[], rows: (string | number)[][], filename: string) => {
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => 
+                row.map(val => {
+                    const escaped = ('' + (val ?? '')).replace(/"/g, '""');
+                    return `"${escaped}"`;
+                }).join(',')
+            )
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportKpiCSV = () => {
+        if (!current) return;
+        const headers = ['Metric', 'Value', 'Delta vs Previous Period'];
+        const formatDelta = (d: number | null | undefined) => 
+            d === null || d === undefined ? 'New' : `${d > 0 ? '+' : ''}${d.toFixed(1)}%`;
+            
+        const rows = [
+            ['Revenue', current.revenue, formatDelta(summary?.deltas.revenue)],
+            ['Orders', current.orders, formatDelta(summary?.deltas.orders)],
+            ['Avg Order Value', current.avg_order_value, formatDelta(summary?.deltas.avg_order_value)],
+            ['Customers', current.customers, formatDelta(summary?.deltas.customers)],
+            ['Items Sold', current.items_sold, formatDelta(summary?.deltas.items_sold)],
+        ];
+        downloadCSV(headers, rows, `analytics_kpis_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportProductsCSV = () => {
+        const data = productsQuery.data || [];
+        const headers = ['Rank', 'Product Name', 'SKU', 'Category', 'Units Sold', 'Revenue (LKR)'];
+        const rows = data.map((p, idx) => [
+            idx + 1,
+            p.name || 'Unnamed',
+            p.sku || '',
+            p.category || '',
+            p.units_sold,
+            p.revenue
+        ]);
+        downloadCSV(headers, rows, `top_products_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportCustomersCSV = () => {
+        const data = customersQuery.data || [];
+        const headers = ['Rank', 'Customer Name', 'Email', 'Phone', 'Orders Count', 'Total Spent (LKR)', 'Last Order Date'];
+        const rows = data.map((c, idx) => [
+            idx + 1,
+            c.full_name || 'Unnamed',
+            c.email || '',
+            c.phone || '',
+            c.orders,
+            c.revenue,
+            c.last_order_at ? dayjs(c.last_order_at).format('YYYY-MM-DD') : ''
+        ]);
+        downloadCSV(headers, rows, `top_customers_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const handleExportBranchesCSV = () => {
+        const data = branchesQuery.data?.branches || [];
+        const headers = ['Branch Code', 'Branch Name', 'District', 'Revenue (LKR)', 'Orders Count', 'Cancellation Rate', 'Low Stock Alerts'];
+        const rows = data.map(b => [
+            b.code,
+            b.name,
+            b.district || '',
+            b.revenue,
+            b.orders,
+            `${(b.cancellation_rate || 0).toFixed(1)}%`,
+            b.low_stock_alerts
+        ]);
+        downloadCSV(headers, rows, `branch_performance_${dayjs().format('YYYYMMDD')}.csv`);
+    };
+
+    const exportItems: MenuProps['items'] = [
+        {
+            key: 'pdf',
+            label: 'PDF Report Summary',
+            icon: <FilePdfOutlined style={{ color: '#ff4d4f' }} />,
+            onClick: handleExportPDF,
+        },
+        {
+            type: 'divider',
+        },
+        {
+            key: 'csv-kpi',
+            label: 'Export KPIs (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportKpiCSV,
+        },
+        {
+            key: 'csv-products',
+            label: 'Export Top Products (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportProductsCSV,
+        },
+        {
+            key: 'csv-customers',
+            label: 'Export Top Customers (CSV)',
+            icon: <FileTextOutlined />,
+            onClick: handleExportCustomersCSV,
+        },
+        ...(isSuperAdmin ? [
+            {
+                key: 'csv-branches',
+                label: 'Export Branches (CSV)',
+                icon: <FileTextOutlined />,
+                onClick: handleExportBranchesCSV,
+            }
+        ] : []),
+    ];
     const trendRows = useMemo(
         () => mergeSeries(salesQuery.data?.series ?? [], salesQuery.data?.previous_series),
         [salesQuery.data]
@@ -255,6 +389,22 @@ const Analytics: React.FC = () => {
 
     return (
         <div data-testid="analytics-page">
+            {/* Print-only Header */}
+            <div className="print-header">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 style={{ margin: 0, color: '#1890ff', fontSize: 28 }}>SRIBEESonline</h1>
+                        <span style={{ fontSize: 14, color: '#666' }}>Executive Analytics &amp; Reports Summary</span>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: 12, color: '#666' }}>
+                        <div><strong>Report Period:</strong> {days} Days ({summary ? `${dayjs(summary.range.start_date).format('MMM D, YYYY')} - ${dayjs(summary.range.end_date).format('MMM D, YYYY')}` : ''})</div>
+                        <div><strong>Branch Scope:</strong> {branchId ? (branchesQuery.data?.branches.find(b => b.branch_id === branchId)?.name || 'Filtered') : 'All Branches'}</div>
+                        <div><strong>Generated By:</strong> {user?.full_name || 'Administrator'}</div>
+                        <div><strong>Generated At:</strong> {dayjs().format('YYYY-MM-DD HH:mm:ss')}</div>
+                    </div>
+                </div>
+            </div>
+
             <div
                 style={{
                     display: 'flex',
@@ -266,11 +416,11 @@ const Analytics: React.FC = () => {
                 }}
             >
                 <div>
-                    <Title level={3} style={{ margin: 0 }}>
+                    <Title level={3} style={{ margin: 0 }} className="no-print">
                         Analytics &amp; Reports
                     </Title>
                     {summary && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }} className="no-print">
                             {dayjs(summary.range.start_date).format('MMM D, YYYY')} –{' '}
                             {dayjs(summary.range.end_date).format('MMM D, YYYY')}
                             {' · compared with '}
@@ -280,13 +430,18 @@ const Analytics: React.FC = () => {
                         </Text>
                     )}
                 </div>
-                <AnalyticsFilters
-                    days={days}
-                    onDaysChange={setDays}
-                    showBranchFilter={isSuperAdmin}
-                    branchId={branchId}
-                    onBranchChange={setBranchId}
-                />
+                <Space wrap size={12} className="no-print" style={{ alignItems: 'center' }}>
+                    <AnalyticsFilters
+                        days={days}
+                        onDaysChange={setDays}
+                        showBranchFilter={isSuperAdmin}
+                        branchId={branchId}
+                        onBranchChange={setBranchId}
+                    />
+                    <Dropdown menu={{ items: exportItems }} trigger={['click']} placement="bottomRight">
+                        <Button type="primary" icon={<DownloadOutlined />}>Export Report</Button>
+                    </Dropdown>
+                </Space>
             </div>
 
             {firstError && (

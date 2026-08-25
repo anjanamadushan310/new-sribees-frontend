@@ -66,3 +66,57 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+@media print {
+  aside.ant-layout-sider,
+  header.ant-layout-header,
+  .ant-segmented,
+  .ant-select,
+  .ant-btn,
+  .no-print,
+  .ant-dropdown-trigger,
+  [data-testid="analytics-filters"] {
+    display: none !important;
+  }
+
+  body, .ant-layout, .ant-layout-content {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+  }
+
+  .ant-layout-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .ant-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: 1px solid #e8e8e8 !important;
+    box-shadow: none !important;
+    margin-bottom: 24px !important;
+  }
+
+  .ant-table-wrapper {
+    page-break-inside: auto !important;
+  }
+
+  .ant-table-row {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-header {
+    display: block !important;
+    margin-bottom: 30px !important;
+    border-bottom: 2px solid #333 !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+.print-header {
+  display: none;
+}
