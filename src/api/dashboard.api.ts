@@ -16,6 +16,27 @@ export interface DashboardStats {
     watchlistItems?: number;
 }
 
+/**
+ * GET /admin/dashboard/stats — the generic (today: staff-role) dashboard.
+ * Each optional section is present only if the caller holds the specific
+ * permission it represents; `granted` says which ones to expect, so the
+ * page can render an honest "no permission" placeholder instead of
+ * inferring absence from a zero.
+ */
+export interface StaffDashboardStats {
+    granted: { orders: boolean; customers: boolean; products: boolean };
+    totalRevenue?: number;
+    totalOrders?: number;
+    pendingOrders?: number;
+    revenueGrowth?: number;
+    ordersGrowth?: number;
+    revenueTrend?: { date: string; revenue: number; orders: number }[];
+    orderStatusDistribution?: { status: string; orders: number }[];
+    recentOrders?: RecentOrder[];
+    totalCustomers?: number;
+    topSellingProducts?: { productId: string; name: string; unitsSold: number; revenue: number }[];
+}
+
 export interface BranchDashboardStats {
     todayRevenue: number;
     todayOrders: number;
@@ -69,19 +90,52 @@ export interface BranchPerformance {
     low_stock_count: number;
 }
 
+interface StaffDashboardStatsWire {
+    granted: { orders: boolean; customers: boolean; products: boolean };
+    total_revenue?: number;
+    total_orders?: number;
+    pending_orders?: number;
+    revenue_growth?: number;
+    orders_growth?: number;
+    revenue_trend?: { date: string; revenue: number; orders: number }[];
+    order_status_distribution?: { status: string; orders: number }[];
+    recent_orders?: RecentOrder[];
+    total_customers?: number;
+    top_selling_products?: { product_id: string; name: string; units_sold: number; revenue: number }[];
+}
+
+function mapDashboardStatsWire(w: StaffDashboardStatsWire): StaffDashboardStats {
+    return {
+        granted: w.granted,
+        totalRevenue: w.total_revenue,
+        totalOrders: w.total_orders,
+        pendingOrders: w.pending_orders,
+        revenueGrowth: w.revenue_growth,
+        ordersGrowth: w.orders_growth,
+        revenueTrend: w.revenue_trend,
+        orderStatusDistribution: w.order_status_distribution,
+        recentOrders: w.recent_orders,
+        totalCustomers: w.total_customers,
+        topSellingProducts: w.top_selling_products?.map((p) => ({
+            productId: p.product_id,
+            name: p.name,
+            unitsSold: p.units_sold,
+            revenue: p.revenue,
+        })),
+    };
+}
+
 export const dashboardApi = {
     /**
-     * Get global dashboard statistics (Super Admin)
-     * Note: Returns null silently if endpoint not implemented (uses mock data fallback)
+     * The generic dashboard's stats (today: the 'staff' role only — every
+     * base role has its own dedicated dashboard). Each section in the
+     * response is gated server-side on the specific permission it
+     * represents; `granted` says which to expect. Throws on failure —
+     * callers should show a real error state, not infer one from a shape.
      */
-    getStats: async (): Promise<DashboardStats | null> => {
-        try {
-            const response = await apiClient.get('/analytics/dashboard/stats');
-            return response.data.data;
-        } catch (error) {
-            // Silently return null - dashboard uses mock data fallback
-            return null;
-        }
+    getDashboardStats: async (): Promise<StaffDashboardStats> => {
+        const response = await apiClient.get<{ data: StaffDashboardStatsWire }>('/admin/dashboard/stats');
+        return mapDashboardStatsWire(response.data.data);
     },
 
     /**
@@ -107,16 +161,6 @@ export const dashboardApi = {
             return response.data.data?.branches || [];
         } catch (error) {
             console.error('Failed to fetch branch performance:', error);
-            return [];
-        }
-    },
-
-    getRecentOrders: async (limit: number = 10): Promise<RecentOrder[]> => {
-        try {
-            const response = await apiClient.get(`/orders/admin/all?limit=${limit}`);
-            return response.data.data?.orders || [];
-        } catch (error) {
-            console.error('Failed to fetch recent orders:', error);
             return [];
         }
     },

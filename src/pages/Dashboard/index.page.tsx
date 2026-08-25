@@ -1,129 +1,62 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Table, Spin, Alert } from 'antd';
+import { Card, Row, Col, Table, Spin, Alert, Button, Typography } from 'antd';
 import {
     DollarOutlined,
     ShoppingCartOutlined,
     UserOutlined,
     ShoppingOutlined,
-    RiseOutlined,
-    FallOutlined,
+    LockOutlined,
 } from '@ant-design/icons';
 import { LineChart, Line, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { dashboardApi } from '../../api/dashboard.api';
-import type { DashboardStats, RecentOrder } from '../../api/dashboard.api';
+import type { StaffDashboardStats } from '../../api/dashboard.api';
+import { KpiCard } from '../../components/analytics';
+import { formatLKR, formatNumber } from '../../utils/format';
+import { SERIES, PRIMARY } from '../../utils/chartTheme';
 import dayjs from 'dayjs';
 
+const { Text } = Typography;
+
+/**
+ * The generic dashboard — today only the 'staff' role lands here (every
+ * base role has its own dedicated dashboard: DashboardHome, MarketingDashboard,
+ * etc.). Every section is server-permission-gated (see StaffDashboardStats'
+ * `granted` flags): a staff account only sees the numbers its role was
+ * actually delegated, never a zero standing in for "not allowed" and never
+ * a fabricated number standing in for "the request failed".
+ */
 const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
+    const [stats, setStats] = useState<StaffDashboardStats | null>(null);
 
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
             setError(null);
-
-            // Fetch stats and recent orders
-            const [statsData, ordersData] = await Promise.all([
-                dashboardApi.getStats(),
-                dashboardApi.getRecentOrders(5),
-            ]);
-
-            setStats(statsData);
-            setRecentOrders(ordersData);
+            const data = await dashboardApi.getDashboardStats();
+            setStats(data);
         } catch (err: any) {
-            console.error('Dashboard error:', err);
-            setError(err.response?.data?.message || 'Failed to load dashboard data');
-
-            // Use mock data for demo
-            setStats({
-                totalRevenue: 93250.50,
-                totalOrders: 1234,
-                totalCustomers: 567,
-                pendingOrders: 23,
-                revenueGrowth: 12.5,
-                ordersGrowth: 8.3,
-            });
-
-            setRecentOrders([
-                {
-                    order_id: '1',
-                    order_number: 'ORD-2026-001234',
-                    customer_name: 'John Doe',
-                    total_amount: 125.00,
-                    status: 'delivered',
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    order_id: '2',
-                    order_number: 'ORD-2026-001235',
-                    customer_name: 'Jane Smith',
-                    total_amount: 89.50,
-                    status: 'pending',
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    order_id: '3',
-                    order_number: 'ORD-2026-001236',
-                    customer_name: 'Bob Johnson',
-                    total_amount: 210.00,
-                    status: 'shipped',
-                    created_at: new Date().toISOString(),
-                },
-            ]);
+            setError(err.response?.data?.detail || err.message || 'Failed to load dashboard data');
+            setStats(null);
         } finally {
             setLoading(false);
         }
     };
 
-    // Mock data for charts
-    const salesData = [
-        { date: 'Mon', revenue: 4200, orders: 24 },
-        { date: 'Tue', revenue: 5100, orders: 31 },
-        { date: 'Wed', revenue: 3800, orders: 22 },
-        { date: 'Thu', revenue: 6200, orders: 38 },
-        { date: 'Fri', revenue: 7500, orders: 45 },
-        { date: 'Sat', revenue: 8900, orders: 52 },
-        { date: 'Sun', revenue: 6800, orders: 41 },
-    ];
-
-    const orderStatusData = [
-        { name: 'Pending', value: 23, color: '#faad14' },
-        { name: 'Confirmed', value: 45, color: '#1890ff' },
-        { name: 'Packed', value: 32, color: '#722ed1' },
-        { name: 'Shipped', value: 67, color: '#13c2c2' },
-        { name: 'Delivered', value: 156, color: '#52c41a' },
-    ];
-
-    const topProducts = [
-        { name: 'Organic Milk', sales: 245 },
-        { name: 'Fresh Bread', sales: 189 },
-        { name: 'Eggs (Dozen)', sales: 167 },
-        { name: 'Bananas', sales: 143 },
-        { name: 'Tomatoes', sales: 128 },
-    ];
+    useEffect(() => {
+        fetchDashboardData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const columns = [
-        {
-            title: 'Order Number',
-            dataIndex: 'order_number',
-            key: 'order_number',
-        },
-        {
-            title: 'Customer',
-            dataIndex: 'customer_name',
-            key: 'customer_name',
-        },
+        { title: 'Order Number', dataIndex: 'order_number', key: 'order_number' },
+        { title: 'Customer', dataIndex: 'customer_name', key: 'customer_name' },
         {
             title: 'Total',
             dataIndex: 'total_amount',
             key: 'total_amount',
-            render: (amount: number) => `$${amount.toFixed(2)}`,
+            render: (amount: number) => formatLKR(amount),
         },
         {
             title: 'Status',
@@ -157,75 +90,81 @@ const Dashboard: React.FC = () => {
         );
     }
 
+    if (error) {
+        return (
+            <div>
+                <h1 style={{ marginBottom: 24 }}>Dashboard Overview</h1>
+                <Alert
+                    message="Could not load dashboard data"
+                    description={error}
+                    type="error"
+                    action={<Button size="small" onClick={fetchDashboardData}>Retry</Button>}
+                />
+            </div>
+        );
+    }
+
+    const grantedOrders = stats?.granted.orders ?? false;
+    const grantedCustomers = stats?.granted.customers ?? false;
+    const grantedProducts = stats?.granted.products ?? false;
+
     return (
         <div>
             <h1 style={{ marginBottom: 24 }}>Dashboard Overview</h1>
 
-            {error && (
-                <Alert
-                    message="Using Demo Data"
-                    description={error}
-                    type="warning"
-                    closable
-                    style={{ marginBottom: 24 }}
-                />
-            )}
-
             {/* Stats Cards */}
             <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12} lg={6}>
-                    <Card>
-                        <Statistic
+                    {grantedOrders ? (
+                        <KpiCard
                             title="Total Revenue"
-                            value={stats?.totalRevenue || 0}
-                            precision={2}
-                            prefix="$"
-                            suffix={
-                                <DollarOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                            }
+                            value={formatLKR(stats?.totalRevenue)}
+                            icon={<DollarOutlined />}
+                            accent="#52c41a"
+                            delta={stats?.revenueGrowth ?? null}
+                            deltaCaption="vs previous 7 days"
                         />
-                        <div style={{ marginTop: 8, fontSize: 12, color: stats && stats.revenueGrowth > 0 ? '#52c41a' : '#f5222d' }}>
-                            {stats && stats.revenueGrowth > 0 ? <RiseOutlined /> : <FallOutlined />}
-                            {' '}{Math.abs(stats?.revenueGrowth || 0)}% from last month
-                        </div>
-                    </Card>
+                    ) : (
+                        <NoPermissionCard title="Total Revenue" />
+                    )}
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                    <Card>
-                        <Statistic
+                    {grantedOrders ? (
+                        <KpiCard
                             title="Total Orders"
-                            value={stats?.totalOrders || 0}
-                            suffix={
-                                <ShoppingCartOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                            }
+                            value={formatNumber(stats?.totalOrders)}
+                            icon={<ShoppingCartOutlined />}
+                            accent="#1890ff"
+                            delta={stats?.ordersGrowth ?? null}
+                            deltaCaption="vs previous 7 days"
                         />
-                        <div style={{ marginTop: 8, fontSize: 12, color: stats && stats.ordersGrowth > 0 ? '#52c41a' : '#f5222d' }}>
-                            {stats && stats.ordersGrowth > 0 ? <RiseOutlined /> : <FallOutlined />}
-                            {' '}{Math.abs(stats?.ordersGrowth || 0)}% from last month
-                        </div>
-                    </Card>
+                    ) : (
+                        <NoPermissionCard title="Total Orders" />
+                    )}
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                    <Card>
-                        <Statistic
+                    {grantedCustomers ? (
+                        <KpiCard
                             title="Total Customers"
-                            value={stats?.totalCustomers || 0}
-                            suffix={
-                                <UserOutlined style={{ fontSize: 24, color: '#722ed1' }} />
-                            }
+                            value={formatNumber(stats?.totalCustomers)}
+                            icon={<UserOutlined />}
+                            accent="#722ed1"
                         />
-                    </Card>
+                    ) : (
+                        <NoPermissionCard title="Total Customers" />
+                    )}
                 </Col>
                 <Col xs={24} sm={12} lg={6}>
-                    <Card>
-                        <Statistic
+                    {grantedOrders ? (
+                        <KpiCard
                             title="Pending Orders"
-                            value={stats?.pendingOrders || 0}
-                            suffix={
-                                <ShoppingOutlined style={{ fontSize: 24, color: '#faad14' }} />
-                            }
+                            value={formatNumber(stats?.pendingOrders)}
+                            icon={<ShoppingOutlined />}
+                            accent="#faad14"
                         />
-                    </Card>
+                    ) : (
+                        <NoPermissionCard title="Pending Orders" />
+                    )}
                 </Col>
             </Row>
 
@@ -233,65 +172,82 @@ const Dashboard: React.FC = () => {
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
                 <Col xs={24} lg={12}>
                     <Card title="Revenue Trend (Last 7 Days)">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={salesData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Line type="monotone" dataKey="revenue" stroke="#52c41a" strokeWidth={2} />
-                            </LineChart>
-                        </ResponsiveContainer>
+                        {grantedOrders && stats?.revenueTrend ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={stats.revenueTrend}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tickFormatter={(d) => dayjs(d).format('MMM D')} />
+                                    <YAxis />
+                                    <Tooltip labelFormatter={(d) => dayjs(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatLKR(v)} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke={PRIMARY} strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <NoPermissionBody />
+                        )}
                     </Card>
                 </Col>
                 <Col xs={24} lg={12}>
                     <Card title="Order Status Distribution">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={orderStatusData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={(entry) => `${entry.name}: ${entry.value}`}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {orderStatusData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        {grantedOrders && stats?.orderStatusDistribution ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={stats.orderStatusDistribution.filter((s) => s.orders > 0)}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={(entry: any) => `${entry.status}: ${entry.orders}`}
+                                        outerRadius={80}
+                                        dataKey="orders"
+                                        nameKey="status"
+                                    >
+                                        {stats.orderStatusDistribution.map((_entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={SERIES[index % SERIES.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <NoPermissionBody />
+                        )}
                     </Card>
                 </Col>
             </Row>
 
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
                 <Col xs={24} lg={12}>
-                    <Card title="Top Selling Products">
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={topProducts}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="sales" fill="#1890ff" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <Card title="Top Selling Products (Last 30 Days)">
+                        {grantedOrders && grantedProducts && stats?.topSellingProducts ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={stats.topSellingProducts}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                    <YAxis />
+                                    <Tooltip formatter={(v?: number) => formatNumber(v)} />
+                                    <Bar dataKey="unitsSold" name="Units Sold" fill={PRIMARY} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <NoPermissionBody />
+                        )}
                     </Card>
                 </Col>
                 <Col xs={24} lg={12}>
                     <Card title="Recent Orders">
-                        <Table
-                            dataSource={recentOrders}
-                            columns={columns}
-                            pagination={false}
-                            rowKey="order_id"
-                        />
+                        {grantedOrders && stats?.recentOrders ? (
+                            <Table
+                                dataSource={stats.recentOrders}
+                                columns={columns}
+                                pagination={false}
+                                rowKey="order_id"
+                                locale={{ emptyText: 'No orders yet.' }}
+                            />
+                        ) : (
+                            <NoPermissionBody />
+                        )}
                     </Card>
                 </Col>
             </Row>
@@ -299,5 +255,24 @@ const Dashboard: React.FC = () => {
     );
 };
 
-export default Dashboard;
+/** A KPI slot the caller isn't permitted to see — a placeholder keeps the
+ * layout stable and makes clear this is a permissions boundary, not a data
+ * problem (a zero would look like a real, wrong answer). */
+const NoPermissionCard: React.FC<{ title: string }> = ({ title }) => (
+    <Card size="small" style={{ height: '100%' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>{title}</Text>
+        <div style={{ marginTop: 8, color: '#bfbfbf', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LockOutlined />
+            <span style={{ fontSize: 13 }}>No permission</span>
+        </div>
+    </Card>
+);
 
+const NoPermissionBody: React.FC = () => (
+    <div style={{ textAlign: 'center', padding: '80px 0', color: '#bfbfbf' }}>
+        <LockOutlined style={{ fontSize: 28 }} />
+        <div style={{ marginTop: 8, fontSize: 13 }}>You don't have permission to view this.</div>
+    </div>
+);
+
+export default Dashboard;
