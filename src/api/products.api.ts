@@ -193,6 +193,18 @@ export const productsApi = {
         return res.data.data.suggested_keywords;
     },
 
+    /** Generate a guaranteed unique SKU based on name and category_id. */
+    suggestSku: async (payload: {
+        name?: string | null;
+        category_id?: string | null;
+    }): Promise<string> => {
+        const res = await apiClient.post<{ success: boolean; data: { sku: string } }>(
+            '/admin/products/suggest-sku',
+            payload
+        );
+        return res.data.data.sku;
+    },
+
     // --- Images -------------------------------------------------------------
 
     /** Upload a raw file to storage; returns the hosted URL (not yet linked). */

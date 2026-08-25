@@ -23,8 +23,9 @@ import {
     Typography,
     Space,
     Tabs,
+    Tooltip,
 } from 'antd';
-import { ArrowLeftOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ThunderboltOutlined, StarOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
@@ -248,6 +249,26 @@ const ProductForm: React.FC = () => {
                 err.response?.data?.detail ||
                     err.message ||
                     'Could not get AI keyword suggestions.'
+            ),
+    });
+
+    const suggestSkuMutation = useMutation({
+        mutationFn: async () => {
+            const values = form.getFieldsValue();
+            return productsApi.suggestSku({
+                name: values.name,
+                category_id: values.category_id,
+            });
+        },
+        onSuccess: (sku) => {
+            form.setFieldValue('sku', sku);
+            message.success('Guaranteed unique SKU generated!');
+        },
+        onError: (err: any) =>
+            message.error(
+                err.response?.data?.detail ||
+                    err.message ||
+                    'Could not generate a unique SKU.'
             ),
     });
 
@@ -508,7 +529,21 @@ const ProductForm: React.FC = () => {
                                 name="sku"
                                 rules={[{ required: true, whitespace: true, message: 'SKU is required' }]}
                             >
-                                <Input placeholder="e.g. MILK-ORG-1L" />
+                                <Input
+                                    placeholder="e.g. MILK-ORG-1L"
+                                    suffix={
+                                        <Tooltip title="Generate Unique SKU automatically based on Name and Category">
+                                            <Button
+                                                type="text"
+                                                size="small"
+                                                icon={<StarOutlined style={{ color: '#faad14', fontSize: 16 }} />}
+                                                loading={suggestSkuMutation.isPending}
+                                                onClick={() => suggestSkuMutation.mutate()}
+                                                style={{ padding: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                            />
+                                        </Tooltip>
+                                    }
+                                />
                             </Form.Item>
 
                             <Form.Item label="Active" name="is_active" valuePropName="checked">
