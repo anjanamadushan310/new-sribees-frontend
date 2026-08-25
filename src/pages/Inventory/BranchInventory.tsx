@@ -376,6 +376,7 @@ const BranchInventory: React.FC = () => {
                             ? 'Failed to load inventory.'
                             : 'No inventory items found.',
                     }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{
                         current: page,
                         pageSize,

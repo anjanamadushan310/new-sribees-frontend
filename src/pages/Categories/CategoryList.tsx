@@ -387,6 +387,7 @@ const CategoryList: React.FC = () => {
                         emptyText: isError ? 'Failed to load categories.' : 'No categories yet.',
                     }}
                     expandable={{ defaultExpandAllRows: true }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{
                         pageSize: 10,
                         showSizeChanger: true,

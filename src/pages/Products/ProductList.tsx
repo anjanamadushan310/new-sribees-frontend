@@ -261,6 +261,7 @@ const ProductList: React.FC = () => {
                     locale={{
                         emptyText: isError ? 'Failed to load products.' : 'No products found.',
                     }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{
                         current: page,
                         pageSize,
