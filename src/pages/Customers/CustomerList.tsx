@@ -4,8 +4,8 @@
  * toggle. TanStack Query against /api/v1/admin/customers.
  */
 import React, { useState } from 'react';
-import { Card, Table, Input, Tag, Switch, Space, Typography, App } from 'antd';
-import { SearchOutlined, UserOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button } from 'antd';
+import { SearchOutlined, UserOutlined, CheckCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -23,6 +23,54 @@ const CustomerList: React.FC = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
+    const [exporting, setExporting] = useState(false);
+
+    const exportToCSV = async () => {
+        setExporting(true);
+        try {
+            const result = await customersApi.list({
+                page: 1,
+                limit: data?.total || 10000,
+                search: search || undefined,
+            });
+            
+            const exportData = result.customers;
+            const headers = ['Name', 'Email', 'Phone', 'Joined Date', 'Status'];
+            const rows = exportData.map(c => [
+                c.full_name || 'Unnamed',
+                c.email || '',
+                c.phone || '',
+                c.created_at ? dayjs(c.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
+                c.is_active ? 'Active' : 'Inactive'
+            ]);
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => 
+                    row.map(val => {
+                        const escaped = ('' + val).replace(/"/g, '""');
+                        return `"${escaped}"`;
+                    }).join(',')
+                )
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `customers_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            message.success('Customer list exported successfully.');
+        } catch (error) {
+            message.error('Failed to export customer list.');
+        } finally {
+            setExporting(false);
+        }
+    };
 
     const { data, isLoading, isError } = useQuery({
         queryKey: [CUSTOMERS_KEY, { page, pageSize, search }],
@@ -101,12 +149,22 @@ const CustomerList: React.FC = () => {
 
     return (
         <div>
-            <Title level={3} style={{ marginTop: 0 }}>
-                <Space>
-                    <UserOutlined />
-                    Customers
-                </Space>
-            </Title>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Title level={3} style={{ margin: 0 }}>
+                    <Space>
+                        <UserOutlined />
+                        Customers
+                    </Space>
+                </Title>
+                <Button 
+                    type="primary" 
+                    icon={<DownloadOutlined />} 
+                    onClick={exportToCSV}
+                    loading={exporting}
+                >
+                    Export CSV
+                </Button>
+            </div>
 
             <Card>
                 <Input.Search
