@@ -481,9 +481,9 @@ const BranchInventory: React.FC = () => {
                             <Form.Item
                                 label="Reserved Quantity"
                                 name="reserved_quantity"
-                                rules={[{ required: true, message: 'Enter reserved quantity' }]}
+                                extra="Managed automatically by the system based on pending customer orders."
                             >
-                                <InputNumber min={0} style={{ width: '100%' }} />
+                                <InputNumber min={0} style={{ width: '100%' }} disabled />
                             </Form.Item>
                             <Form.Item
                                 label="Low Stock Threshold"
