@@ -295,7 +295,13 @@ const ProductForm: React.FC = () => {
             <Form
                 form={form}
                 layout="vertical"
-                onFinish={(values) => saveMutation.mutate(values)}
+                onFinish={(values) => {
+                    if ((values.stock_quantity === undefined || values.stock_quantity === null || values.stock_quantity <= 0) && values.is_active) {
+                        message.error('Stock quantity is 0, please deactivate the product before saving.');
+                        return;
+                    }
+                    saveMutation.mutate(values);
+                }}
                 initialValues={{ is_active: true, is_featured: false, stock_quantity: 0 }}
             >
                 <Row gutter={16}>
