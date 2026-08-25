@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List, Badge } from 'antd';
+import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List } from 'antd';
 import { SearchOutlined, UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -387,7 +387,7 @@ const CustomerList: React.FC = () => {
                                     {profile.is_blocked ? (
                                         <Space direction="vertical" size={2}>
                                             <Tag color="red">Blocked</Tag>
-                                            <Text type="danger" size="small">Reason: {profile.blocked_reason}</Text>
+                                            <Text type="danger" style={{ fontSize: '12px' }}>Reason: {profile.blocked_reason}</Text>
                                         </Space>
                                     ) : (
                                         <Tag color={profile.is_active ? 'green' : 'default'}>{profile.is_active ? 'Active' : 'Inactive'}</Tag>
