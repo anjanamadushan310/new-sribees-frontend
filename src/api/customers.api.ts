@@ -12,9 +12,59 @@ export interface Customer {
     phone: string | null;
     role: string;
     is_active: boolean;
+    is_blocked?: boolean;
+    blocked_reason?: string | null;
     is_verified: boolean;
     created_at: string | null;
     last_login: string | null;
+}
+
+export interface CustomerAddress {
+    address_id: string;
+    address_line1: string;
+    address_line2: string | null;
+    post_office: string;
+    district: string;
+    postal_code: string;
+    province: string;
+    is_default: boolean;
+}
+
+export interface CustomerStats {
+    total_orders: number;
+    total_spent: number;
+}
+
+export interface CustomerProfile {
+    user_id: string;
+    email: string | null;
+    full_name: string | null;
+    phone: string | null;
+    is_active: boolean;
+    is_blocked: boolean;
+    blocked_reason: string | null;
+    is_verified: boolean;
+    created_at: string | null;
+    last_login: string | null;
+    addresses: CustomerAddress[];
+    stats: CustomerStats;
+}
+
+export interface CustomerOrder {
+    order_id: string;
+    order_number: string;
+    total_amount: number;
+    status: string;
+    payment_status: string;
+    created_at: string | null;
+}
+
+export interface CustomerOrdersResult {
+    orders: CustomerOrder[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
 }
 
 export interface CustomerListParams {
@@ -56,5 +106,35 @@ export const customersApi = {
         await apiClient.put(`/admin/customers/${userId}/status`, null, {
             params: { is_active: isActive },
         });
+    },
+
+    getProfile: async (userId: string): Promise<CustomerProfile> => {
+        const res = await apiClient.get<{ success: boolean; data: CustomerProfile }>(`/admin/customers/${userId}/profile`);
+        return res.data.data;
+    },
+
+    getOrders: async (userId: string, page = 1, limit = 10): Promise<CustomerOrdersResult> => {
+        const res = await apiClient.get<{ success: boolean; data: { orders: CustomerOrder[]; pagination: { total: number; page: number; limit: number; pages: number } } }>(
+            `/admin/customers/${userId}/orders`,
+            { params: { page, limit } }
+        );
+        return { orders: res.data.data.orders, ...res.data.data.pagination };
+    },
+
+    update: async (userId: string, data: { full_name: string; email?: string | null; phone?: string | null }): Promise<void> => {
+        await apiClient.put(`/admin/customers/${userId}`, data);
+    },
+
+    block: async (userId: string, reason: string): Promise<void> => {
+        await apiClient.post(`/admin/customers/${userId}/block`, { reason });
+    },
+
+    unblock: async (userId: string): Promise<void> => {
+        await apiClient.post(`/admin/customers/${userId}/unblock`);
+    },
+
+    delete: async (userId: string): Promise<{ success: boolean; message: string }> => {
+        const res = await apiClient.delete<{ success: boolean; message: string }>(`/admin/customers/${userId}`);
+        return res.data;
     },
 };
