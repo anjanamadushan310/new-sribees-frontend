@@ -52,11 +52,13 @@ const CustomerList: React.FC = () => {
                     {record.is_verified && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
                 </Space>
             ),
+            sorter: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
         },
         {
             title: 'Email',
             dataIndex: 'email',
             key: 'email',
+            sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
         },
         {
             title: 'Phone',
@@ -124,6 +126,7 @@ const CustomerList: React.FC = () => {
                     dataSource={data?.customers ?? []}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load customers.' : 'No customers found.' }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{
                         current: page,
                         pageSize,
