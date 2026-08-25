@@ -218,7 +218,7 @@ const CustomerList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 100,
+            width: 80,
             fixed: 'right' as const,
             render: (_, record) => {
                 const items = [
@@ -332,7 +332,7 @@ const CustomerList: React.FC = () => {
                     dataSource={data?.customers ?? []}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load customers.' : 'No customers found.' }}
-                    scroll={{ x: 'max-content' }}
+                    scroll={{ x: 900 }}
                     pagination={{
                         current: page,
                         pageSize,
