@@ -28,6 +28,7 @@ import {
     StopOutlined,
     SearchOutlined,
     TagOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -121,6 +122,16 @@ const CouponList: React.FC = () => {
         },
         onError: (err: any) =>
             message.error(err.response?.data?.detail || 'Failed to deactivate coupon.'),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => couponsApi.delete(id),
+        onSuccess: () => {
+            message.success('Coupon deleted permanently.');
+            invalidate();
+        },
+        onError: (err: any) =>
+            message.error(err.response?.data?.detail || 'Failed to delete coupon.'),
     });
 
     const openCreate = () => {
@@ -227,7 +238,7 @@ const CouponList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 190,
+            width: 240,
             render: (_, c) => {
                 const isExpired = dayjs().isAfter(dayjs(c.valid_until));
                 const isUsedUp = c.usage_limit != null && c.used_count >= c.usage_limit;
@@ -262,6 +273,17 @@ const CouponList: React.FC = () => {
                                 </Button>
                             </Tooltip>
                         ) : null}
+                        <Popconfirm
+                            title="Delete coupon permanently?"
+                            description={`Are you sure you want to permanently delete "${c.code}"?`}
+                            okText="Delete"
+                            okButtonProps={{ danger: true }}
+                            onConfirm={() => deleteMutation.mutate(c.coupon_id)}
+                        >
+                            <Button type="link" danger icon={<DeleteOutlined />}>
+                                Delete
+                            </Button>
+                        </Popconfirm>
                     </Space>
                 );
             },

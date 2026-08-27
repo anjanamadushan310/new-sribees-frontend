@@ -88,4 +88,9 @@ export const couponsApi = {
     deactivate: async (id: string): Promise<void> => {
         await apiClient.delete(`/admin/coupons/${id}`);
     },
+
+    /** Hard delete — permanently removes the coupon code from the database. */
+    delete: async (id: string): Promise<void> => {
+        await apiClient.delete(`/admin/coupons/${id}`, { params: { hard: true } });
+    },
 };
