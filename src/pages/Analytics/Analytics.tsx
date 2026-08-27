@@ -363,14 +363,29 @@ const Analytics: React.FC = () => {
             title: 'Product',
             dataIndex: 'name',
             key: 'name',
-            render: (name: string, row) => (
-                <div>
-                    <div>{name}</div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                        {[row.sku, row.category].filter(Boolean).join(' · ') || '—'}
-                    </Text>
-                </div>
-            ),
+            render: (name: string, row) => {
+                const subtext = [row.sku, row.category].filter(Boolean).join(' · ') || '—';
+                return (
+                    <div style={{ maxWidth: 220 }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
+                            {name}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: '12px',
+                                color: '#475569',
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                            title={subtext}
+                        >
+                            {subtext}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             title: 'Units',
@@ -401,14 +416,29 @@ const Analytics: React.FC = () => {
             title: 'Customer',
             dataIndex: 'full_name',
             key: 'full_name',
-            render: (name: string, row) => (
-                <div>
-                    <div>{name}</div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                        {row.email || row.phone || '—'}
-                    </Text>
-                </div>
-            ),
+            render: (name: string, row) => {
+                const contactText = row.email || row.phone || '—';
+                return (
+                    <div style={{ maxWidth: 220 }}>
+                        <div style={{ fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
+                            {name}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: '12px',
+                                color: '#475569',
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                            title={contactText}
+                        >
+                            {contactText}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             title: 'Orders',
