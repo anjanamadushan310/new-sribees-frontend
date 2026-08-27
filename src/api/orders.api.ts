@@ -73,6 +73,15 @@ export interface OrderReturnItem {
     quantity: number;
 }
 
+export interface OrderStatusHistoryItem {
+    history_id: string;
+    old_status: OrderStatus | string | null;
+    new_status: OrderStatus | string;
+    changed_by: string;
+    notes: string | null;
+    created_at: string | null;
+}
+
 export interface OrderDetail {
     order_id: string;
     order_number: string;
@@ -97,6 +106,7 @@ export interface OrderDetail {
     delivery_address: OrderDeliveryAddress | null;
     items: OrderItem[];
     pricing: OrderPricing;
+    history?: OrderStatusHistoryItem[];
 }
 
 export interface OrderScope {

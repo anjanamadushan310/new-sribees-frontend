@@ -17,8 +17,9 @@ import {
     Empty,
     App,
     Typography,
+    Timeline,
 } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UserOutlined, RobotOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -371,6 +372,58 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                 wallet{order.return_reason ? ` (${order.return_reason})` : ''}.
                             </Text>
                         </>
+                    )}
+
+                    <Divider titlePlacement="start">📜 Status History & Audit Trail</Divider>
+                    {order.history && order.history.length > 0 ? (
+                        <div style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0' }}>
+                            <Timeline
+                                style={{ marginTop: 16 }}
+                                items={order.history.map((h) => {
+                                    const meta = ORDER_STATUS_META[h.new_status as OrderStatus];
+                                    let color = meta?.color || 'blue';
+                                    if (h.new_status === 'delivered') color = 'green';
+                                    if (h.new_status === 'cancelled') color = 'red';
+                                    if (h.new_status === 'shipped') color = 'cyan';
+                                    if (h.new_status === 'pending') color = 'gold';
+
+                                    const isUser = h.changed_by.toLowerCase().includes('customer');
+                                    const isAdmin = h.changed_by.toLowerCase().includes('admin');
+
+                                    return {
+                                        color: color,
+                                        children: (
+                                            <div style={{ marginBottom: 6 }}>
+                                                <Space wrap size={8}>
+                                                    <Text strong style={{ fontSize: 13 }}>
+                                                        {meta?.label ?? h.new_status.toUpperCase()}
+                                                    </Text>
+                                                    <Tag color={color} style={{ margin: 0, fontSize: 11 }}>
+                                                        {h.new_status}
+                                                    </Tag>
+                                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                                        <ClockCircleOutlined style={{ marginRight: 4 }} />
+                                                        {h.created_at ? dayjs(h.created_at).format('MMM DD, YYYY · hh:mm A') : '—'}
+                                                    </Text>
+                                                </Space>
+                                                <div style={{ marginTop: 4 }}>
+                                                    <Tag icon={isAdmin || isUser ? <UserOutlined /> : <RobotOutlined />} color={isAdmin ? 'purple' : isUser ? 'orange' : 'default'} style={{ fontSize: 11 }}>
+                                                        by {h.changed_by}
+                                                    </Tag>
+                                                    {h.notes && (
+                                                        <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                                                            ({h.notes})
+                                                        </Text>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ),
+                                    };
+                                })}
+                            />
+                        </div>
+                    ) : (
+                        <Text type="secondary">No status history records available.</Text>
                     )}
 
                     <Divider titlePlacement="start">Actions</Divider>
