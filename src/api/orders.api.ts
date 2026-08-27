@@ -195,4 +195,46 @@ export const ordersApi = {
         });
         return res.data as Blob;
     },
+
+    exportCSV: async (params?: {
+        order_status?: OrderStatus;
+        search?: string;
+        branch_id?: string;
+        order_ids?: string[];
+    }): Promise<Blob> => {
+        const clean: Record<string, unknown> = {};
+        if (params) {
+            if (params.order_status) clean.order_status = params.order_status;
+            if (params.search) clean.search = params.search;
+            if (params.branch_id) clean.branch_id = params.branch_id;
+            if (params.order_ids && params.order_ids.length > 0)
+                clean.order_ids = params.order_ids.join(',');
+        }
+        const res = await apiClient.get('/admin/orders/export/csv', {
+            params: clean,
+            responseType: 'blob',
+        });
+        return res.data as Blob;
+    },
+
+    exportPDF: async (params?: {
+        order_status?: OrderStatus;
+        search?: string;
+        branch_id?: string;
+        order_ids?: string[];
+    }): Promise<Blob> => {
+        const clean: Record<string, unknown> = {};
+        if (params) {
+            if (params.order_status) clean.order_status = params.order_status;
+            if (params.search) clean.search = params.search;
+            if (params.branch_id) clean.branch_id = params.branch_id;
+            if (params.order_ids && params.order_ids.length > 0)
+                clean.order_ids = params.order_ids.join(',');
+        }
+        const res = await apiClient.get('/admin/orders/export/pdf', {
+            params: clean,
+            responseType: 'blob',
+        });
+        return res.data as Blob;
+    },
 };

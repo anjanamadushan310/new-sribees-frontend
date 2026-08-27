@@ -9,8 +9,8 @@
  * /api/v1/admin/orders.
  */
 import React, { useState } from 'react';
-import { Card, Table, Input, Select, Space, Button, Typography, App } from 'antd';
-import { EyeOutlined, SearchOutlined } from '@ant-design/icons';
+import { Card, Table, Input, Select, Space, Button, Typography, App, Alert } from 'antd';
+import { EyeOutlined, SearchOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
@@ -42,6 +42,10 @@ const OrderList: React.FC = () => {
     const [openOrderId, setOpenOrderId] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
+    const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+    const [exportingCsv, setExportingCsv] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
+
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'transfers', 'branches'],
         queryFn: transfersApi.branches,
@@ -65,14 +69,63 @@ const OrderList: React.FC = () => {
         message.error((error as any)?.response?.data?.detail || 'Failed to load orders.');
     }
 
-    // The API's `scope.is_super_admin` only reflects the literal role, but
-    // Customer Support is unscoped too (see admin_orders.py) — derive this
-    // from the permission model, not that one flag.
     const showBranchColumn = isNetworkWide;
 
     const openDrawer = (id: string) => {
         setOpenOrderId(id);
         setDrawerOpen(true);
+    };
+
+    const handleExportCSV = async (useSelection: boolean = false) => {
+        try {
+            setExportingCsv(true);
+            const orderIds = useSelection ? (selectedRowKeys as string[]) : undefined;
+            const blob = await ordersApi.exportCSV({
+                order_status: statusFilter,
+                search: search || undefined,
+                branch_id: branchId,
+                order_ids: orderIds,
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `orders_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            message.success('CSV export downloaded successfully.');
+        } catch (err: any) {
+            message.error(err?.response?.data?.detail || 'Failed to export CSV.');
+        } finally {
+            setExportingCsv(false);
+        }
+    };
+
+    const handleExportPDF = async (useSelection: boolean = false) => {
+        try {
+            setExportingPdf(true);
+            const orderIds = useSelection ? (selectedRowKeys as string[]) : undefined;
+            const blob = await ordersApi.exportPDF({
+                order_status: statusFilter,
+                search: search || undefined,
+                branch_id: branchId,
+                order_ids: orderIds,
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dispatch_manifest_${dayjs().format('YYYYMMDD_HHmmss')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            message.success('Dispatch Manifest PDF downloaded successfully.');
+        } catch (err: any) {
+            message.error(err?.response?.data?.detail || 'Failed to export Dispatch Manifest PDF.');
+        } finally {
+            setExportingPdf(false);
+        }
     };
 
     const columns: ColumnsType<OrderListItem> = [
@@ -155,48 +208,109 @@ const OrderList: React.FC = () => {
             </Title>
 
             <Card>
-                <Space wrap style={{ marginBottom: 16 }}>
-                    <Input.Search
-                        placeholder="Search order # or customer…"
-                        allowClear
-                        enterButton={<SearchOutlined />}
-                        style={{ width: 300 }}
-                        onSearch={(value) => {
-                            setPage(1);
-                            setSearch(value);
-                        }}
-                    />
-                    <Select
-                        placeholder="All statuses"
-                        style={{ width: 180 }}
-                        allowClear
-                        value={statusFilter}
-                        onChange={(value) => {
-                            setPage(1);
-                            setStatusFilter(value);
-                        }}
-                        options={ORDER_STATUSES.map((s) => ({
-                            label: ORDER_STATUS_META[s].label,
-                            value: s,
-                        }))}
-                    />
-                    {showBranchColumn && (
-                        <Select
-                            placeholder="All branches"
-                            style={{ width: 220 }}
+                <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+                    <Space wrap>
+                        <Input.Search
+                            placeholder="Search order # or customer…"
                             allowClear
-                            value={branchId}
+                            enterButton={<SearchOutlined />}
+                            style={{ width: 300 }}
+                            onSearch={(value) => {
+                                setPage(1);
+                                setSearch(value);
+                            }}
+                        />
+                        <Select
+                            placeholder="All statuses"
+                            style={{ width: 180 }}
+                            allowClear
+                            value={statusFilter}
                             onChange={(value) => {
                                 setPage(1);
-                                setBranchId(value);
+                                setStatusFilter(value);
                             }}
-                            options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                            options={ORDER_STATUSES.map((s) => ({
+                                label: ORDER_STATUS_META[s].label,
+                                value: s,
+                            }))}
                         />
-                    )}
+                        {showBranchColumn && (
+                            <Select
+                                placeholder="All branches"
+                                style={{ width: 220 }}
+                                allowClear
+                                value={branchId}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setBranchId(value);
+                                }}
+                                options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                            />
+                        )}
+                    </Space>
+
+                    <Space wrap>
+                        <Button
+                            icon={<FileExcelOutlined />}
+                            loading={exportingCsv}
+                            onClick={() => handleExportCSV(false)}
+                        >
+                            Export CSV
+                        </Button>
+                        <Button
+                            type="primary"
+                            icon={<PrinterOutlined />}
+                            loading={exportingPdf}
+                            onClick={() => handleExportPDF(false)}
+                        >
+                            Dispatch PDF
+                        </Button>
+                    </Space>
                 </Space>
+
+                {selectedRowKeys.length > 0 && (
+                    <Alert
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: 16 }}
+                        message={
+                            <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+                                <span>
+                                    <b>{selectedRowKeys.length}</b> {selectedRowKeys.length === 1 ? 'order' : 'orders'} selected
+                                </span>
+                                <Space wrap>
+                                    <Button
+                                        size="small"
+                                        icon={<FileExcelOutlined />}
+                                        loading={exportingCsv}
+                                        onClick={() => handleExportCSV(true)}
+                                    >
+                                        Export Selected (CSV)
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        type="primary"
+                                        icon={<PrinterOutlined />}
+                                        loading={exportingPdf}
+                                        onClick={() => handleExportPDF(true)}
+                                    >
+                                        Export Selected (PDF)
+                                    </Button>
+                                    <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>
+                                        Clear Selection
+                                    </Button>
+                                </Space>
+                            </Space>
+                        }
+                    />
+                )}
 
                 <Table
                     rowKey="order_id"
+                    rowSelection={{
+                        selectedRowKeys,
+                        onChange: (keys) => setSelectedRowKeys(keys),
+                    }}
                     columns={columns}
                     dataSource={data?.orders ?? []}
                     loading={isLoading}
