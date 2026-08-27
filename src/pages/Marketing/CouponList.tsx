@@ -383,7 +383,7 @@ const CouponList: React.FC = () => {
                             <Select
                                 options={[
                                     { label: 'Percentage (%)', value: 'percentage' },
-                                    { label: 'Fixed (Rs)', value: 'fixed' },
+                                    { label: 'Fixed (LKR)', value: 'fixed' },
                                 ]}
                             />
                         </Form.Item>
@@ -409,14 +409,14 @@ const CouponList: React.FC = () => {
                                 min={0}
                                 step={discountType === 'percentage' ? 1 : 10}
                                 style={{ width: '100%' }}
-                                addonAfter={discountType === 'percentage' ? '%' : 'Rs'}
+                                addonAfter={discountType === 'percentage' ? '%' : 'LKR'}
                             />
                         </Form.Item>
                     </Space>
 
                     <Space style={{ display: 'flex' }} align="start">
                         <Form.Item label="Min. Order Value" name="min_order_value" style={{ width: 200 }}>
-                            <InputNumber min={0} style={{ width: '100%' }} addonBefore="Rs" />
+                            <InputNumber min={0} style={{ width: '100%' }} addonBefore="LKR" />
                         </Form.Item>
 
                         <Form.Item
