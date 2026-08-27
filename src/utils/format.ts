@@ -27,14 +27,14 @@ export const formatLKRPrecise = (value: number | null | undefined): string =>
     lkrPrecise.format(value ?? 0);
 
 /**
- * Rs 12k / Rs 1.2M — for axis ticks, where a full figure would collide with
+ * LKR 12k / LKR 1.2M — for axis ticks, where a full figure would collide with
  * its neighbour. Never use it for a value the reader has to act on.
  */
 export const compactLKR = (value: number | null | undefined): string => {
     const v = value ?? 0;
-    if (Math.abs(v) >= 1_000_000) return `Rs ${(v / 1_000_000).toFixed(1)}M`;
-    if (Math.abs(v) >= 1_000) return `Rs ${Math.round(v / 1_000)}k`;
-    return `Rs ${Math.round(v)}`;
+    if (Math.abs(v) >= 1_000_000) return `LKR ${(v / 1_000_000).toFixed(1)}M`;
+    if (Math.abs(v) >= 1_000) return `LKR ${Math.round(v / 1_000)}k`;
+    return `LKR ${Math.round(v)}`;
 };
 
 export const formatNumber = (value: number | null | undefined): string =>
