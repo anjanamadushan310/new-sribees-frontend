@@ -13,6 +13,7 @@ export interface Coupon {
     discount_type: DiscountType;
     discount_value: number;
     min_order_value: number;
+    max_discount_amount?: number | null;
     usage_limit: number | null;
     used_count: number;
     valid_from: string;
@@ -27,6 +28,7 @@ export interface CouponPayload {
     discount_type: DiscountType;
     discount_value: number;
     min_order_value?: number;
+    max_discount_amount?: number | null;
     usage_limit?: number | null;
     valid_from: string; // ISO
     valid_until: string; // ISO

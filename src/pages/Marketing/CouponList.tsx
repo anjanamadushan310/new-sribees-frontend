@@ -29,6 +29,7 @@ import {
     SearchOutlined,
     TagOutlined,
     DeleteOutlined,
+    ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -46,8 +47,14 @@ const formatLKR = (value: number): string =>
         value ?? 0
     );
 
-const discountLabel = (c: Coupon): string =>
-    c.discount_type === 'percentage' ? `${c.discount_value}%` : formatLKR(c.discount_value);
+const discountLabel = (c: Coupon): string => {
+    if (c.discount_type === 'percentage') {
+        return c.max_discount_amount
+            ? `${c.discount_value}% (Cap: ${formatLKR(c.max_discount_amount)})`
+            : `${c.discount_value}%`;
+    }
+    return formatLKR(c.discount_value);
+};
 
 // Derived display status from is_active + validity window + usage.
 const couponStatus = (c: Coupon): { label: string; color: string } => {
@@ -66,6 +73,7 @@ interface CouponFormValues {
     discount_type: DiscountType;
     discount_value: number;
     min_order_value?: number;
+    max_discount_amount?: number | null;
     usage_limit?: number | null;
     validity: [Dayjs, Dayjs];
     is_active: boolean;
@@ -149,6 +157,7 @@ const CouponList: React.FC = () => {
             discount_type: c.discount_type,
             discount_value: c.discount_value,
             min_order_value: c.min_order_value,
+            max_discount_amount: c.max_discount_amount ?? undefined,
             usage_limit: c.usage_limit ?? undefined,
             validity: [dayjs(c.valid_from), dayjs(c.valid_until)],
             is_active: c.is_active,
@@ -162,24 +171,42 @@ const CouponList: React.FC = () => {
         form.resetFields();
     };
 
+    const executeSubmit = (payload: CouponPayload) => {
+        if (editing) {
+            updateMutation.mutate({ id: editing.coupon_id, payload });
+        } else {
+            createMutation.mutate(payload);
+        }
+    };
+
     const handleSubmit = async () => {
         const values = await form.validateFields();
         const [from, to] = values.validity;
+        const minOrder = values.min_order_value ?? 0;
         const payload: CouponPayload = {
             code: values.code.trim().toUpperCase(),
             description: values.description?.trim() || null,
             discount_type: values.discount_type,
             discount_value: values.discount_value,
-            min_order_value: values.min_order_value ?? 0,
+            min_order_value: minOrder,
+            max_discount_amount: values.discount_type === 'percentage' ? (values.max_discount_amount ?? null) : null,
             usage_limit: values.usage_limit ?? null,
             valid_from: from.startOf('day').toISOString(),
             valid_until: to.endOf('day').toISOString(),
             is_active: values.is_active ?? true,
         };
-        if (editing) {
-            updateMutation.mutate({ id: editing.coupon_id, payload });
+
+        if (minOrder === 0) {
+            Modal.confirm({
+                title: 'Zero Spend Minimum Warning',
+                icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+                content: 'Setting Min. Order to LKR 0 allows this coupon to be used on any basket size without a minimum spend threshold. Are you sure you want to proceed?',
+                okText: 'Yes, Save Coupon',
+                cancelText: 'Go Back',
+                onOk: () => executeSubmit(payload),
+            });
         } else {
-            createMutation.mutate(payload);
+            executeSubmit(payload);
         }
     };
 
@@ -414,10 +441,40 @@ const CouponList: React.FC = () => {
                         </Form.Item>
                     </Space>
 
-                    <Space style={{ display: 'flex' }} align="start">
-                        <Form.Item label="Min. Order Value" name="min_order_value" style={{ width: 200 }}>
+                    <Space style={{ display: 'flex' }} align="start" wrap>
+                        <Form.Item
+                            label="Min. Order Value"
+                            name="min_order_value"
+                            dependencies={['discount_type', 'discount_value']}
+                            rules={[
+                                ({ getFieldValue }) => ({
+                                    validator(_, value) {
+                                        const type = getFieldValue('discount_type');
+                                        const discVal = getFieldValue('discount_value');
+                                        if (type === 'fixed' && value != null && discVal != null && value < discVal) {
+                                            return Promise.reject(
+                                                new Error(`Min. Order must be at least LKR ${discVal} for fixed discounts`)
+                                            );
+                                        }
+                                        return Promise.resolve();
+                                    },
+                                }),
+                            ]}
+                            style={{ width: 200 }}
+                        >
                             <InputNumber min={0} style={{ width: '100%' }} addonBefore="LKR" />
                         </Form.Item>
+
+                        {discountType === 'percentage' && (
+                            <Form.Item
+                                label="Max Discount Amount"
+                                name="max_discount_amount"
+                                extra="Cap for percentage discount"
+                                style={{ width: 200 }}
+                            >
+                                <InputNumber min={0} style={{ width: '100%' }} addonBefore="LKR" placeholder="Unlimited" />
+                            </Form.Item>
+                        )}
 
                         <Form.Item
                             label="Usage Limit"
