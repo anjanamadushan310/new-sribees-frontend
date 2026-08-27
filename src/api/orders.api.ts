@@ -120,6 +120,8 @@ export interface OrderListParams {
     order_status?: OrderStatus;
     search?: string;
     branch_id?: string; // super admin only
+    from_date?: string;
+    to_date?: string;
 }
 
 export interface OrderListResult {
@@ -210,6 +212,8 @@ export const ordersApi = {
         order_status?: OrderStatus;
         search?: string;
         branch_id?: string;
+        from_date?: string;
+        to_date?: string;
         order_ids?: string[];
     }): Promise<Blob> => {
         const clean: Record<string, unknown> = {};
@@ -217,6 +221,8 @@ export const ordersApi = {
             if (params.order_status) clean.order_status = params.order_status;
             if (params.search) clean.search = params.search;
             if (params.branch_id) clean.branch_id = params.branch_id;
+            if (params.from_date) clean.from_date = params.from_date;
+            if (params.to_date) clean.to_date = params.to_date;
             if (params.order_ids && params.order_ids.length > 0)
                 clean.order_ids = params.order_ids.join(',');
         }
@@ -231,6 +237,8 @@ export const ordersApi = {
         order_status?: OrderStatus;
         search?: string;
         branch_id?: string;
+        from_date?: string;
+        to_date?: string;
         order_ids?: string[];
     }): Promise<Blob> => {
         const clean: Record<string, unknown> = {};
@@ -238,6 +246,8 @@ export const ordersApi = {
             if (params.order_status) clean.order_status = params.order_status;
             if (params.search) clean.search = params.search;
             if (params.branch_id) clean.branch_id = params.branch_id;
+            if (params.from_date) clean.from_date = params.from_date;
+            if (params.to_date) clean.to_date = params.to_date;
             if (params.order_ids && params.order_ids.length > 0)
                 clean.order_ids = params.order_ids.join(',');
         }

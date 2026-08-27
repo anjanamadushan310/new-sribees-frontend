@@ -9,7 +9,7 @@
  * /api/v1/admin/orders.
  */
 import React, { useState } from 'react';
-import { Card, Table, Input, Select, Space, Button, Typography, App, Alert } from 'antd';
+import { Card, Table, Input, Select, Space, Button, Typography, App, Alert, DatePicker } from 'antd';
 import { EyeOutlined, SearchOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -25,6 +25,16 @@ import { usePermissions } from '../../hooks/usePermissions';
 import OrderDetails, { statusTag } from './OrderDetails';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+const rangePresets: { label: string; value: [dayjs.Dayjs, dayjs.Dayjs] }[] = [
+    { label: 'Today', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+    { label: 'Yesterday', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+    { label: 'Last 7 Days', value: [dayjs().subtract(7, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: 'Last 30 Days', value: [dayjs().subtract(30, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: 'This Month', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+    { label: 'Last Month', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+];
 
 const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
@@ -39,12 +49,16 @@ const OrderList: React.FC = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<OrderStatus | undefined>(undefined);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
+    const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
     const [openOrderId, setOpenOrderId] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [exportingCsv, setExportingCsv] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
+
+    const fromDate = dateRange?.[0] ? dateRange[0].format('YYYY-MM-DD') : undefined;
+    const toDate = dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined;
 
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'transfers', 'branches'],
@@ -53,7 +67,7 @@ const OrderList: React.FC = () => {
     });
 
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['admin', 'orders', { page, pageSize, search, statusFilter, branchId }],
+        queryKey: ['admin', 'orders', { page, pageSize, search, statusFilter, branchId, fromDate, toDate }],
         queryFn: () =>
             ordersApi.list({
                 page,
@@ -61,6 +75,8 @@ const OrderList: React.FC = () => {
                 search: search || undefined,
                 order_status: statusFilter,
                 branch_id: branchId,
+                from_date: fromDate,
+                to_date: toDate,
             }),
         placeholderData: keepPreviousData,
     });
@@ -84,6 +100,8 @@ const OrderList: React.FC = () => {
                 order_status: statusFilter,
                 search: search || undefined,
                 branch_id: branchId,
+                from_date: fromDate,
+                to_date: toDate,
                 order_ids: orderIds,
             });
             const url = window.URL.createObjectURL(blob);
@@ -110,6 +128,8 @@ const OrderList: React.FC = () => {
                 order_status: statusFilter,
                 search: search || undefined,
                 branch_id: branchId,
+                from_date: fromDate,
+                to_date: toDate,
                 order_ids: orderIds,
             });
             const url = window.URL.createObjectURL(blob);
@@ -247,6 +267,16 @@ const OrderList: React.FC = () => {
                                 options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
                             />
                         )}
+                        <RangePicker
+                            presets={rangePresets}
+                            value={dateRange}
+                            onChange={(dates) => {
+                                setPage(1);
+                                setDateRange(dates as any);
+                            }}
+                            style={{ width: 280 }}
+                            allowClear
+                        />
                     </Space>
 
                     <Space wrap>
