@@ -86,6 +86,9 @@ const QuickSale: React.FC = () => {
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [editing, setEditing] = useState<MarketingProduct | null>(null);
 
+    const discountVal = Form.useWatch('discount_percentage', form);
+    const cashbackVal = Form.useWatch('cashback_percentage', form);
+
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'branches'],
         queryFn: branchesApi.list,
@@ -356,15 +359,52 @@ const QuickSale: React.FC = () => {
 
                         <Form form={form} layout="vertical">
                             <Form.Item
-                                label="Branch Discount (%)"
+                                label={
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                        <span>Branch Discount (%)</span>
+                                        {discountVal != null && (
+                                            <Button
+                                                type="link"
+                                                size="small"
+                                                style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                                                onClick={() => form.setFieldValue('discount_percentage', null)}
+                                            >
+                                                Reset to Global
+                                            </Button>
+                                        )}
+                                    </div>
+                                }
                                 name="discount_percentage"
-                                extra="Leave empty to inherit the product's global discount."
+                                extra={
+                                    editing.global_discount_percentage !== null && editing.global_discount_percentage > 0
+                                        ? `Leave empty to inherit the product's global discount (Current: ${editing.global_discount_percentage}%).`
+                                        : "Leave empty to inherit the product's global discount (Current: 0%)."
+                                }
                             >
-                                <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                                <InputNumber
+                                    min={0}
+                                    max={100}
+                                    style={{ width: '100%' }}
+                                    placeholder={`Inherited: ${editing.global_discount_percentage ?? 0}%`}
+                                />
                             </Form.Item>
 
                             <Form.Item
-                                label="Branch Cashback (%)"
+                                label={
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                        <span>Branch Cashback (%)</span>
+                                        {cashbackVal != null && (
+                                            <Button
+                                                type="link"
+                                                size="small"
+                                                style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                                                onClick={() => form.setFieldValue('cashback_percentage', null)}
+                                            >
+                                                Reset to Default
+                                            </Button>
+                                        )}
+                                    </div>
+                                }
                                 name="cashback_percentage"
                                 extra={
                                     editing.global_cashback_percentage !== null
