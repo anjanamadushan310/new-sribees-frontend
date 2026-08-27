@@ -34,9 +34,10 @@ const { Text, Title } = Typography;
 const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
 
-export const statusTag = (status: OrderStatus) => {
+export const statusTag = (status: OrderStatus, showPrefix: boolean = false) => {
     const meta = ORDER_STATUS_META[status];
-    return <Tag color={meta?.color ?? 'default'}>{meta?.label ?? status}</Tag>;
+    const label = showPrefix ? `🚚 Status: ${meta?.label ?? status}` : (meta?.label ?? status);
+    return <Tag color={meta?.color ?? 'default'}>{label}</Tag>;
 };
 
 interface OrderDetailsProps {
@@ -217,11 +218,29 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             ) : (
                 <>
                     <Space wrap style={{ marginBottom: 16 }}>
-                        {statusTag(order.status)}
-                        <Tag color={order.payment_status === 'paid' ? 'green' : 'orange'}>
-                            {order.payment_status?.toUpperCase()}
-                        </Tag>
-                        {order.branch_name && <Tag color="geekblue">{order.branch_name}</Tag>}
+                        {statusTag(order.status, true)}
+                        {(() => {
+                            const isCOD =
+                                order.payment_method === 'CASH_ON_DELIVERY' ||
+                                order.payment_method === 'cash_on_delivery';
+                            let color = 'orange';
+                            let text = order.payment_status?.toUpperCase() || 'PENDING';
+                            if (order.payment_status === 'paid') {
+                                color = 'green';
+                                text = 'Paid';
+                            } else if (order.payment_status === 'failed') {
+                                color = 'red';
+                                text = 'Failed';
+                            } else if (order.payment_status === 'refunded') {
+                                color = 'purple';
+                                text = 'Refunded';
+                            } else if (order.payment_status === 'pending' || !order.payment_status) {
+                                color = 'orange';
+                                text = isCOD ? 'Pending (COD)' : 'Pending';
+                            }
+                            return <Tag color={color}>💳 Payment: {text}</Tag>;
+                        })()}
+                        {order.branch_name && <Tag color="geekblue">📍 Branch: {order.branch_name}</Tag>}
                     </Space>
 
                     <Descriptions column={1} size="small" bordered>
