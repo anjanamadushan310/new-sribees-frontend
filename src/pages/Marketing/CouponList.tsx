@@ -20,6 +20,7 @@ import {
     Popconfirm,
     App,
     Typography,
+    Tooltip,
 } from 'antd';
 import {
     PlusOutlined,
@@ -227,25 +228,43 @@ const CouponList: React.FC = () => {
             title: 'Actions',
             key: 'actions',
             width: 190,
-            render: (_, c) => (
-                <Space>
-                    <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(c)}>
-                        Edit
-                    </Button>
-                    {c.is_active && (
-                        <Popconfirm
-                            title="Deactivate this coupon?"
-                            okText="Deactivate"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => deactivateMutation.mutate(c.coupon_id)}
-                        >
-                            <Button type="link" danger icon={<StopOutlined />}>
-                                Deactivate
-                            </Button>
-                        </Popconfirm>
-                    )}
-                </Space>
-            ),
+            render: (_, c) => {
+                const isExpired = dayjs().isAfter(dayjs(c.valid_until));
+                const isUsedUp = c.usage_limit != null && c.used_count >= c.usage_limit;
+                const canDeactivate = c.is_active && !isExpired && !isUsedUp;
+
+                const getDeactivateReason = () => {
+                    if (isExpired) return 'Coupon is expired and cannot be deactivated';
+                    if (isUsedUp) return 'Coupon usage limit reached (Used Up)';
+                    return 'Coupon is inactive';
+                };
+
+                return (
+                    <Space>
+                        <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(c)}>
+                            Edit
+                        </Button>
+                        {canDeactivate ? (
+                            <Popconfirm
+                                title="Deactivate this coupon?"
+                                okText="Deactivate"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => deactivateMutation.mutate(c.coupon_id)}
+                            >
+                                <Button type="link" danger icon={<StopOutlined />}>
+                                    Deactivate
+                                </Button>
+                            </Popconfirm>
+                        ) : c.is_active ? (
+                            <Tooltip title={getDeactivateReason()}>
+                                <Button type="link" danger disabled icon={<StopOutlined />}>
+                                    Deactivate
+                                </Button>
+                            </Tooltip>
+                        ) : null}
+                    </Space>
+                );
+            },
         },
     ];
 
