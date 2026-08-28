@@ -7,6 +7,7 @@ import { AdminRole } from '../../types/admin.types';
 import { authApi } from '../../api/auth.api';
 import { apiErrorMessage } from '../../utils/analytics';
 import DeliveryZones from './DeliveryZones';
+import MyBranch from './MyBranch';
 
 const Settings: React.FC = () => {
     const [profileForm] = Form.useForm();
@@ -16,6 +17,7 @@ const Settings: React.FC = () => {
     const user = useAuthStore((s) => s.user);
     const updateUser = useAuthStore((s) => s.updateUser);
     const isSuperAdmin = user?.role === AdminRole.SUPER_ADMIN;
+    const isBranchManager = user?.role === AdminRole.BRANCH_MANAGER;
 
     const handleProfileUpdate = async (values: { name: string }) => {
         setSavingProfile(true);
@@ -148,6 +150,17 @@ const Settings: React.FC = () => {
                       key: 'delivery-zones',
                       label: 'Delivery Zones',
                       children: <DeliveryZones />,
+                  },
+              ]
+            : []),
+        // My Branch — Branch Manager only. New branches are created inactive
+        // by the Super Admin; this is where the manager brings it live.
+        ...(isBranchManager
+            ? [
+                  {
+                      key: 'my-branch',
+                      label: 'My Branch',
+                      children: <MyBranch />,
                   },
               ]
             : []),
