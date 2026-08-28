@@ -131,6 +131,7 @@ const BranchList: React.FC = () => {
     const openCreate = () => {
         setEditing(null);
         form.resetFields();
+        form.setFieldsValue({ is_active: true });
         setModalOpen(true);
     };
 
@@ -174,11 +175,9 @@ const BranchList: React.FC = () => {
             district: values.district?.trim() || null,
             coverage_post_offices: values.coverage_post_offices ?? [],
             phone: values.phone?.trim() || null,
+            is_active: values.is_active ?? true,
         };
         if (editing) {
-            // New branches always start inactive (server-enforced) — only an
-            // edit carries a meaningful status change.
-            payload.is_active = values.is_active ?? true;
             updateMutation.mutate({ id: editing.branch_id, payload });
         } else {
             createMutation.mutate(payload);
@@ -399,7 +398,7 @@ const BranchList: React.FC = () => {
                 destroyOnHidden
                 width={560}
             >
-                <Form form={form} layout="vertical">
+                <Form form={form} layout="vertical" initialValues={{ is_active: true }}>
                     <Form.Item
                         label="Branch Name"
                         name="name"
@@ -490,21 +489,9 @@ const BranchList: React.FC = () => {
                         <Input placeholder="+94 11 234 5678" />
                     </Form.Item>
 
-                    {editing ? (
-                        <Form.Item
-                            label="Active"
-                            name="is_active"
-                            valuePropName="checked"
-                            extra="New branches always start inactive — only the branch's own manager can bring it live."
-                        >
-                            <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                        </Form.Item>
-                    ) : (
-                        <Text type="secondary" style={{ display: 'block', marginTop: -8 }}>
-                            This branch will be created <b>inactive</b>. Its Branch Manager
-                            activates it once it's ready to go live.
-                        </Text>
-                    )}
+                    <Form.Item label="Active" name="is_active" valuePropName="checked">
+                        <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                    </Form.Item>
                 </Form>
             </Modal>
         </div>

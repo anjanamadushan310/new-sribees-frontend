@@ -84,17 +84,18 @@ export interface ProductPayload {
     short_description_ta?: string | null;
     search_keywords?: string | null;
     sku?: string | null;
-    // No price / stock_quantity / cashback_percentage: the Super Admin
-    // defines the shared catalog entry only. Those values are set per branch
-    // by that branch's manager via the Inventory API (BranchOverridePayload).
+    price: number;
     compare_at_price?: number | null;
     cost_price?: number | null;
     category_id?: string | null;
     // Must be a child of category_id — the backend rejects a mismatched pair.
     subcategory_id?: string | null;
+    stock_quantity?: number;
     low_stock_threshold?: number;
     is_active?: boolean;
     is_featured?: boolean;
+    /** null clears the product-wide rate, falling back to the platform default. */
+    cashback_percentage?: number | null;
 }
 
 export interface ProductListParams {

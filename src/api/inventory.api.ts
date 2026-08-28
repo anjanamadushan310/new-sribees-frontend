@@ -22,9 +22,6 @@ export interface InventoryItem {
     discount_percentage: number | null;
     global_discount_percentage: number | null;
     effective_discount: number | null;
-    cashback_percentage: number | null;
-    global_cashback_percentage: number | null;
-    effective_cashback: number;
     is_on_sale: boolean;
     stock_quantity: number;
     reserved_quantity: number;
@@ -63,8 +60,6 @@ export interface InventoryUpdatePayload {
     reserved_quantity?: number;
     low_stock_threshold?: number;
     discount_percentage?: number | null;
-    // null falls back to the product's global cashback, then the platform rate.
-    cashback_percentage?: number | null;
     is_on_sale?: boolean;
     is_active?: boolean;
 }
@@ -87,22 +82,15 @@ export interface StockableListResult {
     total_pages: number;
 }
 
-/**
- * Pull a global product into a branch, with the local price/stock/cashback
- * that make it sellable there. branch_price and stock_quantity are required —
- * the global catalog product carries no real price of its own (Super Admins
- * cannot set one), so this is the only place they get set.
- */
+/** Pull a global product into a branch, optionally with local overrides. */
 export interface BranchOverridePayload {
     product_id: string;
     branch_id?: string; // super admin only; ignored for scoped admins
-    branch_price: number;
-    stock_quantity: number;
+    branch_price?: number | null;
+    stock_quantity?: number;
     low_stock_threshold?: number;
     discount_percentage?: number | null;
-    cashback_percentage?: number | null;
     is_on_sale?: boolean;
-    // Defaults to hidden server-side; pass true to make it visible immediately.
     is_active?: boolean;
 }
 

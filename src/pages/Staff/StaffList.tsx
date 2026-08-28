@@ -156,7 +156,6 @@ const StaffList: React.FC = () => {
 
     const openEdit = (row: StaffUser) => {
         setEditing(row);
-        setRoleMode('new'); // reset so edit modal doesn't inherit stale create-mode state
         form.resetFields();
         form.setFieldsValue({
             full_name: row.full_name,

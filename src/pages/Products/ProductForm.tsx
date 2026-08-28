@@ -10,19 +10,20 @@ import React, { useEffect, useState } from 'react';
 import {
     Form,
     Input,
+    InputNumber,
     Select,
     Switch,
     Button,
     Card,
     Row,
     Col,
+    Divider,
     Spin,
     App,
     Typography,
     Space,
     Tabs,
     Tooltip,
-    Alert,
 } from 'antd';
 import { ArrowLeftOutlined, ThunderboltOutlined, StarOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -58,8 +59,12 @@ interface ProductFormValues {
     short_description_si?: string;
     short_description_ta?: string;
     search_keywords?: string;
+    price: number;
+    compare_at_price?: number;
+    stock_quantity?: number;
     is_active: boolean;
     is_featured: boolean;
+    cashback_percentage?: number | null;
 }
 
 const ProductForm: React.FC = () => {
@@ -113,8 +118,12 @@ const ProductForm: React.FC = () => {
                 short_description_si: product.short_description_si ?? undefined,
                 short_description_ta: product.short_description_ta ?? undefined,
                 search_keywords: product.search_keywords ?? undefined,
+                price: product.price,
+                compare_at_price: product.compare_at_price ?? undefined,
+                stock_quantity: product.stock_quantity,
                 is_active: product.is_active,
                 is_featured: product.is_featured,
+                cashback_percentage: product.cashback_percentage ?? undefined,
             });
             const loaded: GalleryImage[] = product.images
                 .slice()
@@ -182,8 +191,14 @@ const ProductForm: React.FC = () => {
                 short_description_si: values.short_description_si?.trim() || null,
                 short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
+                price: values.price,
+                compare_at_price: values.compare_at_price ?? null,
+                stock_quantity: values.stock_quantity ?? 0,
                 is_active: values.is_active,
                 is_featured: values.is_featured,
+                // Empty means "no product-wide rate" — send null so the server
+                // clears it and the platform rate applies again.
+                cashback_percentage: values.cashback_percentage ?? null,
             };
 
             const saved = isEdit
@@ -277,19 +292,17 @@ const ProductForm: React.FC = () => {
 
             <Title level={3}>{isEdit ? 'Edit Product' : 'New Product'}</Title>
 
-            <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 16 }}
-                message="No price, stock or cashback here"
-                description="This is the shared catalog entry only. Price, stock quantity and cashback % are set per branch by that branch's manager, from Inventory → Add Product to Branch."
-            />
-
             <Form
                 form={form}
                 layout="vertical"
-                onFinish={(values) => saveMutation.mutate(values)}
-                initialValues={{ is_active: true, is_featured: false }}
+                onFinish={(values) => {
+                    if ((values.stock_quantity === undefined || values.stock_quantity === null || values.stock_quantity <= 0) && values.is_active) {
+                        message.error('Stock quantity is 0, please inactivate the product before saving.');
+                        return;
+                    }
+                    saveMutation.mutate(values);
+                }}
+                initialValues={{ is_active: true, is_featured: false, stock_quantity: 0 }}
             >
                 <Row gutter={16}>
                     <Col xs={24} lg={16}>
@@ -545,6 +558,63 @@ const ProductForm: React.FC = () => {
 
                             <Form.Item label="Featured" name="is_featured" valuePropName="checked">
                                 <Switch />
+                            </Form.Item>
+                        </Card>
+
+                        <Card title="Pricing & Stock">
+                            <Form.Item
+                                label="Base Price (LKR)"
+                                name="price"
+                                rules={[
+                                    { required: true, message: 'Price is required' },
+                                    {
+                                        type: 'number',
+                                        min: 0.01,
+                                        message: 'Price must be greater than 0',
+                                    },
+                                ]}
+                            >
+                                <InputNumber
+                                    min={0.01}
+                                    step={0.01}
+                                    style={{ width: '100%' }}
+                                    prefix="LKR"
+                                    placeholder="0.00"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Compare-at Price (LKR)"
+                                name="compare_at_price"
+                                extra="Original price shown struck-through when discounted"
+                            >
+                                <InputNumber
+                                    min={0}
+                                    step={0.01}
+                                    style={{ width: '100%' }}
+                                    prefix="LKR"
+                                    placeholder="0.00"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Cashback (%)"
+                                name="cashback_percentage"
+                                extra="Applies in every branch. Leave empty to use the platform default rate. A branch's Marketing Manager can override this per product from Quick Sale."
+                            >
+                                <InputNumber
+                                    min={0}
+                                    max={100}
+                                    style={{ width: '100%' }}
+                                    placeholder="Platform default"
+                                    suffix="%"
+                                />
+                            </Form.Item>
+
+                            <Divider style={{ margin: '8px 0 16px' }} />
+
+                            <Form.Item label="Stock Quantity" name="stock_quantity">
+                                <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
                             </Form.Item>
                         </Card>
                     </Col>
