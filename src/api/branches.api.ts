@@ -66,4 +66,15 @@ export const branchesApi = {
     remove: async (id: string): Promise<void> => {
         await apiClient.delete(`/admin/branches/${id}`);
     },
+
+    /**
+     * Activate/deactivate a branch. Open to Branch Managers for their own
+     * branch too (not just Super Admin) — see admin_branches.set_branch_status.
+     */
+    setStatus: async (id: string, isActive: boolean): Promise<Branch> => {
+        const res = await apiClient.patch<BranchMutationWire>(`/admin/branches/${id}/status`, {
+            is_active: isActive,
+        });
+        return res.data.data;
+    },
 };
