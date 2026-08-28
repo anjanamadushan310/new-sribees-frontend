@@ -99,9 +99,11 @@ const BranchInventory: React.FC = () => {
     const [addSearch, setAddSearch] = useState('');
     const [addForm] = Form.useForm<{
         product_id: string;
-        branch_price?: number | null;
+        branch_price: number;
         stock_quantity: number;
         low_stock_threshold: number;
+        cashback_percentage?: number | null;
+        is_active: boolean;
     }>();
 
     // Branch options for the Super Admin branch filter (branches API is now live).
@@ -178,6 +180,7 @@ const BranchInventory: React.FC = () => {
             reserved_quantity: item.reserved_quantity,
             low_stock_threshold: item.low_stock_threshold,
             discount_percentage: item.discount_percentage,
+            cashback_percentage: item.cashback_percentage,
             is_on_sale: item.is_on_sale,
             is_active: item.is_active,
         });
@@ -198,6 +201,7 @@ const BranchInventory: React.FC = () => {
             ...values,
             branch_price: values.branch_price ?? null,
             discount_percentage: values.discount_percentage ?? null,
+            cashback_percentage: values.cashback_percentage ?? null,
         };
         updateMutation.mutate({ id: editing.inventory_id, payload });
     };
@@ -208,9 +212,11 @@ const BranchInventory: React.FC = () => {
         stockMutation.mutate({
             product_id: values.product_id,
             branch_id: targetBranchId,
-            branch_price: values.branch_price ?? null,
-            stock_quantity: values.stock_quantity ?? 0,
+            branch_price: values.branch_price,
+            stock_quantity: values.stock_quantity,
             low_stock_threshold: values.low_stock_threshold ?? 10,
+            cashback_percentage: values.cashback_percentage ?? null,
+            is_active: values.is_active ?? false,
         });
     };
 
@@ -319,7 +325,7 @@ const BranchInventory: React.FC = () => {
                         disabled={!canAdd}
                         onClick={() => {
                             addForm.resetFields();
-                            addForm.setFieldsValue({ stock_quantity: 0, low_stock_threshold: 10 });
+                            addForm.setFieldsValue({ low_stock_threshold: 10, is_active: false });
                             setAddSearch('');
                             setAddOpen(true);
                         }}
@@ -452,6 +458,14 @@ const BranchInventory: React.FC = () => {
                                 <InputNumber min={0} max={100} style={{ width: '100%' }} />
                             </Form.Item>
 
+                            <Form.Item
+                                label="Cashback (%)"
+                                name="cashback_percentage"
+                                extra="Leave empty to use the platform default rate."
+                            >
+                                <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                            </Form.Item>
+
                             <Form.Item label="Quick Sale" name="is_on_sale" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
@@ -540,9 +554,7 @@ const BranchInventory: React.FC = () => {
                                     : 'No unstocked products match.'
                             }
                             options={(stockable?.products ?? []).map((p: StockableProduct) => ({
-                                label: `${p.name}${p.sku ? ` (${p.sku})` : ''} — ${money(
-                                    p.global_price
-                                )}`,
+                                label: `${p.name}${p.sku ? ` (${p.sku})` : ''}`,
                                 value: p.product_id,
                             }))}
                         />
@@ -551,14 +563,18 @@ const BranchInventory: React.FC = () => {
                     <Form.Item
                         label="Branch Price (LKR)"
                         name="branch_price"
-                        extra="Leave empty to sell at the product's global price."
+                        rules={[
+                            { required: true, message: 'Enter the price for this branch' },
+                            { type: 'number', min: 0.01, message: 'Price must be greater than 0' },
+                        ]}
+                        extra="The global catalog carries no price of its own — set what this branch sells it for."
                     >
                         <InputNumber
-                            min={0}
+                            min={0.01}
                             step={0.01}
                             style={{ width: '100%' }}
                             prefix="LKR"
-                            placeholder="Use global price"
+                            placeholder="0.00"
                         />
                     </Form.Item>
 
@@ -573,6 +589,29 @@ const BranchInventory: React.FC = () => {
 
                     <Form.Item label="Low Stock Threshold" name="low_stock_threshold">
                         <InputNumber min={0} style={{ width: '100%' }} />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Cashback (%)"
+                        name="cashback_percentage"
+                        extra="Leave empty to use the platform default rate."
+                    >
+                        <InputNumber
+                            min={0}
+                            max={100}
+                            style={{ width: '100%' }}
+                            placeholder="Platform default"
+                            suffix="%"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Visible in this branch"
+                        name="is_active"
+                        valuePropName="checked"
+                        extra="Stays hidden from customers until you turn this on — here or later from Quick Edit."
+                    >
+                        <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                     </Form.Item>
                 </Form>
             </Modal>
