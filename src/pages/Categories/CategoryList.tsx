@@ -284,7 +284,10 @@ const CategoryList: React.FC = () => {
             title: 'Description',
             dataIndex: 'description',
             key: 'description',
-            ellipsis: true,
+            width: 250,
+            ellipsis: {
+                showTitle: true,
+            },
             render: (d: string | null) => d || <span style={{ color: '#bbb' }}>—</span>,
         },
         {
