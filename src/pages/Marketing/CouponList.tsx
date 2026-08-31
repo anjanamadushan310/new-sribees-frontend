@@ -75,6 +75,8 @@ interface CouponFormValues {
     min_order_value?: number;
     max_discount_amount?: number | null;
     usage_limit?: number | null;
+    per_user_limit?: number | null;
+    is_public?: boolean;
     validity: [Dayjs, Dayjs];
     is_active: boolean;
 }
@@ -145,7 +147,13 @@ const CouponList: React.FC = () => {
     const openCreate = () => {
         setEditing(null);
         form.resetFields();
-        form.setFieldsValue({ discount_type: 'percentage', is_active: true, min_order_value: 0 });
+        form.setFieldsValue({
+            discount_type: 'percentage',
+            is_active: true,
+            min_order_value: 0,
+            per_user_limit: 1,
+            is_public: false,
+        });
         setModalOpen(true);
     };
 
@@ -159,6 +167,8 @@ const CouponList: React.FC = () => {
             min_order_value: c.min_order_value,
             max_discount_amount: c.max_discount_amount ?? undefined,
             usage_limit: c.usage_limit ?? undefined,
+            per_user_limit: c.per_user_limit ?? undefined,
+            is_public: c.is_public,
             validity: [dayjs(c.valid_from), dayjs(c.valid_until)],
             is_active: c.is_active,
         });
@@ -191,6 +201,8 @@ const CouponList: React.FC = () => {
             min_order_value: minOrder,
             max_discount_amount: values.discount_type === 'percentage' ? (values.max_discount_amount ?? null) : null,
             usage_limit: values.usage_limit ?? null,
+            per_user_limit: values.per_user_limit ?? null,
+            is_public: values.is_public ?? false,
             valid_from: from.startOf('day').toISOString(),
             valid_until: to.endOf('day').toISOString(),
             is_active: values.is_active ?? true,
@@ -215,7 +227,12 @@ const CouponList: React.FC = () => {
             title: 'Code',
             dataIndex: 'code',
             key: 'code',
-            render: (code: string) => <Tag color="geekblue">{code}</Tag>,
+            render: (code: string, c) => (
+                <Space size={4} wrap>
+                    <Tag color="geekblue">{code}</Tag>
+                    {c.is_public && <Tag color="purple">In app</Tag>}
+                </Space>
+            ),
         },
         {
             title: 'Type',
@@ -240,6 +257,9 @@ const CouponList: React.FC = () => {
             render: (_, c) => (
                 <span>
                     {c.used_count} / {c.usage_limit ?? '∞'}
+                    <span style={{ color: '#999', fontSize: 12 }}>
+                        {' '}· {c.per_user_limit ?? '∞'}/customer
+                    </span>
                 </span>
             ),
         },
@@ -477,14 +497,32 @@ const CouponList: React.FC = () => {
                         )}
 
                         <Form.Item
-                            label="Usage Limit"
+                            label="Usage Limit (total)"
                             name="usage_limit"
                             extra="Leave blank for unlimited"
                             style={{ width: 200 }}
                         >
                             <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
                         </Form.Item>
+
+                        <Form.Item
+                            label="Per-customer Limit"
+                            name="per_user_limit"
+                            extra="Max uses per customer (blank = unlimited)"
+                            style={{ width: 200 }}
+                        >
+                            <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
+                        </Form.Item>
                     </Space>
+
+                    <Form.Item
+                        label="Show in app (collectible offer)"
+                        name="is_public"
+                        valuePropName="checked"
+                        extra="Customers see this in “Available Offers” and must collect it before applying. Off = private code."
+                    >
+                        <Switch checkedChildren="Public" unCheckedChildren="Private" />
+                    </Form.Item>
 
                     <Form.Item
                         label="Validity Period"

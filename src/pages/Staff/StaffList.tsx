@@ -58,6 +58,15 @@ interface StaffFormValues {
     permission_ids: string[];
 }
 
+// One-click role for a Branch Manager's order-fulfilment staff: see the branch
+// order queue, advance orders through packing/handover, and land on the staff
+// dashboard. Matches the backend fulfilment workflow (order_workflow.py).
+const FULFILMENT_STAFF_PRESET: { resource: string; action: string }[] = [
+    { resource: 'orders', action: 'read' },
+    { resource: 'orders', action: 'update' },
+    { resource: 'dashboard', action: 'read' },
+];
+
 const groupByResource = <T extends { resource: string }>(items: T[]): Record<string, T[]> =>
     items.reduce<Record<string, T[]>>((acc, item) => {
         (acc[item.resource] ??= []).push(item);
@@ -169,6 +178,30 @@ const StaffList: React.FC = () => {
         setModalOpen(false);
         setEditing(null);
         form.resetFields();
+    };
+
+    const applyFulfilmentPreset = () => {
+        const presetIds = catalogPermissions
+            .filter((p) =>
+                FULFILMENT_STAFF_PRESET.some(
+                    (want) => want.resource === p.resource && want.action === p.action
+                )
+            )
+            .map((p) => p.permissionId);
+        const grantable = presetIds.filter((id) => myPermissionIds.has(id));
+
+        if (grantable.length < FULFILMENT_STAFF_PRESET.length) {
+            message.warning(
+                'You need orders:read, orders:update and dashboard:read yourself to grant the full preset — only the permissions you hold were selected.'
+            );
+        }
+
+        setRoleMode('new');
+        form.setFieldsValue({
+            role_mode: 'new',
+            new_role_name: form.getFieldValue('new_role_name') || 'Fulfilment Staff',
+            permission_ids: grantable,
+        });
     };
 
     const handleSubmit = async () => {
@@ -401,6 +434,18 @@ const StaffList: React.FC = () => {
                     )}
 
                     <Divider />
+
+                    {!editing && (
+                        <Button
+                            type="dashed"
+                            size="small"
+                            style={{ marginBottom: 12 }}
+                            disabled={!catalog}
+                            onClick={applyFulfilmentPreset}
+                        >
+                            ⚡ Use “Fulfilment Staff” preset
+                        </Button>
+                    )}
 
                     {!editing && (
                         <Form.Item label="Role" name="role_mode" initialValue="new">

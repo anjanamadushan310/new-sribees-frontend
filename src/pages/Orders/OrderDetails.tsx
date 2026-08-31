@@ -26,9 +26,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ordersApi,
     ORDER_STATUS_META,
-    ORDER_STATUSES,
+    nextOrderStatuses,
 } from '../../api/orders.api';
 import type { OrderItem, OrderStatus } from '../../api/orders.api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { Text, Title } = Typography;
 
@@ -50,6 +51,7 @@ interface OrderDetailsProps {
 const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
+    const { isSuperAdmin, canUpdate } = usePermissions();
     const [nextStatus, setNextStatus] = useState<OrderStatus | undefined>(undefined);
 
     const { data: order, isLoading } = useQuery({
@@ -76,21 +78,25 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             message.error(err.response?.data?.detail || 'Failed to update status.'),
     });
 
-    const confirmUpdate = () => {
-        if (!order || !nextStatus) return;
+    const runStatusChange = (target: OrderStatus) => {
+        if (!order) return;
         modal.confirm({
             title: 'Update order status?',
             content: (
                 <span>
                     Change <b>{order.order_number}</b> from {ORDER_STATUS_META[order.status].label} to{' '}
-                    <b>{ORDER_STATUS_META[nextStatus].label}</b>?
-                    {(nextStatus === 'shipped' || nextStatus === 'delivered') &&
+                    <b>{ORDER_STATUS_META[target].label}</b>?
+                    {(target === 'shipped' || target === 'delivered') &&
                         ' The customer will be notified.'}
                 </span>
             ),
             okText: 'Update',
-            onOk: () => statusMutation.mutateAsync({ id: order.order_id, status: nextStatus }),
+            onOk: () => statusMutation.mutateAsync({ id: order.order_id, status: target }),
         });
+    };
+
+    const confirmUpdate = () => {
+        if (nextStatus) runStatusChange(nextStatus);
     };
 
     const invalidateOrder = () => {
@@ -199,10 +205,24 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         },
     ];
 
-    const statusOptions = ORDER_STATUSES.filter((s) => s !== order?.status).map((s) => ({
+    // Valid next states for this actor from the order's current status. Mirrors
+    // the backend fulfilment state machine; the server re-validates regardless.
+    const allowedNext = order ? nextOrderStatuses(order.status, isSuperAdmin) : [];
+    const statusOptions = allowedNext.map((s) => ({
         label: ORDER_STATUS_META[s].label,
         value: s,
     }));
+
+    // Branch-floor fulfilment shortcuts, shown only when they're a valid move.
+    const fulfilmentQuickActions = (
+        [
+            { status: 'packing', label: 'Start Packing' },
+            { status: 'packed', label: 'Mark Packed' },
+            { status: 'handed_to_courier', label: 'Handed to Courier' },
+        ] as { status: OrderStatus; label: string }[]
+    ).filter((q) => allowedNext.includes(q.status));
+
+    const canUpdateOrders = canUpdate('orders');
 
     return (
         <Drawer
@@ -427,22 +447,44 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     )}
 
                     <Divider titlePlacement="start">Actions</Divider>
+                    {canUpdateOrders && fulfilmentQuickActions.length > 0 && (
+                        <Space wrap style={{ marginBottom: 12 }}>
+                            {fulfilmentQuickActions.map((q) => (
+                                <Button
+                                    key={q.status}
+                                    type="primary"
+                                    ghost
+                                    loading={statusMutation.isPending}
+                                    onClick={() => runStatusChange(q.status)}
+                                >
+                                    {q.label}
+                                </Button>
+                            ))}
+                        </Space>
+                    )}
                     <Space wrap>
-                        <Select
-                            placeholder="Advance status to…"
-                            style={{ width: 220 }}
-                            value={nextStatus}
-                            onChange={(v) => setNextStatus(v)}
-                            options={statusOptions}
-                        />
-                        <Button
-                            type="primary"
-                            disabled={!nextStatus}
-                            loading={statusMutation.isPending}
-                            onClick={confirmUpdate}
-                        >
-                            Update Status
-                        </Button>
+                        {canUpdateOrders && (
+                            <>
+                                <Select
+                                    placeholder={
+                                        statusOptions.length ? 'Advance status to…' : 'No status changes available'
+                                    }
+                                    style={{ width: 220 }}
+                                    value={nextStatus}
+                                    disabled={statusOptions.length === 0}
+                                    onChange={(v) => setNextStatus(v)}
+                                    options={statusOptions}
+                                />
+                                <Button
+                                    type="primary"
+                                    disabled={!nextStatus}
+                                    loading={statusMutation.isPending}
+                                    onClick={confirmUpdate}
+                                >
+                                    Update Status
+                                </Button>
+                            </>
+                        )}
                         <Button
                             icon={<DownloadOutlined />}
                             loading={invoiceMutation.isPending}

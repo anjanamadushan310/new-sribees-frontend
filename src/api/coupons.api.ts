@@ -16,6 +16,10 @@ export interface Coupon {
     max_discount_amount?: number | null;
     usage_limit: number | null;
     used_count: number;
+    /** Max redemptions per customer; null = unlimited. */
+    per_user_limit: number | null;
+    /** Listed in the mobile "Available Offers" feed (customers must collect it). */
+    is_public: boolean;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -30,6 +34,8 @@ export interface CouponPayload {
     min_order_value?: number;
     max_discount_amount?: number | null;
     usage_limit?: number | null;
+    per_user_limit?: number | null;
+    is_public?: boolean;
     valid_from: string; // ISO
     valid_until: string; // ISO
     is_active?: boolean;
