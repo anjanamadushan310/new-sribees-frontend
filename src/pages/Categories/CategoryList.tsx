@@ -284,11 +284,15 @@ const CategoryList: React.FC = () => {
             title: 'Description',
             dataIndex: 'description',
             key: 'description',
-            width: 250,
-            ellipsis: {
-                showTitle: true,
-            },
-            render: (d: string | null) => d || <span style={{ color: '#bbb' }}>—</span>,
+            width: 280,
+            render: (d: string | null) =>
+                d ? (
+                    <div style={{ maxWidth: 280, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                        {d}
+                    </div>
+                ) : (
+                    <span style={{ color: '#bbb' }}>—</span>
+                ),
         },
         {
             title: 'Products',
