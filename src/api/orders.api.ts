@@ -8,6 +8,9 @@ export type OrderStatus =
     | 'pending'
     | 'confirmed'
     | 'processing'
+    | 'packing'
+    | 'packed'
+    | 'handed_to_courier'
     | 'shipped'
     | 'out_for_delivery'
     | 'delivered'
@@ -91,6 +94,8 @@ export interface OrderDetail {
     branch_id: string | null;
     branch_name: string | null;
     created_at: string | null;
+    packed_at: string | null;
+    handed_to_courier_at: string | null;
     shipped_at: string | null;
     delivered_at: string | null;
     delivery_slot_date: string | null;
@@ -153,6 +158,9 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     pending: { label: 'Pending', color: 'gold' },
     confirmed: { label: 'Confirmed', color: 'blue' },
     processing: { label: 'Processing', color: 'geekblue' },
+    packing: { label: 'Packing', color: 'geekblue' },
+    packed: { label: 'Packed', color: 'lime' },
+    handed_to_courier: { label: 'Handed to Courier', color: 'cyan' },
     shipped: { label: 'Shipped', color: 'cyan' },
     out_for_delivery: { label: 'Out for Delivery', color: 'purple' },
     delivered: { label: 'Delivered', color: 'green' },
@@ -163,6 +171,38 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
 };
 
 export const ORDER_STATUSES = Object.keys(ORDER_STATUS_META) as OrderStatus[];
+
+/**
+ * Fulfilment state machine — mirror of the backend
+ * (fastapi_backend/app/services/order_workflow.py ADMIN_TRANSITIONS). Drives
+ * which "Advance status to…" options a non-super-admin sees. The server
+ * re-validates every transition, so a stale copy here only ever narrows the
+ * UI, never widens access. Super Admin is offered every other status.
+ */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+    pending: ['confirmed', 'packing', 'cancelled'],
+    confirmed: ['packing', 'cancelled'],
+    processing: ['packing', 'packed', 'cancelled'],
+    packing: ['packed', 'confirmed', 'cancelled'],
+    packed: ['handed_to_courier', 'packing', 'cancelled'],
+    handed_to_courier: ['shipped', 'packed'],
+    shipped: ['out_for_delivery', 'delivered'],
+    out_for_delivery: ['delivered', 'shipped'],
+    delivered: [],
+    cancelled: [],
+    return_requested: [],
+    return_approved: [],
+    refunded: [],
+};
+
+/** Ordered next-status options for an actor, honouring the Super Admin override. */
+export const nextOrderStatuses = (
+    current: OrderStatus,
+    isSuperAdmin: boolean,
+): OrderStatus[] =>
+    isSuperAdmin
+        ? ORDER_STATUSES.filter((s) => s !== current)
+        : ORDER_STATUS_TRANSITIONS[current] ?? [];
 
 export const ordersApi = {
     list: async (params?: OrderListParams): Promise<OrderListResult> => {

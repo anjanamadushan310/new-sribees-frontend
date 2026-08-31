@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { Title, Text } = Typography;
 
@@ -15,6 +16,11 @@ const CustomerList: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm();
+    // Editing / blocking a customer is a network-wide action (super_admin +
+    // customer_support only on the server); a Branch Manager sees their branch's
+    // customers read-only. Deleting is super_admin only.
+    const { isSuperAdmin, isSupport } = usePermissions();
+    const canManageCustomers = isSuperAdmin || isSupport;
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -196,7 +202,7 @@ const CustomerList: React.FC = () => {
                     <Switch
                         size="small"
                         checked={record.is_active}
-                        disabled={record.is_blocked}
+                        disabled={record.is_blocked || !canManageCustomers}
                         loading={
                             statusMutation.isPending &&
                             statusMutation.variables?.id === record.user_id
@@ -232,58 +238,62 @@ const CustomerList: React.FC = () => {
                             setDrawerVisible(true);
                         }
                     },
-                    {
-                        key: 'edit',
-                        label: 'Edit Info',
-                        icon: <EditOutlined />,
-                        onClick: () => {
-                            setSelectedCustomerId(record.user_id);
-                            form.setFieldsValue({
-                                full_name: record.full_name,
-                                email: record.email,
-                                phone: record.phone
-                            });
-                            setEditModalVisible(true);
+                    ...(canManageCustomers ? [
+                        {
+                            key: 'edit',
+                            label: 'Edit Info',
+                            icon: <EditOutlined />,
+                            onClick: () => {
+                                setSelectedCustomerId(record.user_id);
+                                form.setFieldsValue({
+                                    full_name: record.full_name,
+                                    email: record.email,
+                                    phone: record.phone
+                                });
+                                setEditModalVisible(true);
+                            }
+                        },
+                        record.is_blocked ? {
+                            key: 'unblock',
+                            label: 'Unblock Account',
+                            icon: <UnlockOutlined />,
+                            onClick: () => {
+                                unblockMutation.mutate(record.user_id);
+                            }
+                        } : {
+                            key: 'block',
+                            label: 'Block Account',
+                            icon: <LockOutlined />,
+                            danger: true,
+                            onClick: () => {
+                                setSelectedCustomerId(record.user_id);
+                                setBlockReason('');
+                                setBlockModalVisible(true);
+                            }
+                        },
+                    ] : []),
+                    ...(isSuperAdmin ? [
+                        {
+                            type: 'divider' as const
+                        },
+                        {
+                            key: 'delete',
+                            label: (
+                                <Popconfirm
+                                    title="Delete/Anonymize Customer Account?"
+                                    description="Are you sure you want to delete this customer? If they have order history, they will be anonymized instead of hard-deleted."
+                                    onConfirm={() => deleteMutation.mutate(record.user_id)}
+                                    okText="Yes, Delete"
+                                    cancelText="Cancel"
+                                    okButtonProps={{ danger: true }}
+                                >
+                                    <span style={{ display: 'block', width: '100%' }}>Delete Customer</span>
+                                </Popconfirm>
+                            ),
+                            icon: <DeleteOutlined />,
+                            danger: true
                         }
-                    },
-                    record.is_blocked ? {
-                        key: 'unblock',
-                        label: 'Unblock Account',
-                        icon: <UnlockOutlined />,
-                        onClick: () => {
-                            unblockMutation.mutate(record.user_id);
-                        }
-                    } : {
-                        key: 'block',
-                        label: 'Block Account',
-                        icon: <LockOutlined />,
-                        danger: true,
-                        onClick: () => {
-                            setSelectedCustomerId(record.user_id);
-                            setBlockReason('');
-                            setBlockModalVisible(true);
-                        }
-                    },
-                    {
-                        type: 'divider' as const
-                    },
-                    {
-                        key: 'delete',
-                        label: (
-                            <Popconfirm
-                                title="Delete/Anonymize Customer Account?"
-                                description="Are you sure you want to delete this customer? If they have order history, they will be anonymized instead of hard-deleted."
-                                onConfirm={() => deleteMutation.mutate(record.user_id)}
-                                okText="Yes, Delete"
-                                cancelText="Cancel"
-                                okButtonProps={{ danger: true }}
-                            >
-                                <span style={{ display: 'block', width: '100%' }}>Delete Customer</span>
-                            </Popconfirm>
-                        ),
-                        icon: <DeleteOutlined />,
-                        danger: true
-                    }
+                    ] : [])
                 ];
 
                 return (

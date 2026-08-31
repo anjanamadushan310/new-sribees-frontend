@@ -1,6 +1,13 @@
 /**
  * Admin Customer API (/api/v1/admin/customers) — operates on the customer
- * `users` table. Restricted to super_admin + customer_support.
+ * `users` table.
+ *
+ * Reads (list / profile / orders) need `customers:read` and are branch-isolated
+ * server-side: a scoped admin (Branch Manager + their staff, Marketing/Inventory
+ * Manager) only sees customers with an order in their branch, and only that
+ * branch's orders/stats. Super Admin and Customer Support see everyone.
+ * Writes (edit / block / unblock / status) are super_admin + customer_support;
+ * delete is super_admin only.
  * Responses are snake_case dicts.
  */
 import apiClient from './client';
