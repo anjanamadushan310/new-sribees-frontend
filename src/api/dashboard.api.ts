@@ -24,17 +24,19 @@ export interface DashboardStats {
  * inferring absence from a zero.
  */
 export interface StaffDashboardStats {
-    granted: { orders: boolean; customers: boolean; products: boolean };
+    // `revenue` gates every money figure — analytics:read, NOT orders:read (B6).
+    granted: { orders: boolean; customers: boolean; products: boolean; revenue: boolean };
     totalRevenue?: number;
     totalOrders?: number;
     pendingOrders?: number;
     revenueGrowth?: number;
     ordersGrowth?: number;
     revenueTrend?: { date: string; revenue: number; orders: number }[];
+    ordersTrend?: { date: string; orders: number }[];
     orderStatusDistribution?: { status: string; orders: number }[];
     recentOrders?: RecentOrder[];
     totalCustomers?: number;
-    topSellingProducts?: { productId: string; name: string; unitsSold: number; revenue: number }[];
+    topSellingProducts?: { productId: string; name: string; unitsSold: number; revenue?: number }[];
 }
 
 export interface BranchDashboardStats {
@@ -91,17 +93,18 @@ export interface BranchPerformance {
 }
 
 interface StaffDashboardStatsWire {
-    granted: { orders: boolean; customers: boolean; products: boolean };
+    granted: { orders: boolean; customers: boolean; products: boolean; revenue: boolean };
     total_revenue?: number;
     total_orders?: number;
     pending_orders?: number;
     revenue_growth?: number;
     orders_growth?: number;
     revenue_trend?: { date: string; revenue: number; orders: number }[];
+    orders_trend?: { date: string; orders: number }[];
     order_status_distribution?: { status: string; orders: number }[];
     recent_orders?: RecentOrder[];
     total_customers?: number;
-    top_selling_products?: { product_id: string; name: string; units_sold: number; revenue: number }[];
+    top_selling_products?: { product_id: string; name: string; units_sold: number; revenue?: number }[];
 }
 
 function mapDashboardStatsWire(w: StaffDashboardStatsWire): StaffDashboardStats {
@@ -113,6 +116,7 @@ function mapDashboardStatsWire(w: StaffDashboardStatsWire): StaffDashboardStats 
         revenueGrowth: w.revenue_growth,
         ordersGrowth: w.orders_growth,
         revenueTrend: w.revenue_trend,
+        ordersTrend: w.orders_trend,
         orderStatusDistribution: w.order_status_distribution,
         recentOrders: w.recent_orders,
         totalCustomers: w.total_customers,

@@ -21,6 +21,7 @@ import {
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
+    EyeOutlined,
     SearchOutlined,
     PictureOutlined,
 } from '@ant-design/icons';
@@ -30,6 +31,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { productsApi } from '../../api/products.api';
 import type { AdminProduct } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { Title } = Typography;
 
@@ -43,6 +45,12 @@ const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { message } = App.useApp();
     const queryClient = useQueryClient();
+    // Support staff (and any role without products write) get a read-only
+    // catalog: no Add / Edit / Delete, only View Details (B5).
+    const { canCreate, canUpdate, canDelete } = usePermissions();
+    const canAddProduct = canCreate('products');
+    const canEditProduct = canUpdate('products');
+    const canDeleteProduct = canDelete('products');
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -170,27 +178,38 @@ const ProductList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 160,
+            width: 180,
             render: (_, record) => (
                 <Space>
                     <Button
                         type="link"
-                        icon={<EditOutlined />}
+                        icon={<EyeOutlined />}
                         onClick={() => navigate(`/products/${record.product_id}/edit`)}
                     >
-                        Edit
+                        View
                     </Button>
-                    <Popconfirm
-                        title="Delete product"
-                        description="This permanently removes the product."
-                        okText="Delete"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => deleteMutation.mutate(record.product_id)}
-                    >
-                        <Button type="link" danger icon={<DeleteOutlined />}>
-                            Delete
+                    {canEditProduct && (
+                        <Button
+                            type="link"
+                            icon={<EditOutlined />}
+                            onClick={() => navigate(`/products/${record.product_id}/edit`)}
+                        >
+                            Edit
                         </Button>
-                    </Popconfirm>
+                    )}
+                    {canDeleteProduct && (
+                        <Popconfirm
+                            title="Delete product"
+                            description="This permanently removes the product."
+                            okText="Delete"
+                            okButtonProps={{ danger: true }}
+                            onConfirm={() => deleteMutation.mutate(record.product_id)}
+                        >
+                            <Button type="link" danger icon={<DeleteOutlined />}>
+                                Delete
+                            </Button>
+                        </Popconfirm>
+                    )}
                 </Space>
             ),
         },
@@ -209,9 +228,11 @@ const ProductList: React.FC = () => {
                 <Title level={3} style={{ margin: 0 }}>
                     Products
                 </Title>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/products/new')}>
-                    Add Product
-                </Button>
+                {canAddProduct && (
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/products/new')}>
+                        Add Product
+                    </Button>
+                )}
             </div>
 
             <Card>
