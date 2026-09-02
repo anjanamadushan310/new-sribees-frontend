@@ -21,6 +21,7 @@ import {
     Empty,
     Input,
     Modal,
+    Radio,
     Select,
     Space,
     Spin,
@@ -32,15 +33,26 @@ import {
 import {
     ClockCircleOutlined,
     DownloadOutlined,
+    FlagOutlined,
+    PhoneOutlined,
     RobotOutlined,
     SettingOutlined,
     UserOutlined,
+    WhatsAppOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi, ORDER_STATUS_META } from '../../api/orders.api';
-import type { OrderItem, OrderStatus } from '../../api/orders.api';
+import type {
+    EscalationCategory,
+    FulfilmentContacts,
+    OrderEscalation,
+    OrderItem,
+    OrderStatus,
+    ReturnResolution,
+} from '../../api/orders.api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { Text, Title } = Typography;
 
@@ -66,13 +78,34 @@ interface OrderDetailsProps {
     onClose: () => void;
 }
 
+const ESC_CATEGORIES: { value: EscalationCategory; label: string }[] = [
+    { value: 'cancel_request', label: 'Urgent Cancellation' },
+    { value: 'address_correction', label: 'Address Correction' },
+    { value: 'hold_shipment', label: 'Hold Shipment' },
+    { value: 'customer_complaint', label: 'Customer Complaint' },
+    { value: 'other', label: 'Other' },
+];
+const escLabel = (c: string) => ESC_CATEGORIES.find((x) => x.value === c)?.label ?? c;
+const telHref = (p?: string | null) => (p ? `tel:${p.replace(/\s+/g, '')}` : undefined);
+const waHref = (p?: string | null) =>
+    p ? `https://wa.me/${p.replace(/[^\d]/g, '')}` : undefined;
+
 const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
+    const { isSuperAdmin, isBranchManager, isSupport } = usePermissions();
+    const canDecideReturn = isSuperAdmin || isBranchManager;
 
     const [overrideOpen, setOverrideOpen] = useState(false);
     const [overrideTarget, setOverrideTarget] = useState<OrderStatus | undefined>(undefined);
     const [overrideReason, setOverrideReason] = useState('');
+
+    const [returnResolution, setReturnResolution] = useState<ReturnResolution>('returnless_refund');
+    const [returnNote, setReturnNote] = useState('');
+    const [proofNote, setProofNote] = useState('');
+    const [escOpen, setEscOpen] = useState(false);
+    const [escCategory, setEscCategory] = useState<EscalationCategory>('cancel_request');
+    const [escMessage, setEscMessage] = useState('');
 
     const { data: order, isLoading } = useQuery({
         queryKey: ['admin', 'order', orderId],
@@ -90,12 +123,52 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         setOverrideOpen(false);
         setOverrideTarget(undefined);
         setOverrideReason('');
+        setReturnResolution('returnless_refund');
+        setReturnNote('');
+        setProofNote('');
+        setEscOpen(false);
+        setEscCategory('cancel_request');
+        setEscMessage('');
     }, [orderId]);
 
     const invalidateOrder = () => {
         queryClient.invalidateQueries({ queryKey: ['admin', 'order', orderId] });
         queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
     };
+
+    const escalations = order?.escalations ?? [];
+    const contacts: FulfilmentContacts | undefined = order?.fulfilment_contacts;
+
+    const raiseEscMut = useMutation({
+        mutationFn: () => ordersApi.raiseEscalation(order!.order_id, escCategory, escMessage.trim()),
+        onSuccess: () => {
+            message.success('Escalation raised.');
+            setEscOpen(false);
+            setEscMessage('');
+            invalidateOrder();
+        },
+        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to raise escalation.'),
+    });
+
+    const escUpdateMut = useMutation({
+        mutationFn: ({ eid, status, note }: { eid: string; status: 'acknowledged' | 'resolved'; note?: string }) =>
+            ordersApi.updateEscalation(order!.order_id, eid, status, note),
+        onSuccess: (_r, v) => {
+            message.success(`Escalation ${v.status}.`);
+            invalidateOrder();
+        },
+        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to update escalation.'),
+    });
+
+    const proofMut = useMutation({
+        mutationFn: () => ordersApi.addReturnNote(order!.order_id, proofNote.trim()),
+        onSuccess: () => {
+            message.success('Note added to the return claim.');
+            setProofNote('');
+            invalidateOrder();
+        },
+        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to add note.'),
+    });
 
     const statusMutation = useMutation({
         mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
@@ -139,7 +212,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
     };
 
     const approveReturnMutation = useMutation({
-        mutationFn: (id: string) => ordersApi.approveReturn(id),
+        mutationFn: (id: string) => ordersApi.approveReturn(id, returnResolution, returnNote.trim() || undefined),
         onSuccess: (updated) => {
             message.success(
                 `Return approved. ${formatLKR(updated.refund_amount ?? 0)} credited to the customer's wallet.`
@@ -151,7 +224,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
     });
 
     const rejectReturnMutation = useMutation({
-        mutationFn: (id: string) => ordersApi.rejectReturn(id),
+        mutationFn: (id: string) => ordersApi.rejectReturn(id, returnNote.trim() || undefined),
         onSuccess: () => {
             message.success('Return rejected. Order reverted to Delivered.');
             invalidateOrder();
@@ -166,8 +239,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             title: 'Approve return?',
             content: (
                 <span>
-                    Approve the return for <b>{order.order_number}</b>? The returned items' value
-                    will be refunded to the customer's SRIBEES Wallet and the order marked Refunded.
+                    Approve the return for <b>{order.order_number}</b> as{' '}
+                    <b>
+                        {returnResolution === 'reverse_pickup'
+                            ? 'a reverse pickup (rider collects the goods)'
+                            : 'a returnless refund (no pickup)'}
+                    </b>
+                    ? The returned items' value will be refunded to the customer's SRIBEES Wallet.
                 </span>
             ),
             okText: 'Approve & Refund',
@@ -336,6 +414,68 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                         <Text type="secondary">No delivery address</Text>
                     )}
 
+                    <Divider titlePlacement="start">🏢 Fulfilment &amp; Logistics Contacts</Divider>
+                    {contacts?.branch ? (
+                        <Descriptions column={1} size="small" bordered>
+                            <Descriptions.Item label="Branch">
+                                {contacts.branch.name} ({contacts.branch.code})
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Manager">
+                                {contacts.branch.manager_name || '—'}
+                                {contacts.branch.manager_email ? ` · ${contacts.branch.manager_email}` : ''}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Branch Phone">
+                                {contacts.branch.phone ? (
+                                    <Space>
+                                        <span>{contacts.branch.phone}</span>
+                                        <a href={telHref(contacts.branch.phone)}>
+                                            <PhoneOutlined /> Call
+                                        </a>
+                                        <a href={waHref(contacts.branch.phone)} target="_blank" rel="noreferrer">
+                                            <WhatsAppOutlined /> WhatsApp
+                                        </a>
+                                    </Space>
+                                ) : (
+                                    '—'
+                                )}
+                            </Descriptions.Item>
+                        </Descriptions>
+                    ) : (
+                        <Text type="secondary">This order has no fulfilling branch.</Text>
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                        {contacts?.rider?.state === 'assigned' ? (
+                            <Descriptions column={1} size="small">
+                                <Descriptions.Item label="Rider">
+                                    {contacts.rider.name || (
+                                        <Text type="secondary">
+                                            With the courier — waybill{' '}
+                                            {contacts.rider.waybill || 'pending'}
+                                            {contacts.rider.tracking_status
+                                                ? ` · ${contacts.rider.tracking_status}`
+                                                : ''}
+                                        </Text>
+                                    )}
+                                </Descriptions.Item>
+                                {contacts.rider.phone && (
+                                    <Descriptions.Item label="Rider Phone">
+                                        <Space>
+                                            <span>{contacts.rider.phone}</span>
+                                            <a href={telHref(contacts.rider.phone)}>
+                                                <PhoneOutlined /> Call
+                                            </a>
+                                            <a href={waHref(contacts.rider.phone)} target="_blank" rel="noreferrer">
+                                                <WhatsAppOutlined /> WhatsApp
+                                            </a>
+                                        </Space>
+                                    </Descriptions.Item>
+                                )}
+                            </Descriptions>
+                        ) : (
+                            <Text type="secondary">⏳ Rider: Pending Assignment (not dispatched yet)</Text>
+                        )}
+                    </div>
+
                     <Divider titlePlacement="start">Items</Divider>
                     <Table
                         columns={itemColumns}
@@ -387,22 +527,73 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                         : 'Full order'}
                                 </Descriptions.Item>
                             </Descriptions>
-                            <Space style={{ marginTop: 12 }}>
-                                <Button
-                                    type="primary"
-                                    loading={approveReturnMutation.isPending}
-                                    onClick={confirmApproveReturn}
-                                >
-                                    Approve Return
-                                </Button>
-                                <Button
-                                    danger
-                                    loading={rejectReturnMutation.isPending}
-                                    onClick={confirmRejectReturn}
-                                >
-                                    Reject Return
-                                </Button>
-                            </Space>
+                            {/* Support captures proofs; only BM/SA decides (B4 §2). */}
+                            <div style={{ marginTop: 12 }}>
+                                <Text strong style={{ fontSize: 13 }}>Add a proof / context note</Text>
+                                <Space.Compact style={{ display: 'flex', marginTop: 4 }}>
+                                    <Input
+                                        placeholder="e.g. customer sent a photo of the spoiled item…"
+                                        value={proofNote}
+                                        onChange={(e) => setProofNote(e.target.value)}
+                                        onPressEnter={() => proofNote.trim().length >= 3 && proofMut.mutate()}
+                                    />
+                                    <Button
+                                        onClick={() => proofMut.mutate()}
+                                        loading={proofMut.isPending}
+                                        disabled={proofNote.trim().length < 3}
+                                    >
+                                        Add
+                                    </Button>
+                                </Space.Compact>
+                            </div>
+
+                            {canDecideReturn ? (
+                                <div style={{ marginTop: 16 }}>
+                                    <Text strong style={{ fontSize: 13 }}>Resolution</Text>
+                                    <Radio.Group
+                                        style={{ display: 'block', marginTop: 4 }}
+                                        value={returnResolution}
+                                        onChange={(e) => setReturnResolution(e.target.value)}
+                                    >
+                                        <Radio value="returnless_refund">
+                                            Returnless refund <Text type="secondary">(spoilage — no pickup)</Text>
+                                        </Radio>
+                                        <Radio value="reverse_pickup">
+                                            Reverse pickup <Text type="secondary">(a rider collects the goods)</Text>
+                                        </Radio>
+                                    </Radio.Group>
+                                    <Input.TextArea
+                                        style={{ marginTop: 8 }}
+                                        rows={2}
+                                        placeholder="Decision note (optional)…"
+                                        value={returnNote}
+                                        onChange={(e) => setReturnNote(e.target.value)}
+                                    />
+                                    <Space style={{ marginTop: 12 }}>
+                                        <Button
+                                            type="primary"
+                                            loading={approveReturnMutation.isPending}
+                                            onClick={confirmApproveReturn}
+                                        >
+                                            Approve &amp; Refund
+                                        </Button>
+                                        <Button
+                                            danger
+                                            loading={rejectReturnMutation.isPending}
+                                            onClick={confirmRejectReturn}
+                                        >
+                                            Reject Claim
+                                        </Button>
+                                    </Space>
+                                </div>
+                            ) : (
+                                <Alert
+                                    style={{ marginTop: 12 }}
+                                    type="info"
+                                    showIcon
+                                    message="A Branch Manager or Super Admin reviews and decides this claim."
+                                />
+                            )}
                         </>
                     )}
 
@@ -473,6 +664,101 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     ) : (
                         <Text type="secondary">No status history records available.</Text>
                     )}
+
+                    <Divider titlePlacement="start">
+                        <Space>
+                            <FlagOutlined /> Escalation Tickets
+                            {escalations.some((e) => e.status !== 'resolved') && (
+                                <Tag color="red">
+                                    {escalations.filter((e) => e.status !== 'resolved').length} open
+                                </Tag>
+                            )}
+                        </Space>
+                    </Divider>
+                    <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                        {escalations.length === 0 && (
+                            <Text type="secondary">No escalations raised on this order.</Text>
+                        )}
+                        {escalations.map((e: OrderEscalation) => (
+                            <div
+                                key={e.escalation_id}
+                                style={{
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    border: '1px solid #f0f0f0',
+                                    background: e.status === 'resolved' ? '#fafafa' : '#fffef7',
+                                }}
+                            >
+                                <Space wrap size={6}>
+                                    <Tag color="geekblue">{escLabel(e.category)}</Tag>
+                                    <Tag color={e.status === 'open' ? 'red' : e.status === 'acknowledged' ? 'gold' : 'green'}>
+                                        {e.status}
+                                    </Tag>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                        {e.raised_by_name}
+                                        {e.created_at ? ` · ${dayjs(e.created_at).format('MMM DD, HH:mm')}` : ''}
+                                    </Text>
+                                </Space>
+                                <div style={{ marginTop: 4 }}>{e.message}</div>
+                                {e.resolution_note && (
+                                    <div style={{ marginTop: 4 }}>
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                            ↳ {e.handled_by_name}: {e.resolution_note}
+                                        </Text>
+                                    </div>
+                                )}
+                                {canDecideReturn && e.status !== 'resolved' && (
+                                    <Space style={{ marginTop: 8 }}>
+                                        {e.status === 'open' && (
+                                            <Button
+                                                size="small"
+                                                loading={escUpdateMut.isPending}
+                                                onClick={() =>
+                                                    escUpdateMut.mutate({ eid: e.escalation_id, status: 'acknowledged' })
+                                                }
+                                            >
+                                                Acknowledge
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="small"
+                                            type="primary"
+                                            loading={escUpdateMut.isPending}
+                                            onClick={() => {
+                                                let note = '';
+                                                modal.confirm({
+                                                    title: 'Resolve escalation',
+                                                    content: (
+                                                        <Input.TextArea
+                                                            rows={3}
+                                                            placeholder="Resolution note (optional)…"
+                                                            onChange={(ev) => (note = ev.target.value)}
+                                                        />
+                                                    ),
+                                                    okText: 'Resolve',
+                                                    onOk: () =>
+                                                        escUpdateMut.mutateAsync({
+                                                            eid: e.escalation_id,
+                                                            status: 'resolved',
+                                                            note: note.trim() || undefined,
+                                                        }),
+                                                });
+                                            }}
+                                        >
+                                            Resolve
+                                        </Button>
+                                    </Space>
+                                )}
+                            </div>
+                        ))}
+                        <Button
+                            icon={<FlagOutlined />}
+                            onClick={() => setEscOpen(true)}
+                            style={{ alignSelf: 'flex-start' }}
+                        >
+                            Raise Escalation
+                        </Button>
+                    </Space>
 
                     <Divider titlePlacement="start">Actions</Divider>
                     {actions.length > 0 ? (
@@ -581,6 +867,49 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                 showIcon
                                 message="Overriding status bypasses standard operational validations and will be logged permanently in the audit trail."
                             />
+                        </Space>
+                    </Modal>
+
+                    <Modal
+                        title="🚩 Raise Internal Escalation"
+                        open={escOpen}
+                        onCancel={() => setEscOpen(false)}
+                        okText="Raise Escalation"
+                        okButtonProps={{
+                            disabled: escMessage.trim().length < 5,
+                            loading: raiseEscMut.isPending,
+                        }}
+                        onOk={() => raiseEscMut.mutate()}
+                    >
+                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                            <div>
+                                <Text strong>Category</Text>
+                                <Select
+                                    style={{ width: '100%', marginTop: 4 }}
+                                    value={escCategory}
+                                    onChange={setEscCategory}
+                                    options={ESC_CATEGORIES}
+                                />
+                            </div>
+                            <div>
+                                <Text strong>What needs the branch's attention?</Text>
+                                <Input.TextArea
+                                    style={{ marginTop: 4 }}
+                                    rows={4}
+                                    maxLength={2000}
+                                    showCount
+                                    placeholder="e.g. Customer called to cancel — order is still Confirmed, please hold before packing."
+                                    value={escMessage}
+                                    onChange={(e) => setEscMessage(e.target.value)}
+                                />
+                            </div>
+                            {isSupport && (
+                                <Alert
+                                    type="info"
+                                    showIcon
+                                    message="The Branch Manager is notified and will acknowledge / resolve this ticket."
+                                />
+                            )}
                         </Space>
                     </Modal>
                 </>

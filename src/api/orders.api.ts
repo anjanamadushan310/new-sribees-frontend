@@ -101,6 +101,51 @@ export interface OrderStatusHistoryItem {
     created_at: string | null;
 }
 
+/** Fulfilment & logistics contacts card (B4 Module A). */
+export interface FulfilmentContacts {
+    branch: {
+        name: string;
+        code: string;
+        phone: string | null;
+        manager_name: string | null;
+        manager_email: string | null;
+    } | null;
+    rider: {
+        state: 'pending' | 'assigned';
+        name: string | null;
+        phone: string | null;
+        vehicle: string | null;
+        waybill: string | null;
+        tracking_status: string | null;
+        courier_booking_status: string | null;
+    };
+}
+
+export type EscalationCategory =
+    | 'cancel_request'
+    | 'address_correction'
+    | 'hold_shipment'
+    | 'customer_complaint'
+    | 'other';
+export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
+
+/** Internal support → branch ticket (B4 Module B). */
+export interface OrderEscalation {
+    escalation_id: string;
+    order_id: string;
+    category: EscalationCategory;
+    message: string;
+    status: EscalationStatus;
+    resolution_note: string | null;
+    raised_by_name: string;
+    handled_by_name: string | null;
+    created_at: string | null;
+    acknowledged_at: string | null;
+    resolved_at: string | null;
+}
+
+export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
+
 export interface OrderDetail {
     order_id: string;
     order_number: string;
@@ -124,11 +169,15 @@ export interface OrderDetail {
     return_items: OrderReturnItem[] | null;
     return_requested_at: string | null;
     refund_amount: number | null;
+    return_resolution: ReturnResolution | null;
+    return_resolution_note: string | null;
     customer: OrderCustomer | null;
     delivery_address: OrderDeliveryAddress | null;
     items: OrderItem[];
     pricing: OrderPricing;
     history?: OrderStatusHistoryItem[];
+    fulfilment_contacts?: FulfilmentContacts;
+    escalations?: OrderEscalation[];
 }
 
 export interface OrderScope {
@@ -317,13 +366,58 @@ export const ordersApi = {
         return res.data.data;
     },
 
-    approveReturn: async (id: string): Promise<OrderDetail> => {
-        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/approve`);
+    /** Branch Manager / Super Admin only. resolution: returnless refund vs reverse pickup (B4). */
+    approveReturn: async (
+        id: string,
+        resolution: ReturnResolution = 'returnless_refund',
+        note?: string,
+    ): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/approve`, {
+            resolution,
+            note,
+        });
         return res.data.data;
     },
 
-    rejectReturn: async (id: string): Promise<OrderDetail> => {
-        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/reject`);
+    rejectReturn: async (id: string, note?: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/reject`, { note });
+        return res.data.data;
+    },
+
+    /** Customer Support appends a proof/context note to an open return claim (B4). */
+    addReturnNote: async (id: string, note: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/note`, { note });
+        return res.data.data;
+    },
+
+    // --- Internal escalation tickets (B4 Module B) ---
+    listEscalations: async (id: string): Promise<OrderEscalation[]> => {
+        const res = await apiClient.get<{ success: boolean; data: { escalations: OrderEscalation[] } }>(
+            `/admin/orders/${id}/escalations`,
+        );
+        return res.data.data.escalations;
+    },
+    raiseEscalation: async (
+        id: string,
+        category: EscalationCategory,
+        message: string,
+    ): Promise<OrderEscalation> => {
+        const res = await apiClient.post<{ success: boolean; data: OrderEscalation }>(
+            `/admin/orders/${id}/escalations`,
+            { category, message },
+        );
+        return res.data.data;
+    },
+    updateEscalation: async (
+        id: string,
+        escalationId: string,
+        status: EscalationStatus,
+        resolutionNote?: string,
+    ): Promise<OrderEscalation> => {
+        const res = await apiClient.patch<{ success: boolean; data: OrderEscalation }>(
+            `/admin/orders/${id}/escalations/${escalationId}`,
+            { status, resolution_note: resolutionNote },
+        );
         return res.data.data;
     },
 
