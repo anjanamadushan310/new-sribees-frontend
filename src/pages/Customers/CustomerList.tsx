@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List } from 'antd';
-import { SearchOutlined, UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
+import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -325,16 +326,18 @@ const CustomerList: React.FC = () => {
             </div>
 
             <Card>
-                <Input.Search
-                    placeholder="Search by name, email or phone…"
-                    allowClear
-                    enterButton={<SearchOutlined />}
-                    style={{ width: 340, marginBottom: 16 }}
-                    onSearch={(value) => {
-                        setPage(1);
-                        setSearch(value);
-                    }}
-                />
+                <div style={{ marginBottom: 16 }}>
+                    <DebouncedSearchInput
+                        placeholder="Search name, phone, email…"
+                        value={search}
+                        onChange={(v) => {
+                            setPage(1);
+                            setSearch(v);
+                        }}
+                        urlParam="q"
+                        style={{ width: 340 }}
+                    />
+                </div>
 
                 <Table
                     rowKey="user_id"

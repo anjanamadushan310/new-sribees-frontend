@@ -1,28 +1,27 @@
 /**
- * Order Management (Module 7.3)
- * Branch-scoped order list with status + branch filters. Branch isolation
- * happens server-side: Branch Manager sees only their own branch; Super
- * Admin and Customer Support are unscoped (a support agent has to be able
- * to look up any customer's order, not just the branch they're listed
- * under) and get the branch column + filter to tell orders apart.
- * Row click / View opens the OrderDetails drawer. TanStack Query against
- * /api/v1/admin/orders.
+ * Order Management (Module 7.3 / QA spec B2)
+ *
+ * Two-tier lifecycle filter:
+ *   Tier 1 — main tabs (New / Warehouse / Logistics / Delivered / Returns /
+ *            Exceptions) with badge counters.
+ *   Tier 2 — sub-status pills for the active tab.
+ * Row 3 — search, branch, date range, exports.
+ *
+ * Branch isolation is server-side (inject_branch_filter); the tab/pill counts
+ * come from the same context-filtered `status_counts` map the list returns.
  */
 import React, { useState } from 'react';
-import { Card, Table, Input, Select, Space, Button, Typography, App, Alert, DatePicker } from 'antd';
-import { EyeOutlined, SearchOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
+import { Alert, App, Badge, Button, Card, DatePicker, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
+import { EyeOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import {
-    ordersApi,
-    ORDER_STATUS_META,
-    ORDER_STATUSES,
-} from '../../api/orders.api';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ordersApi, ORDER_TABS, sumCounts } from '../../api/orders.api';
 import type { OrderListItem, OrderStatus } from '../../api/orders.api';
 import { transfersApi } from '../../api/transfers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import OrderDetails, { statusTag } from './OrderDetails';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -47,7 +46,8 @@ const OrderList: React.FC = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<OrderStatus | undefined>(undefined);
+    const [tabKey, setTabKey] = useState('all');
+    const [pillKey, setPillKey] = useState<string | undefined>(undefined);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
     const [openOrderId, setOpenOrderId] = useState<string | null>(null);
@@ -60,6 +60,12 @@ const OrderList: React.FC = () => {
     const fromDate = dateRange?.[0] ? dateRange[0].format('YYYY-MM-DD') : undefined;
     const toDate = dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined;
 
+    const activeTab = ORDER_TABS.find((t) => t.key === tabKey) ?? ORDER_TABS[0];
+    const activePill = activeTab.subPills.find((p) => p.key === pillKey);
+    const filterStatuses: OrderStatus[] = activePill?.statuses ?? activeTab.statuses;
+    const orderStatusesParam = filterStatuses.length ? filterStatuses.join(',') : undefined;
+    const statusFilterForExport = filterStatuses.length === 1 ? filterStatuses[0] : undefined;
+
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'transfers', 'branches'],
         queryFn: transfersApi.branches,
@@ -67,13 +73,13 @@ const OrderList: React.FC = () => {
     });
 
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['admin', 'orders', { page, pageSize, search, statusFilter, branchId, fromDate, toDate }],
+        queryKey: ['admin', 'orders', { page, pageSize, search, orderStatusesParam, branchId, fromDate, toDate }],
         queryFn: () =>
             ordersApi.list({
                 page,
                 limit: pageSize,
                 search: search || undefined,
-                order_status: statusFilter,
+                order_statuses: orderStatusesParam,
                 branch_id: branchId,
                 from_date: fromDate,
                 to_date: toDate,
@@ -85,66 +91,50 @@ const OrderList: React.FC = () => {
         message.error((error as any)?.response?.data?.detail || 'Failed to load orders.');
     }
 
+    const counts = data?.statusCounts ?? {};
     const showBranchColumn = isNetworkWide;
+
+    const resetTo = (nextTab: string, nextPill?: string) => {
+        setTabKey(nextTab);
+        setPillKey(nextPill);
+        setPage(1);
+        setSelectedRowKeys([]);
+    };
 
     const openDrawer = (id: string) => {
         setOpenOrderId(id);
         setDrawerOpen(true);
     };
 
-    const handleExportCSV = async (useSelection: boolean = false) => {
+    const runExport = async (kind: 'csv' | 'pdf', useSelection: boolean) => {
+        const set = kind === 'csv' ? setExportingCsv : setExportingPdf;
         try {
-            setExportingCsv(true);
-            const orderIds = useSelection ? (selectedRowKeys as string[]) : undefined;
-            const blob = await ordersApi.exportCSV({
-                order_status: statusFilter,
+            set(true);
+            const params = {
+                order_status: statusFilterForExport,
                 search: search || undefined,
                 branch_id: branchId,
                 from_date: fromDate,
                 to_date: toDate,
-                order_ids: orderIds,
-            });
+                order_ids: useSelection ? (selectedRowKeys as string[]) : undefined,
+            };
+            const blob = kind === 'csv' ? await ordersApi.exportCSV(params) : await ordersApi.exportPDF(params);
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `orders_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+            a.download =
+                kind === 'csv'
+                    ? `orders_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`
+                    : `dispatch_manifest_${dayjs().format('YYYYMMDD_HHmmss')}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            message.success('CSV export downloaded successfully.');
+            message.success(kind === 'csv' ? 'CSV export downloaded.' : 'Dispatch Manifest PDF downloaded.');
         } catch (err: any) {
-            message.error(err?.response?.data?.detail || 'Failed to export CSV.');
+            message.error(err?.response?.data?.detail || `Failed to export ${kind.toUpperCase()}.`);
         } finally {
-            setExportingCsv(false);
-        }
-    };
-
-    const handleExportPDF = async (useSelection: boolean = false) => {
-        try {
-            setExportingPdf(true);
-            const orderIds = useSelection ? (selectedRowKeys as string[]) : undefined;
-            const blob = await ordersApi.exportPDF({
-                order_status: statusFilter,
-                search: search || undefined,
-                branch_id: branchId,
-                from_date: fromDate,
-                to_date: toDate,
-                order_ids: orderIds,
-            });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `dispatch_manifest_${dayjs().format('YYYYMMDD_HHmmss')}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-            message.success('Dispatch Manifest PDF downloaded successfully.');
-        } catch (err: any) {
-            message.error(err?.response?.data?.detail || 'Failed to export Dispatch Manifest PDF.');
-        } finally {
-            setExportingPdf(false);
+            set(false);
         }
     };
 
@@ -153,9 +143,7 @@ const OrderList: React.FC = () => {
             title: 'Order',
             dataIndex: 'order_number',
             key: 'order_number',
-            render: (num: string, record) => (
-                <a onClick={() => openDrawer(record.order_id)}>{num}</a>
-            ),
+            render: (num: string, record) => <a onClick={() => openDrawer(record.order_id)}>{num}</a>,
         },
         {
             title: 'Customer',
@@ -188,13 +176,7 @@ const OrderList: React.FC = () => {
             key: 'created_at',
             render: (d: string | null) => (d ? dayjs(d).format('MMM DD, YYYY') : '—'),
         },
-        {
-            title: 'Items',
-            dataIndex: 'item_count',
-            key: 'item_count',
-            width: 70,
-            align: 'right',
-        },
+        { title: 'Items', dataIndex: 'item_count', key: 'item_count', width: 70, align: 'right' },
         {
             title: 'Total',
             dataIndex: 'total_amount',
@@ -206,7 +188,7 @@ const OrderList: React.FC = () => {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            width: 140,
+            width: 150,
             render: (s: OrderStatus) => statusTag(s),
         },
         {
@@ -221,6 +203,21 @@ const OrderList: React.FC = () => {
         },
     ];
 
+    const tabItems = ORDER_TABS.map((t) => ({
+        key: t.key,
+        label: (
+            <span>
+                {t.label}{' '}
+                <Badge
+                    count={sumCounts(counts, t.statuses)}
+                    showZero
+                    overflowCount={9999}
+                    style={{ backgroundColor: t.key === tabKey ? '#1677ff' : '#bfbfbf' }}
+                />
+            </span>
+        ),
+    }));
+
     return (
         <div>
             <Title level={3} style={{ marginTop: 0 }}>
@@ -228,31 +225,43 @@ const OrderList: React.FC = () => {
             </Title>
 
             <Card>
+                {/* Tier 1: main tabs */}
+                <Tabs
+                    activeKey={tabKey}
+                    items={tabItems}
+                    onChange={(k) => resetTo(k)}
+                    tabBarStyle={{ marginBottom: 8 }}
+                />
+
+                {/* Tier 2: sub-status pills */}
+                {activeTab.subPills.length > 0 && (
+                    <Space wrap size={8} style={{ marginBottom: 16 }}>
+                        <Tag.CheckableTag checked={!pillKey} onChange={() => resetTo(tabKey)}>
+                            All ({sumCounts(counts, activeTab.statuses)})
+                        </Tag.CheckableTag>
+                        {activeTab.subPills.map((p) => (
+                            <Tag.CheckableTag
+                                key={p.key}
+                                checked={pillKey === p.key}
+                                onChange={() => resetTo(tabKey, pillKey === p.key ? undefined : p.key)}
+                            >
+                                {p.label} ({sumCounts(counts, p.statuses)})
+                            </Tag.CheckableTag>
+                        ))}
+                    </Space>
+                )}
+
+                {/* Row 3: secondary filters + exports */}
                 <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
                     <Space wrap>
-                        <Input.Search
-                            placeholder="Search order # or customer…"
-                            allowClear
-                            enterButton={<SearchOutlined />}
-                            style={{ width: 300 }}
-                            onSearch={(value) => {
+                        <DebouncedSearchInput
+                            placeholder="Search order #, customer, phone, email…"
+                            value={search}
+                            onChange={(v) => {
                                 setPage(1);
-                                setSearch(value);
+                                setSearch(v);
                             }}
-                        />
-                        <Select
-                            placeholder="All statuses"
-                            style={{ width: 180 }}
-                            allowClear
-                            value={statusFilter}
-                            onChange={(value) => {
-                                setPage(1);
-                                setStatusFilter(value);
-                            }}
-                            options={ORDER_STATUSES.map((s) => ({
-                                label: ORDER_STATUS_META[s].label,
-                                value: s,
-                            }))}
+                            style={{ width: 320 }}
                         />
                         {showBranchColumn && (
                             <Select
@@ -260,9 +269,9 @@ const OrderList: React.FC = () => {
                                 style={{ width: 220 }}
                                 allowClear
                                 value={branchId}
-                                onChange={(value) => {
+                                onChange={(v) => {
                                     setPage(1);
-                                    setBranchId(value);
+                                    setBranchId(v);
                                 }}
                                 options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
                             />
@@ -280,18 +289,14 @@ const OrderList: React.FC = () => {
                     </Space>
 
                     <Space wrap>
-                        <Button
-                            icon={<FileExcelOutlined />}
-                            loading={exportingCsv}
-                            onClick={() => handleExportCSV(false)}
-                        >
+                        <Button icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', false)}>
                             Export CSV
                         </Button>
                         <Button
                             type="primary"
                             icon={<PrinterOutlined />}
                             loading={exportingPdf}
-                            onClick={() => handleExportPDF(false)}
+                            onClick={() => runExport('pdf', false)}
                         >
                             Dispatch PDF
                         </Button>
@@ -306,24 +311,14 @@ const OrderList: React.FC = () => {
                         message={
                             <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
                                 <span>
-                                    <b>{selectedRowKeys.length}</b> {selectedRowKeys.length === 1 ? 'order' : 'orders'} selected
+                                    <b>{selectedRowKeys.length}</b>{' '}
+                                    {selectedRowKeys.length === 1 ? 'order' : 'orders'} selected
                                 </span>
                                 <Space wrap>
-                                    <Button
-                                        size="small"
-                                        icon={<FileExcelOutlined />}
-                                        loading={exportingCsv}
-                                        onClick={() => handleExportCSV(true)}
-                                    >
+                                    <Button size="small" icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', true)}>
                                         Export Selected (CSV)
                                     </Button>
-                                    <Button
-                                        size="small"
-                                        type="primary"
-                                        icon={<PrinterOutlined />}
-                                        loading={exportingPdf}
-                                        onClick={() => handleExportPDF(true)}
-                                    >
+                                    <Button size="small" type="primary" icon={<PrinterOutlined />} loading={exportingPdf} onClick={() => runExport('pdf', true)}>
                                         Export Selected (PDF)
                                     </Button>
                                     <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>
@@ -337,10 +332,7 @@ const OrderList: React.FC = () => {
 
                 <Table
                     rowKey="order_id"
-                    rowSelection={{
-                        selectedRowKeys,
-                        onChange: (keys) => setSelectedRowKeys(keys),
-                    }}
+                    rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) }}
                     columns={columns}
                     dataSource={data?.orders ?? []}
                     loading={isLoading}
@@ -359,11 +351,7 @@ const OrderList: React.FC = () => {
                 />
             </Card>
 
-            <OrderDetails
-                orderId={openOrderId}
-                open={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
-            />
+            <OrderDetails orderId={openOrderId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
         </div>
     );
 };

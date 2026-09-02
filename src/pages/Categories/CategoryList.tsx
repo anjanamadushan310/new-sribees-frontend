@@ -26,7 +26,6 @@ import {
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
-    SearchOutlined,
     PictureOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -35,6 +34,7 @@ import { categoriesApi } from '../../api/categories.api';
 import type { Category, CategoryPayload } from '../../api/categories.api';
 import CategoryImageUpload from '../../components/categories/CategoryImageUpload';
 import { usePermissions } from '../../hooks/usePermissions';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -211,9 +211,15 @@ const CategoryList: React.FC = () => {
         }
     };
 
-    const matches = (c: Category) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.slug.toLowerCase().includes(search.toLowerCase());
+    const matches = (c: Category) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            c.name.toLowerCase().includes(q) ||
+            c.slug.toLowerCase().includes(q) ||
+            (c.description ?? '').toLowerCase().includes(q)
+        );
+    };
 
     // Nest sub-categories under their parent. antd renders a `children` array as
     // expandable rows, but an empty one still draws an expand caret — so the key
@@ -389,14 +395,14 @@ const CategoryList: React.FC = () => {
             </div>
 
             <Card>
-                <Input
-                    placeholder="Search by name or slug"
-                    allowClear
-                    prefix={<SearchOutlined />}
-                    style={{ width: 320, marginBottom: 16 }}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+                <div style={{ marginBottom: 16 }}>
+                    <DebouncedSearchInput
+                        placeholder="Search name, slug, description…"
+                        value={search}
+                        onChange={setSearch}
+                        style={{ width: 320 }}
+                    />
+                </div>
 
                 <Table
                     rowKey="category_id"

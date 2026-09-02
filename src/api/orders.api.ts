@@ -140,6 +140,8 @@ export interface OrderListParams {
     page?: number;
     limit?: number;
     order_status?: OrderStatus;
+    /** Comma-joined statuses — used by the B2 order tabs/pills. */
+    order_statuses?: string;
     search?: string;
     branch_id?: string; // super admin only
     from_date?: string;
@@ -153,6 +155,8 @@ export interface OrderListResult {
     limit: number;
     total_pages: number;
     scope: OrderScope;
+    /** {status: count} across the current date/branch/search context (B2). */
+    statusCounts: Record<string, number>;
 }
 
 interface OrderListWire {
@@ -160,9 +164,86 @@ interface OrderListWire {
     data: {
         orders: OrderListItem[];
         pagination: { total: number; page: number; limit: number; total_pages: number };
+        status_counts?: Record<string, number>;
         scope: OrderScope;
     };
 }
+
+/**
+ * Two-tier order lifecycle tabs (QA spec B2). Tier 1 = main tab, tier 2 =
+ * sub-status pills. `statuses` is the set of backend status values a
+ * tab/pill filters to; an empty `subPills` means the tab has no pills.
+ */
+export interface OrderSubPill {
+    key: string;
+    label: string;
+    statuses: OrderStatus[];
+}
+export interface OrderTab {
+    key: string;
+    label: string;
+    statuses: OrderStatus[]; // empty = "all orders"
+    subPills: OrderSubPill[];
+}
+
+export const ORDER_TABS: OrderTab[] = [
+    { key: 'all', label: 'All Orders', statuses: [], subPills: [] },
+    {
+        key: 'new',
+        label: 'New Orders',
+        statuses: ['pending', 'confirmed'],
+        subPills: [
+            { key: 'pending', label: 'Pending', statuses: ['pending'] },
+            { key: 'confirmed', label: 'Confirmed', statuses: ['confirmed'] },
+        ],
+    },
+    {
+        key: 'warehouse',
+        label: 'Warehouse',
+        statuses: ['processing', 'packing', 'packed'],
+        subPills: [
+            { key: 'packing', label: 'Packing', statuses: ['processing', 'packing'] },
+            { key: 'packed', label: 'Packed (Ready)', statuses: ['packed'] },
+        ],
+    },
+    {
+        key: 'logistics',
+        label: 'Logistics',
+        statuses: ['handed_to_courier', 'shipped', 'out_for_delivery'],
+        subPills: [
+            { key: 'handed', label: 'Handed to Courier', statuses: ['handed_to_courier'] },
+            { key: 'shipped', label: 'Shipped', statuses: ['shipped'] },
+            { key: 'ofd', label: 'Out for Delivery', statuses: ['out_for_delivery'] },
+        ],
+    },
+    { key: 'delivered', label: 'Delivered', statuses: ['delivered'], subPills: [] },
+    {
+        key: 'returns',
+        label: 'Returns & Refunds',
+        statuses: ['return_requested', 'return_approved', 'refunded'],
+        subPills: [
+            { key: 'requested', label: 'Return Requested', statuses: ['return_requested'] },
+            { key: 'qc', label: 'QC Pending', statuses: ['return_approved'] },
+            { key: 'refunded', label: 'Refunded', statuses: ['refunded'] },
+        ],
+    },
+    {
+        key: 'exceptions',
+        label: 'Exceptions',
+        statuses: ['cancelled', 'delivery_failed', 'rto_initiated'],
+        subPills: [
+            { key: 'cancelled', label: 'Cancelled', statuses: ['cancelled'] },
+            { key: 'failed', label: 'Delivery Failed', statuses: ['delivery_failed'] },
+            { key: 'rto', label: 'RTO', statuses: ['rto_initiated'] },
+        ],
+    },
+];
+
+/** Sum of the given statuses in a status_counts map. */
+export const sumCounts = (counts: Record<string, number>, statuses: OrderStatus[]): number =>
+    statuses.length === 0
+        ? Object.values(counts).reduce((a, b) => a + b, 0)
+        : statuses.reduce((a, s) => a + (counts[s] ?? 0), 0);
 
 interface OrderDetailWire {
     success: boolean;
@@ -203,6 +284,7 @@ export const ordersApi = {
         return {
             orders: res.data.data.orders,
             scope: res.data.data.scope,
+            statusCounts: res.data.data.status_counts ?? {},
             ...res.data.data.pagination,
         };
     },

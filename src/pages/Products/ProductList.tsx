@@ -8,7 +8,6 @@ import {
     Card,
     Table,
     Button,
-    Input,
     Select,
     Space,
     Tag,
@@ -22,7 +21,6 @@ import {
     EditOutlined,
     DeleteOutlined,
     EyeOutlined,
-    SearchOutlined,
     PictureOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -32,6 +30,7 @@ import { productsApi } from '../../api/products.api';
 import type { AdminProduct } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title } = Typography;
 
@@ -237,15 +236,15 @@ const ProductList: React.FC = () => {
 
             <Card>
                 <Space wrap style={{ marginBottom: 16 }}>
-                    <Input.Search
-                        placeholder="Search by name…"
-                        allowClear
-                        enterButton={<SearchOutlined />}
-                        style={{ width: 300 }}
-                        onSearch={(value) => {
+                    <DebouncedSearchInput
+                        placeholder="Search name, SKU…"
+                        value={search}
+                        onChange={(v) => {
                             setPage(1);
-                            setSearch(value);
+                            setSearch(v);
                         }}
+                        urlParam="q"
+                        style={{ width: 300 }}
                     />
                     <Select
                         placeholder="All categories"
