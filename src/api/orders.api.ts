@@ -14,10 +14,26 @@ export type OrderStatus =
     | 'shipped'
     | 'out_for_delivery'
     | 'delivered'
+    | 'delivery_failed'
+    | 'rto_initiated'
     | 'cancelled'
     | 'return_requested'
     | 'return_approved'
     | 'refunded';
+
+/** One contextual action button from GET /admin/orders/{id}/next-statuses (B1 §3). */
+export interface OrderStatusAction {
+    status: OrderStatus;
+    label: string;
+    kind: 'primary' | 'danger';
+}
+
+export interface OrderNextStatuses {
+    status: OrderStatus;
+    actions: OrderStatusAction[];
+    can_override: boolean;
+    all_statuses: OrderStatus[];
+}
 
 export interface OrderListItem {
     order_id: string;
@@ -98,6 +114,7 @@ export interface OrderDetail {
     handed_to_courier_at: string | null;
     shipped_at: string | null;
     delivered_at: string | null;
+    delivery_failed_at: string | null;
     delivery_slot_date: string | null;
     delivery_slot_time: string | null;
     notes: string | null;
@@ -164,6 +181,8 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     shipped: { label: 'Shipped', color: 'cyan' },
     out_for_delivery: { label: 'Out for Delivery', color: 'purple' },
     delivered: { label: 'Delivered', color: 'green' },
+    delivery_failed: { label: 'Delivery Failed', color: 'volcano' },
+    rto_initiated: { label: 'Returning to Store', color: 'orange' },
     cancelled: { label: 'Cancelled', color: 'red' },
     return_requested: { label: 'Return Requested', color: 'orange' },
     return_approved: { label: 'Return Approved', color: 'gold' },
@@ -171,38 +190,6 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
 };
 
 export const ORDER_STATUSES = Object.keys(ORDER_STATUS_META) as OrderStatus[];
-
-/**
- * Fulfilment state machine — mirror of the backend
- * (fastapi_backend/app/services/order_workflow.py ADMIN_TRANSITIONS). Drives
- * which "Advance status to…" options a non-super-admin sees. The server
- * re-validates every transition, so a stale copy here only ever narrows the
- * UI, never widens access. Super Admin is offered every other status.
- */
-export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-    pending: ['confirmed', 'packing', 'cancelled'],
-    confirmed: ['packing', 'cancelled'],
-    processing: ['packing', 'packed', 'cancelled'],
-    packing: ['packed', 'confirmed', 'cancelled'],
-    packed: ['handed_to_courier', 'packing', 'cancelled'],
-    handed_to_courier: ['shipped', 'packed'],
-    shipped: ['out_for_delivery', 'delivered'],
-    out_for_delivery: ['delivered', 'shipped'],
-    delivered: [],
-    cancelled: [],
-    return_requested: [],
-    return_approved: [],
-    refunded: [],
-};
-
-/** Ordered next-status options for an actor, honouring the Super Admin override. */
-export const nextOrderStatuses = (
-    current: OrderStatus,
-    isSuperAdmin: boolean,
-): OrderStatus[] =>
-    isSuperAdmin
-        ? ORDER_STATUSES.filter((s) => s !== current)
-        : ORDER_STATUS_TRANSITIONS[current] ?? [];
 
 export const ordersApi = {
     list: async (params?: OrderListParams): Promise<OrderListResult> => {
@@ -225,8 +212,26 @@ export const ordersApi = {
         return res.data.data;
     },
 
+    /** Contextual status action buttons for this order + the caller's role (B1 §3). */
+    nextStatuses: async (id: string): Promise<OrderNextStatuses> => {
+        const res = await apiClient.get<{ success: boolean; data: OrderNextStatuses }>(
+            `/admin/orders/${id}/next-statuses`,
+        );
+        return res.data.data;
+    },
+
+    /** Standard state-machine transition (super_admin / branch_manager only). */
     updateStatus: async (id: string, status: OrderStatus): Promise<OrderDetail> => {
         const res = await apiClient.patch<OrderDetailWire>(`/admin/orders/${id}/status`, { status });
+        return res.data.data;
+    },
+
+    /** Super Admin emergency override — bypasses the state machine, reason >= 15 chars (B1 §4). */
+    overrideStatus: async (id: string, status: OrderStatus, reason: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/status/override`, {
+            status,
+            reason,
+        });
         return res.data.data;
     },
 

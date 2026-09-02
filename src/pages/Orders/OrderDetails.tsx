@@ -1,46 +1,64 @@
 /**
- * Order Details Drawer (Module 7.3)
+ * Order Details Drawer (Module 7.3 / QA spec B1)
+ *
  * Shows items, delivery details and the pricing breakdown for one order, and
- * lets an admin advance the order status behind a confirmation modal.
+ * drives the fulfilment lifecycle:
+ *   - Contextual state-driven action buttons (one-click next step), fetched
+ *     from GET /admin/orders/{id}/next-statuses so the server is the single
+ *     source of truth for what this role may do (B1 §3).
+ *   - Read-only status badge for roles with no allowed transitions.
+ *   - Super-Admin-only "Admin Override Status" modal with a mandatory
+ *     >= 15-char justification, permanently logged to the audit trail (B1 §4).
  */
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Drawer,
+    Alert,
+    App,
+    Button,
     Descriptions,
+    Divider,
+    Drawer,
+    Empty,
+    Input,
+    Modal,
+    Select,
+    Space,
+    Spin,
     Table,
     Tag,
-    Space,
-    Select,
-    Button,
-    Divider,
-    Spin,
-    Empty,
-    App,
-    Typography,
     Timeline,
+    Typography,
 } from 'antd';
-import { DownloadOutlined, UserOutlined, RobotOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import {
+    ClockCircleOutlined,
+    DownloadOutlined,
+    RobotOutlined,
+    SettingOutlined,
+    UserOutlined,
+} from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-    ordersApi,
-    ORDER_STATUS_META,
-    nextOrderStatuses,
-} from '../../api/orders.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ordersApi, ORDER_STATUS_META } from '../../api/orders.api';
 import type { OrderItem, OrderStatus } from '../../api/orders.api';
-import { usePermissions } from '../../hooks/usePermissions';
 
 const { Text, Title } = Typography;
 
 const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
 
+const statusLabel = (s: OrderStatus | string): string =>
+    ORDER_STATUS_META[s as OrderStatus]?.label ?? String(s);
+
 export const statusTag = (status: OrderStatus, showPrefix: boolean = false) => {
     const meta = ORDER_STATUS_META[status];
     const label = showPrefix ? `🚚 Status: ${meta?.label ?? status}` : (meta?.label ?? status);
     return <Tag color={meta?.color ?? 'default'}>{label}</Tag>;
 };
+
+const NOTIFY_ON: OrderStatus[] = [
+    'handed_to_courier', 'shipped', 'out_for_delivery', 'delivered', 'delivery_failed',
+];
 
 interface OrderDetailsProps {
     orderId: string | null;
@@ -51,8 +69,10 @@ interface OrderDetailsProps {
 const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
-    const { isSuperAdmin, canUpdate } = usePermissions();
-    const [nextStatus, setNextStatus] = useState<OrderStatus | undefined>(undefined);
+
+    const [overrideOpen, setOverrideOpen] = useState(false);
+    const [overrideTarget, setOverrideTarget] = useState<OrderStatus | undefined>(undefined);
+    const [overrideReason, setOverrideReason] = useState('');
 
     const { data: order, isLoading } = useQuery({
         queryKey: ['admin', 'order', orderId],
@@ -60,22 +80,46 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         enabled: open && !!orderId,
     });
 
-    // Reset the pending status selection whenever a different order is opened.
+    const { data: actionsData } = useQuery({
+        queryKey: ['admin', 'order', orderId, 'next-statuses'],
+        queryFn: () => ordersApi.nextStatuses(orderId!),
+        enabled: open && !!orderId && !!order,
+    });
+
     useEffect(() => {
-        setNextStatus(undefined);
+        setOverrideOpen(false);
+        setOverrideTarget(undefined);
+        setOverrideReason('');
     }, [orderId]);
+
+    const invalidateOrder = () => {
+        queryClient.invalidateQueries({ queryKey: ['admin', 'order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+    };
 
     const statusMutation = useMutation({
         mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
             ordersApi.updateStatus(id, status),
         onSuccess: (updated) => {
-            message.success(`Status updated to ${ORDER_STATUS_META[updated.status].label}.`);
-            setNextStatus(undefined);
-            queryClient.invalidateQueries({ queryKey: ['admin', 'order', orderId] });
-            queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+            message.success(`Status updated to ${statusLabel(updated.status)}.`);
+            invalidateOrder();
         },
         onError: (err: any) =>
             message.error(err.response?.data?.detail || 'Failed to update status.'),
+    });
+
+    const overrideMutation = useMutation({
+        mutationFn: ({ id, status, reason }: { id: string; status: OrderStatus; reason: string }) =>
+            ordersApi.overrideStatus(id, status, reason),
+        onSuccess: (updated) => {
+            message.success(`Status overridden to ${statusLabel(updated.status)}.`);
+            setOverrideOpen(false);
+            setOverrideTarget(undefined);
+            setOverrideReason('');
+            invalidateOrder();
+        },
+        onError: (err: any) =>
+            message.error(err.response?.data?.detail || 'Override failed.'),
     });
 
     const runStatusChange = (target: OrderStatus) => {
@@ -84,24 +128,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             title: 'Update order status?',
             content: (
                 <span>
-                    Change <b>{order.order_number}</b> from {ORDER_STATUS_META[order.status].label} to{' '}
-                    <b>{ORDER_STATUS_META[target].label}</b>?
-                    {(target === 'shipped' || target === 'delivered') &&
-                        ' The customer will be notified.'}
+                    Change <b>{order.order_number}</b> from {statusLabel(order.status)} to{' '}
+                    <b>{statusLabel(target)}</b>?
+                    {NOTIFY_ON.includes(target) && ' The customer will be notified.'}
                 </span>
             ),
             okText: 'Update',
             onOk: () => statusMutation.mutateAsync({ id: order.order_id, status: target }),
         });
-    };
-
-    const confirmUpdate = () => {
-        if (nextStatus) runStatusChange(nextStatus);
-    };
-
-    const invalidateOrder = () => {
-        queryClient.invalidateQueries({ queryKey: ['admin', 'order', orderId] });
-        queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
     };
 
     const approveReturnMutation = useMutation({
@@ -205,24 +239,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         },
     ];
 
-    // Valid next states for this actor from the order's current status. Mirrors
-    // the backend fulfilment state machine; the server re-validates regardless.
-    const allowedNext = order ? nextOrderStatuses(order.status, isSuperAdmin) : [];
-    const statusOptions = allowedNext.map((s) => ({
-        label: ORDER_STATUS_META[s].label,
-        value: s,
-    }));
-
-    // Branch-floor fulfilment shortcuts, shown only when they're a valid move.
-    const fulfilmentQuickActions = (
-        [
-            { status: 'packing', label: 'Start Packing' },
-            { status: 'packed', label: 'Mark Packed' },
-            { status: 'handed_to_courier', label: 'Handed to Courier' },
-        ] as { status: OrderStatus; label: string }[]
-    ).filter((q) => allowedNext.includes(q.status));
-
-    const canUpdateOrders = canUpdate('orders');
+    const actions = actionsData?.actions ?? [];
+    const canOverride = !!actionsData?.can_override;
+    const overrideOptions = (actionsData?.all_statuses ?? [])
+        .filter((s) => s !== order?.status)
+        .map((s) => ({ label: statusLabel(s), value: s }));
+    const busy = statusMutation.isPending;
 
     return (
         <Drawer
@@ -409,9 +431,10 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
 
                                     const isUser = h.changed_by.toLowerCase().includes('customer');
                                     const isAdmin = h.changed_by.toLowerCase().includes('admin');
+                                    const isOverride = (h.notes ?? '').includes('[EMERGENCY OVERRIDE]');
 
                                     return {
-                                        color: color,
+                                        color: isOverride ? 'red' : color,
                                         children: (
                                             <div style={{ marginBottom: 6 }}>
                                                 <Space wrap size={8}>
@@ -421,6 +444,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                                     <Tag color={color} style={{ margin: 0, fontSize: 11 }}>
                                                         {h.new_status}
                                                     </Tag>
+                                                    {isOverride && (
+                                                        <Tag color="red" style={{ margin: 0, fontSize: 11 }}>
+                                                            OVERRIDE
+                                                        </Tag>
+                                                    )}
                                                     <Text type="secondary" style={{ fontSize: 12 }}>
                                                         <ClockCircleOutlined style={{ marginRight: 4 }} />
                                                         {h.created_at ? dayjs(h.created_at).format('MMM DD, YYYY · hh:mm A') : '—'}
@@ -447,52 +475,114 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     )}
 
                     <Divider titlePlacement="start">Actions</Divider>
-                    {canUpdateOrders && fulfilmentQuickActions.length > 0 && (
-                        <Space wrap style={{ marginBottom: 12 }}>
-                            {fulfilmentQuickActions.map((q) => (
+                    {actions.length > 0 ? (
+                        <Space wrap>
+                            {actions.map((a) => (
                                 <Button
-                                    key={q.status}
-                                    type="primary"
-                                    ghost
-                                    loading={statusMutation.isPending}
-                                    onClick={() => runStatusChange(q.status)}
+                                    key={a.status}
+                                    type={a.kind === 'danger' ? 'default' : 'primary'}
+                                    danger={a.kind === 'danger'}
+                                    loading={busy}
+                                    onClick={() => runStatusChange(a.status)}
                                 >
-                                    {q.label}
+                                    {a.label}
                                 </Button>
                             ))}
                         </Space>
+                    ) : (
+                        <Text type="secondary">
+                            No status changes available from here for your role.
+                        </Text>
                     )}
-                    <Space wrap>
-                        {canUpdateOrders && (
-                            <>
-                                <Select
-                                    placeholder={
-                                        statusOptions.length ? 'Advance status to…' : 'No status changes available'
-                                    }
-                                    style={{ width: 220 }}
-                                    value={nextStatus}
-                                    disabled={statusOptions.length === 0}
-                                    onChange={(v) => setNextStatus(v)}
-                                    options={statusOptions}
-                                />
+
+                    <div style={{ marginTop: 16 }}>
+                        <Space wrap>
+                            <Button
+                                icon={<DownloadOutlined />}
+                                loading={invoiceMutation.isPending}
+                                onClick={() => invoiceMutation.mutate(order.order_id)}
+                            >
+                                Download Invoice
+                            </Button>
+                            {canOverride && (
                                 <Button
-                                    type="primary"
-                                    disabled={!nextStatus}
-                                    loading={statusMutation.isPending}
-                                    onClick={confirmUpdate}
+                                    type="link"
+                                    danger
+                                    icon={<SettingOutlined />}
+                                    onClick={() => setOverrideOpen(true)}
                                 >
-                                    Update Status
+                                    Admin Override Status
                                 </Button>
-                            </>
-                        )}
-                        <Button
-                            icon={<DownloadOutlined />}
-                            loading={invoiceMutation.isPending}
-                            onClick={() => invoiceMutation.mutate(order.order_id)}
-                        >
-                            Download Invoice
-                        </Button>
-                    </Space>
+                            )}
+                        </Space>
+                    </div>
+
+                    <Modal
+                        title="⚙️ Emergency Manual Status Override"
+                        open={overrideOpen}
+                        onCancel={() => setOverrideOpen(false)}
+                        okText="Confirm Override"
+                        okButtonProps={{
+                            danger: true,
+                            disabled: !overrideTarget || overrideReason.trim().length < 15,
+                            loading: overrideMutation.isPending,
+                        }}
+                        onOk={() =>
+                            overrideTarget &&
+                            overrideMutation.mutate({
+                                id: order.order_id,
+                                status: overrideTarget,
+                                reason: overrideReason.trim(),
+                            })
+                        }
+                    >
+                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                            <Descriptions column={1} size="small" bordered>
+                                <Descriptions.Item label="Current Status">
+                                    {statusLabel(order.status)}
+                                </Descriptions.Item>
+                            </Descriptions>
+                            <div>
+                                <Text strong>Target Status</Text>
+                                <Select
+                                    style={{ width: '100%', marginTop: 4 }}
+                                    placeholder="Pick any order status…"
+                                    value={overrideTarget}
+                                    onChange={setOverrideTarget}
+                                    options={overrideOptions}
+                                    showSearch
+                                    optionFilterProp="label"
+                                />
+                            </div>
+                            <div>
+                                <Text strong>Reason / Justification (required)</Text>
+                                <Input.TextArea
+                                    style={{ marginTop: 4 }}
+                                    rows={3}
+                                    maxLength={1000}
+                                    showCount
+                                    placeholder="Explain why an emergency manual status change is required…"
+                                    value={overrideReason}
+                                    onChange={(e) => setOverrideReason(e.target.value)}
+                                    status={
+                                        overrideReason.length > 0 && overrideReason.trim().length < 15
+                                            ? 'error'
+                                            : undefined
+                                    }
+                                />
+                                {overrideReason.length > 0 && overrideReason.trim().length < 15 && (
+                                    <Text type="danger" style={{ fontSize: 12 }}>
+                                        At least 15 characters.
+                                    </Text>
+                                )}
+                            </div>
+                            <Alert
+                                type="warning"
+                                showIcon
+                                message="Overriding status bypasses standard operational validations and will be logged permanently in the audit trail."
+                            />
+                        </Space>
+                    </Modal>
                 </>
             )}
         </Drawer>
