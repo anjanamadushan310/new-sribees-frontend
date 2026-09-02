@@ -25,7 +25,6 @@ import {
 import {
     PlusOutlined,
     EditOutlined,
-    SearchOutlined,
     TeamOutlined,
     StopOutlined,
     CheckCircleOutlined,
@@ -38,6 +37,7 @@ import { rolesApi } from '../../api/roles.api';
 import { branchesApi } from '../../api/branches.api';
 import { useAuthStore } from '../../store/authStore';
 import type { StaffUser } from '../../types/roles.types';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -232,11 +232,16 @@ const StaffList: React.FC = () => {
         }
     };
 
-    const filtered = staff.filter(
-        (s) =>
-            s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-            s.email.toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = staff.filter((s) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            s.full_name.toLowerCase().includes(q) ||
+            s.email.toLowerCase().includes(q) ||
+            (s.role_name ?? '').toLowerCase().includes(q) ||
+            (s.branch_name ?? '').toLowerCase().includes(q)
+        );
+    });
 
     const columns: ColumnsType<StaffUser> = [
         {
@@ -352,14 +357,14 @@ const StaffList: React.FC = () => {
             </div>
 
             <Card>
-                <Input
-                    placeholder="Search by name or email"
-                    allowClear
-                    prefix={<SearchOutlined />}
-                    style={{ width: 320, marginBottom: 16 }}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+                <div style={{ marginBottom: 16 }}>
+                    <DebouncedSearchInput
+                        placeholder="Search name, email, role, branch…"
+                        value={search}
+                        onChange={setSearch}
+                        style={{ width: 320 }}
+                    />
+                </div>
 
                 <Table
                     rowKey="admin_id"

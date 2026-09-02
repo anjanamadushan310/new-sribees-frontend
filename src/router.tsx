@@ -166,10 +166,12 @@ const AppRouter: React.FC = () => {
                                 </RoleGuard>
                             }
                         />
+                        {/* products:read reaches the form for View; ProductForm
+                            renders read-only and hides Save without products:update. */}
                         <Route
                             path="products/:id/edit"
                             element={
-                                <RoleGuard requiredPermission={{ resource: 'products', action: 'update' }}>
+                                <RoleGuard requiredPermission={{ resource: 'products', action: 'read' }}>
                                     <ProductForm />
                                 </RoleGuard>
                             }

@@ -26,7 +26,6 @@ import {
     PlusOutlined,
     EditOutlined,
     DeleteOutlined,
-    SearchOutlined,
     PictureOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -34,6 +33,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriesApi } from '../../api/categories.api';
 import type { Category, CategoryPayload } from '../../api/categories.api';
 import CategoryImageUpload from '../../components/categories/CategoryImageUpload';
+import { usePermissions } from '../../hooks/usePermissions';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -62,6 +63,10 @@ const CategoryList: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<CategoryPayload>();
+    // Support staff get a read-only Categories screen (B5).
+    const { canCreate, canUpdate, canDelete } = usePermissions();
+    const canWrite = canCreate('categories') || canUpdate('categories');
+    const canRemove = canDelete('categories');
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Category | null>(null);
@@ -206,9 +211,15 @@ const CategoryList: React.FC = () => {
         }
     };
 
-    const matches = (c: Category) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.slug.toLowerCase().includes(search.toLowerCase());
+    const matches = (c: Category) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return (
+            c.name.toLowerCase().includes(q) ||
+            c.slug.toLowerCase().includes(q) ||
+            (c.description ?? '').toLowerCase().includes(q)
+        );
+    };
 
     // Nest sub-categories under their parent. antd renders a `children` array as
     // expandable rows, but an empty one still draws an expand caret — so the key
@@ -233,7 +244,7 @@ const CategoryList: React.FC = () => {
         })
         .filter((c): c is Category => c !== null);
 
-    const columns: ColumnsType<Category> = [
+    const columns = [
         {
             title: 'Image',
             dataIndex: 'image_url',
@@ -317,45 +328,51 @@ const CategoryList: React.FC = () => {
             ],
             onFilter: (val, record) => record.is_active === val,
         },
-        {
-            title: 'Actions',
-            key: 'actions',
-            width: 260,
-            render: (_, record) => (
-                <Space>
-                    {/* Only a root category can take sub-categories — the tree is
-                        capped at two levels. */}
-                    {!record.parent_category_id && (
-                        <Button
-                            type="link"
-                            icon={<PlusOutlined />}
-                            onClick={() => openCreate(record)}
-                        >
-                            Sub-category
-                        </Button>
-                    )}
-                    <Button
-                        type="link"
-                        icon={<EditOutlined />}
-                        onClick={() => openEdit(record)}
-                    >
-                        Edit
-                    </Button>
-                    <Popconfirm
-                        title="Delete category"
-                        description="Categories with products or sub-categories cannot be deleted."
-                        okText="Delete"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => deleteMutation.mutate(record.category_id)}
-                    >
-                        <Button type="link" danger icon={<DeleteOutlined />}>
-                            Delete
-                        </Button>
-                    </Popconfirm>
-                </Space>
-            ),
-        },
-    ];
+        ...(canWrite || canRemove
+            ? [{
+                title: 'Actions',
+                key: 'actions',
+                width: 260,
+                render: (_: unknown, record: Category) => (
+                    <Space>
+                        {/* Only a root category can take sub-categories — the
+                            tree is capped at two levels. */}
+                        {canWrite && !record.parent_category_id && (
+                            <Button
+                                type="link"
+                                icon={<PlusOutlined />}
+                                onClick={() => openCreate(record)}
+                            >
+                                Sub-category
+                            </Button>
+                        )}
+                        {canWrite && (
+                            <Button
+                                type="link"
+                                icon={<EditOutlined />}
+                                onClick={() => openEdit(record)}
+                            >
+                                Edit
+                            </Button>
+                        )}
+                        {canRemove && (
+                            <Popconfirm
+                                title="Delete category"
+                                description="Categories with products or sub-categories cannot be deleted."
+                                okText="Delete"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => deleteMutation.mutate(record.category_id)}
+                            >
+                                <Button type="link" danger icon={<DeleteOutlined />}>
+                                    Delete
+                                </Button>
+                            </Popconfirm>
+                        )}
+                    </Space>
+                ),
+            }]
+            : []),
+    ] as ColumnsType<Category>;
 
     return (
         <div>
@@ -370,20 +387,22 @@ const CategoryList: React.FC = () => {
                 <Title level={3} style={{ margin: 0 }}>
                     Categories
                 </Title>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
-                    Add Category
-                </Button>
+                {canCreate('categories') && (
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
+                        Add Category
+                    </Button>
+                )}
             </div>
 
             <Card>
-                <Input
-                    placeholder="Search by name or slug"
-                    allowClear
-                    prefix={<SearchOutlined />}
-                    style={{ width: 320, marginBottom: 16 }}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+                <div style={{ marginBottom: 16 }}>
+                    <DebouncedSearchInput
+                        placeholder="Search name, slug, description…"
+                        value={search}
+                        onChange={setSearch}
+                        style={{ width: 320 }}
+                    />
+                </div>
 
                 <Table
                     rowKey="category_id"

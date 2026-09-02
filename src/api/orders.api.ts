@@ -14,10 +14,26 @@ export type OrderStatus =
     | 'shipped'
     | 'out_for_delivery'
     | 'delivered'
+    | 'delivery_failed'
+    | 'rto_initiated'
     | 'cancelled'
     | 'return_requested'
     | 'return_approved'
     | 'refunded';
+
+/** One contextual action button from GET /admin/orders/{id}/next-statuses (B1 §3). */
+export interface OrderStatusAction {
+    status: OrderStatus;
+    label: string;
+    kind: 'primary' | 'danger';
+}
+
+export interface OrderNextStatuses {
+    status: OrderStatus;
+    actions: OrderStatusAction[];
+    can_override: boolean;
+    all_statuses: OrderStatus[];
+}
 
 export interface OrderListItem {
     order_id: string;
@@ -85,6 +101,51 @@ export interface OrderStatusHistoryItem {
     created_at: string | null;
 }
 
+/** Fulfilment & logistics contacts card (B4 Module A). */
+export interface FulfilmentContacts {
+    branch: {
+        name: string;
+        code: string;
+        phone: string | null;
+        manager_name: string | null;
+        manager_email: string | null;
+    } | null;
+    rider: {
+        state: 'pending' | 'assigned';
+        name: string | null;
+        phone: string | null;
+        vehicle: string | null;
+        waybill: string | null;
+        tracking_status: string | null;
+        courier_booking_status: string | null;
+    };
+}
+
+export type EscalationCategory =
+    | 'cancel_request'
+    | 'address_correction'
+    | 'hold_shipment'
+    | 'customer_complaint'
+    | 'other';
+export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
+
+/** Internal support → branch ticket (B4 Module B). */
+export interface OrderEscalation {
+    escalation_id: string;
+    order_id: string;
+    category: EscalationCategory;
+    message: string;
+    status: EscalationStatus;
+    resolution_note: string | null;
+    raised_by_name: string;
+    handled_by_name: string | null;
+    created_at: string | null;
+    acknowledged_at: string | null;
+    resolved_at: string | null;
+}
+
+export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
+
 export interface OrderDetail {
     order_id: string;
     order_number: string;
@@ -98,6 +159,7 @@ export interface OrderDetail {
     handed_to_courier_at: string | null;
     shipped_at: string | null;
     delivered_at: string | null;
+    delivery_failed_at: string | null;
     delivery_slot_date: string | null;
     delivery_slot_time: string | null;
     notes: string | null;
@@ -107,11 +169,15 @@ export interface OrderDetail {
     return_items: OrderReturnItem[] | null;
     return_requested_at: string | null;
     refund_amount: number | null;
+    return_resolution: ReturnResolution | null;
+    return_resolution_note: string | null;
     customer: OrderCustomer | null;
     delivery_address: OrderDeliveryAddress | null;
     items: OrderItem[];
     pricing: OrderPricing;
     history?: OrderStatusHistoryItem[];
+    fulfilment_contacts?: FulfilmentContacts;
+    escalations?: OrderEscalation[];
 }
 
 export interface OrderScope {
@@ -123,6 +189,8 @@ export interface OrderListParams {
     page?: number;
     limit?: number;
     order_status?: OrderStatus;
+    /** Comma-joined statuses — used by the B2 order tabs/pills. */
+    order_statuses?: string;
     search?: string;
     branch_id?: string; // super admin only
     from_date?: string;
@@ -136,6 +204,8 @@ export interface OrderListResult {
     limit: number;
     total_pages: number;
     scope: OrderScope;
+    /** {status: count} across the current date/branch/search context (B2). */
+    statusCounts: Record<string, number>;
 }
 
 interface OrderListWire {
@@ -143,9 +213,86 @@ interface OrderListWire {
     data: {
         orders: OrderListItem[];
         pagination: { total: number; page: number; limit: number; total_pages: number };
+        status_counts?: Record<string, number>;
         scope: OrderScope;
     };
 }
+
+/**
+ * Two-tier order lifecycle tabs (QA spec B2). Tier 1 = main tab, tier 2 =
+ * sub-status pills. `statuses` is the set of backend status values a
+ * tab/pill filters to; an empty `subPills` means the tab has no pills.
+ */
+export interface OrderSubPill {
+    key: string;
+    label: string;
+    statuses: OrderStatus[];
+}
+export interface OrderTab {
+    key: string;
+    label: string;
+    statuses: OrderStatus[]; // empty = "all orders"
+    subPills: OrderSubPill[];
+}
+
+export const ORDER_TABS: OrderTab[] = [
+    { key: 'all', label: 'All Orders', statuses: [], subPills: [] },
+    {
+        key: 'new',
+        label: 'New Orders',
+        statuses: ['pending', 'confirmed'],
+        subPills: [
+            { key: 'pending', label: 'Pending', statuses: ['pending'] },
+            { key: 'confirmed', label: 'Confirmed', statuses: ['confirmed'] },
+        ],
+    },
+    {
+        key: 'warehouse',
+        label: 'Warehouse',
+        statuses: ['processing', 'packing', 'packed'],
+        subPills: [
+            { key: 'packing', label: 'Packing', statuses: ['processing', 'packing'] },
+            { key: 'packed', label: 'Packed (Ready)', statuses: ['packed'] },
+        ],
+    },
+    {
+        key: 'logistics',
+        label: 'Logistics',
+        statuses: ['handed_to_courier', 'shipped', 'out_for_delivery'],
+        subPills: [
+            { key: 'handed', label: 'Handed to Courier', statuses: ['handed_to_courier'] },
+            { key: 'shipped', label: 'Shipped', statuses: ['shipped'] },
+            { key: 'ofd', label: 'Out for Delivery', statuses: ['out_for_delivery'] },
+        ],
+    },
+    { key: 'delivered', label: 'Delivered', statuses: ['delivered'], subPills: [] },
+    {
+        key: 'returns',
+        label: 'Returns & Refunds',
+        statuses: ['return_requested', 'return_approved', 'refunded'],
+        subPills: [
+            { key: 'requested', label: 'Return Requested', statuses: ['return_requested'] },
+            { key: 'qc', label: 'QC Pending', statuses: ['return_approved'] },
+            { key: 'refunded', label: 'Refunded', statuses: ['refunded'] },
+        ],
+    },
+    {
+        key: 'exceptions',
+        label: 'Exceptions',
+        statuses: ['cancelled', 'delivery_failed', 'rto_initiated'],
+        subPills: [
+            { key: 'cancelled', label: 'Cancelled', statuses: ['cancelled'] },
+            { key: 'failed', label: 'Delivery Failed', statuses: ['delivery_failed'] },
+            { key: 'rto', label: 'RTO', statuses: ['rto_initiated'] },
+        ],
+    },
+];
+
+/** Sum of the given statuses in a status_counts map. */
+export const sumCounts = (counts: Record<string, number>, statuses: OrderStatus[]): number =>
+    statuses.length === 0
+        ? Object.values(counts).reduce((a, b) => a + b, 0)
+        : statuses.reduce((a, s) => a + (counts[s] ?? 0), 0);
 
 interface OrderDetailWire {
     success: boolean;
@@ -164,6 +311,8 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     shipped: { label: 'Shipped', color: 'cyan' },
     out_for_delivery: { label: 'Out for Delivery', color: 'purple' },
     delivered: { label: 'Delivered', color: 'green' },
+    delivery_failed: { label: 'Delivery Failed', color: 'volcano' },
+    rto_initiated: { label: 'Returning to Store', color: 'orange' },
     cancelled: { label: 'Cancelled', color: 'red' },
     return_requested: { label: 'Return Requested', color: 'orange' },
     return_approved: { label: 'Return Approved', color: 'gold' },
@@ -171,38 +320,6 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
 };
 
 export const ORDER_STATUSES = Object.keys(ORDER_STATUS_META) as OrderStatus[];
-
-/**
- * Fulfilment state machine — mirror of the backend
- * (fastapi_backend/app/services/order_workflow.py ADMIN_TRANSITIONS). Drives
- * which "Advance status to…" options a non-super-admin sees. The server
- * re-validates every transition, so a stale copy here only ever narrows the
- * UI, never widens access. Super Admin is offered every other status.
- */
-export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-    pending: ['confirmed', 'packing', 'cancelled'],
-    confirmed: ['packing', 'cancelled'],
-    processing: ['packing', 'packed', 'cancelled'],
-    packing: ['packed', 'confirmed', 'cancelled'],
-    packed: ['handed_to_courier', 'packing', 'cancelled'],
-    handed_to_courier: ['shipped', 'packed'],
-    shipped: ['out_for_delivery', 'delivered'],
-    out_for_delivery: ['delivered', 'shipped'],
-    delivered: [],
-    cancelled: [],
-    return_requested: [],
-    return_approved: [],
-    refunded: [],
-};
-
-/** Ordered next-status options for an actor, honouring the Super Admin override. */
-export const nextOrderStatuses = (
-    current: OrderStatus,
-    isSuperAdmin: boolean,
-): OrderStatus[] =>
-    isSuperAdmin
-        ? ORDER_STATUSES.filter((s) => s !== current)
-        : ORDER_STATUS_TRANSITIONS[current] ?? [];
 
 export const ordersApi = {
     list: async (params?: OrderListParams): Promise<OrderListResult> => {
@@ -216,6 +333,7 @@ export const ordersApi = {
         return {
             orders: res.data.data.orders,
             scope: res.data.data.scope,
+            statusCounts: res.data.data.status_counts ?? {},
             ...res.data.data.pagination,
         };
     },
@@ -225,18 +343,81 @@ export const ordersApi = {
         return res.data.data;
     },
 
+    /** Contextual status action buttons for this order + the caller's role (B1 §3). */
+    nextStatuses: async (id: string): Promise<OrderNextStatuses> => {
+        const res = await apiClient.get<{ success: boolean; data: OrderNextStatuses }>(
+            `/admin/orders/${id}/next-statuses`,
+        );
+        return res.data.data;
+    },
+
+    /** Standard state-machine transition (super_admin / branch_manager only). */
     updateStatus: async (id: string, status: OrderStatus): Promise<OrderDetail> => {
         const res = await apiClient.patch<OrderDetailWire>(`/admin/orders/${id}/status`, { status });
         return res.data.data;
     },
 
-    approveReturn: async (id: string): Promise<OrderDetail> => {
-        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/approve`);
+    /** Super Admin emergency override — bypasses the state machine, reason >= 15 chars (B1 §4). */
+    overrideStatus: async (id: string, status: OrderStatus, reason: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/status/override`, {
+            status,
+            reason,
+        });
         return res.data.data;
     },
 
-    rejectReturn: async (id: string): Promise<OrderDetail> => {
-        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/reject`);
+    /** Branch Manager / Super Admin only. resolution: returnless refund vs reverse pickup (B4). */
+    approveReturn: async (
+        id: string,
+        resolution: ReturnResolution = 'returnless_refund',
+        note?: string,
+    ): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/approve`, {
+            resolution,
+            note,
+        });
+        return res.data.data;
+    },
+
+    rejectReturn: async (id: string, note?: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/reject`, { note });
+        return res.data.data;
+    },
+
+    /** Customer Support appends a proof/context note to an open return claim (B4). */
+    addReturnNote: async (id: string, note: string): Promise<OrderDetail> => {
+        const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/note`, { note });
+        return res.data.data;
+    },
+
+    // --- Internal escalation tickets (B4 Module B) ---
+    listEscalations: async (id: string): Promise<OrderEscalation[]> => {
+        const res = await apiClient.get<{ success: boolean; data: { escalations: OrderEscalation[] } }>(
+            `/admin/orders/${id}/escalations`,
+        );
+        return res.data.data.escalations;
+    },
+    raiseEscalation: async (
+        id: string,
+        category: EscalationCategory,
+        message: string,
+    ): Promise<OrderEscalation> => {
+        const res = await apiClient.post<{ success: boolean; data: OrderEscalation }>(
+            `/admin/orders/${id}/escalations`,
+            { category, message },
+        );
+        return res.data.data;
+    },
+    updateEscalation: async (
+        id: string,
+        escalationId: string,
+        status: EscalationStatus,
+        resolutionNote?: string,
+    ): Promise<OrderEscalation> => {
+        const res = await apiClient.patch<{ success: boolean; data: OrderEscalation }>(
+            `/admin/orders/${id}/escalations/${escalationId}`,
+            { status, resolution_note: resolutionNote },
+        );
         return res.data.data;
     },
 

@@ -32,6 +32,7 @@ import type { ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { TextArea } = Input;
 const { Title } = Typography;
@@ -69,6 +70,10 @@ const ProductForm: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<ProductFormValues>();
+    // Support staff (products:read, no products:update) reach the edit route
+    // only to inspect a product — render the whole form read-only (B5).
+    const { canUpdate, canCreate } = usePermissions();
+    const readOnly = isEdit ? !canUpdate('products') : !canCreate('products');
 
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
     // Snapshot of server-side images at load time, to diff removals on save.
@@ -275,19 +280,32 @@ const ProductForm: React.FC = () => {
                 Back to Products
             </Button>
 
-            <Title level={3}>{isEdit ? 'Edit Product' : 'New Product'}</Title>
+            <Title level={3}>
+                {readOnly ? 'Product Details' : isEdit ? 'Edit Product' : 'New Product'}
+            </Title>
 
-            <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 16 }}
-                message="No price, stock or cashback here"
-                description="This is the shared catalog entry only. Price, stock quantity and cashback % are set per branch by that branch's manager, from Inventory → Add Product to Branch."
-            />
+            {readOnly ? (
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="View only"
+                    description="You can inspect this product's catalog details but not change them."
+                />
+            ) : (
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="No price, stock or cashback here"
+                    description="This is the shared catalog entry only. Price, stock quantity and cashback % are set per branch by that branch's manager, from Inventory → Add Product to Branch."
+                />
+            )}
 
             <Form
                 form={form}
                 layout="vertical"
+                disabled={readOnly}
                 onFinish={(values) => saveMutation.mutate(values)}
                 initialValues={{ is_active: true, is_featured: false }}
             >
@@ -550,7 +568,7 @@ const ProductForm: React.FC = () => {
                     </Col>
                 </Row>
 
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: 8 }} hidden={readOnly}>
                     <Button
                         type="primary"
                         htmlType="submit"

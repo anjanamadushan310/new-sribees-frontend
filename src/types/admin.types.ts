@@ -132,6 +132,7 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
     [AdminRole.CUSTOMER_SUPPORT]: [
         { resource: 'dashboard', action: 'read' },
         { resource: 'products', action: 'read' },
+        { resource: 'categories', action: 'read' },
         { resource: 'orders', action: 'read' },
         { resource: 'orders', action: 'update' },
         { resource: 'customers', action: 'read' },
@@ -224,6 +225,8 @@ export const NAVIGATION_CONFIG: Partial<Record<AdminRole, string[]>> = {
         'dashboard',
         'orders',
         'customers',
+        'products',
+        'categories',
         'reviews',
     ],
     [AdminRole.INVENTORY_MANAGER]: [

@@ -107,6 +107,9 @@ const Dashboard: React.FC = () => {
     const grantedOrders = stats?.granted.orders ?? false;
     const grantedCustomers = stats?.granted.customers ?? false;
     const grantedProducts = stats?.granted.products ?? false;
+    // Money figures require analytics:read — an order-support account holds
+    // orders:read to work orders and must never see business revenue (B6).
+    const grantedRevenue = stats?.granted.revenue ?? false;
 
     return (
         <div>
@@ -115,7 +118,7 @@ const Dashboard: React.FC = () => {
             {/* Stats Cards */}
             <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12} lg={6}>
-                    {grantedOrders ? (
+                    {grantedRevenue ? (
                         <KpiCard
                             title="Total Revenue"
                             value={formatLKR(stats?.totalRevenue)}
@@ -171,8 +174,8 @@ const Dashboard: React.FC = () => {
             {/* Charts */}
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
                 <Col xs={24} lg={12}>
-                    <Card title="Revenue Trend (Last 7 Days)">
-                        {grantedOrders && stats?.revenueTrend ? (
+                    <Card title={grantedRevenue ? 'Revenue Trend (Last 7 Days)' : 'Order Volume (Last 7 Days)'}>
+                        {grantedRevenue && stats?.revenueTrend ? (
                             <ResponsiveContainer width="100%" height={300}>
                                 <LineChart data={stats.revenueTrend}>
                                     <CartesianGrid strokeDasharray="3 3" />
@@ -181,6 +184,17 @@ const Dashboard: React.FC = () => {
                                     <Tooltip labelFormatter={(d) => dayjs(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatLKR(v)} />
                                     <Legend />
                                     <Line type="monotone" dataKey="revenue" name="Revenue" stroke={PRIMARY} strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : grantedOrders && stats?.ordersTrend ? (
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={stats.ordersTrend}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tickFormatter={(d) => dayjs(d).format('MMM D')} />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip labelFormatter={(d) => dayjs(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatNumber(v)} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="orders" name="Orders" stroke={PRIMARY} strokeWidth={2} />
                                 </LineChart>
                             </ResponsiveContainer>
                         ) : (
@@ -220,7 +234,7 @@ const Dashboard: React.FC = () => {
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
                 <Col xs={24} lg={12}>
                     <Card title="Top Selling Products (Last 30 Days)">
-                        {grantedOrders && grantedProducts && stats?.topSellingProducts ? (
+                        {grantedRevenue && grantedProducts && stats?.topSellingProducts ? (
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={stats.topSellingProducts}>
                                     <CartesianGrid strokeDasharray="3 3" />
