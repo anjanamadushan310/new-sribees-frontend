@@ -187,6 +187,12 @@ const CategoryList: React.FC = () => {
     const handleSubmit = async () => {
         const values = await form.validateFields();
         const isSub = kind === 'sub';
+
+        if (!isSub && !imageUrl) {
+            message.error('Category Image is required.');
+            return;
+        }
+
         const payload: CategoryPayload = {
             name: values.name.trim(),
             slug: (values.slug || slugify(values.name)).trim(),
@@ -475,7 +481,7 @@ const CategoryList: React.FC = () => {
                             />
                         </Form.Item>
                     ) : (
-                        <Form.Item label="Category Image">
+                        <Form.Item label="Category Image" required>
                             <CategoryImageUpload value={imageUrl} onChange={setImageUrl} />
                         </Form.Item>
                     )}
