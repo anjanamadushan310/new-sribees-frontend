@@ -203,10 +203,18 @@ const PartnerList: React.FC = () => {
         {
             title: 'Partner',
             key: 'partner',
+            width: 240,
             render: (_, record) => (
-                <Space direction="vertical" size={0}>
+                <Space direction="vertical" size={0} style={{ maxWidth: 240 }}>
                     <Text strong>{record.full_name}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text
+                        type="secondary"
+                        style={{
+                            fontSize: 12,
+                            wordBreak: 'break-word',
+                        }}
+                        ellipsis={{ tooltip: record.email }}
+                    >
                         {record.email}
                     </Text>
                 </Space>
@@ -377,6 +385,7 @@ const PartnerList: React.FC = () => {
                     dataSource={filtered}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load partners.' : 'No partners yet.' }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `Total ${t} partners` }}
                 />
             </Card>
