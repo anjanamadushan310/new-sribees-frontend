@@ -6,7 +6,8 @@
  * discount_percentage + is_on_sale on branch_inventory drive the customer-
  * facing "Quick Sale" feed on the Home screen (COALESCE branch -> global).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Card,
     Table,
@@ -85,6 +86,27 @@ const QuickSale: React.FC = () => {
     const [search, setSearch] = useState('');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [editing, setEditing] = useState<MarketingProduct | null>(null);
+
+    // Deep link from the Products page's "⚡ Add Deal" button:
+    // /quick-sale?action=new_deal&sku=XYZ
+    //
+    // A manager who spotted slow-moving stock over there should land here with
+    // that exact product already found, not with an empty search box and a SKU
+    // they now have to remember. The search term is seeded from the URL and the
+    // parameters are then cleared, so a later manual search is not undone by a
+    // re-render replaying a stale link.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const deepLinkConsumed = useRef(false);
+
+    useEffect(() => {
+        if (deepLinkConsumed.current) return;
+        const sku = searchParams.get('sku');
+        if (!sku) return;
+        deepLinkConsumed.current = true;
+        setSearch(sku);
+        setPage(1);
+        setSearchParams({}, { replace: true });
+    }, [searchParams, setSearchParams]);
 
     const discountVal = Form.useWatch('discount_percentage', form);
     const cashbackVal = Form.useWatch('cashback_percentage', form);

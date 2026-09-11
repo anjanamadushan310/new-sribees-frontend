@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List } from 'antd';
+import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List, Segmented, Avatar, Tooltip, Statistic, Row, Col } from 'antd';
 import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import AssignPromoModal from './AssignPromoModal';
+import type { CustomerSegment } from '../../api/customers.api';
 import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -12,6 +14,44 @@ import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInp
 const { Title, Text } = Typography;
 
 const CUSTOMERS_KEY = 'customers';
+
+const SEGMENT_META: Record<CustomerSegment, { label: string; color: string; hint: string }> = {
+    returning: {
+        label: 'Returning',
+        color: 'green',
+        hint: 'Two or more completed orders, and bought within the last 30 days',
+    },
+    new: {
+        label: 'New Customer',
+        color: 'blue',
+        hint: 'One completed order or none yet, and recently joined',
+    },
+    at_risk: {
+        label: 'At Risk (30d+)',
+        color: 'orange',
+        hint:
+            'No completed order in 30 days. Outranks "Returning" on purpose — a ' +
+            'good customer who has gone quiet is the one worth winning back.',
+    },
+};
+
+type FilterTab = 'all' | 'active' | 'blocked' | CustomerSegment;
+
+const FILTER_TABS: { label: string; value: FilterTab }[] = [
+    { label: 'All Customers', value: 'all' },
+    { label: 'Active', value: 'active' },
+    { label: 'Returning', value: 'returning' },
+    { label: 'New', value: 'new' },
+    { label: 'At Risk (30d+)', value: 'at_risk' },
+    { label: 'Blocked', value: 'blocked' },
+];
+
+const formatLKR = (value: number): string =>
+    new Intl.NumberFormat('en-LK', {
+        style: 'currency',
+        currency: 'LKR',
+        maximumFractionDigits: 0,
+    }).format(value ?? 0);
 
 const CustomerList: React.FC = () => {
     const { message } = App.useApp();
@@ -27,6 +67,8 @@ const CustomerList: React.FC = () => {
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
     const [exporting, setExporting] = useState(false);
+    const [tab, setTab] = useState<FilterTab>('all');
+    const [promoOpen, setPromoOpen] = useState(false);
 
     // Selected customer & popup state
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -97,8 +139,19 @@ const CustomerList: React.FC = () => {
     };
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: [CUSTOMERS_KEY, { page, pageSize, search }],
-        queryFn: () => customersApi.list({ page, limit: pageSize, search: search || undefined }),
+        queryKey: [CUSTOMERS_KEY, { page, pageSize, search, tab }],
+        queryFn: () =>
+            customersApi.list({
+                page,
+                limit: pageSize,
+                search: search || undefined,
+                // Segment is derived server-side from order history; account
+                // status is a stored column. Both are applied there so the
+                // rules live in one place.
+                segment:
+                    tab === 'returning' || tab === 'new' || tab === 'at_risk' ? tab : undefined,
+                is_blocked: tab === 'blocked' ? true : tab === 'active' ? false : undefined,
+            }),
         placeholderData: keepPreviousData,
     });
 
@@ -163,16 +216,76 @@ const CustomerList: React.FC = () => {
 
     const columns: ColumnsType<Customer> = [
         {
-            title: 'Name',
+            title: 'Customer',
             key: 'name',
-            render: (_, record) => (
-                <Space>
-                    <UserOutlined style={{ color: record.is_blocked ? '#ff4d4f' : record.is_active ? '#1890ff' : '#bbb' }} />
-                    <Text strong delete={record.is_blocked}>{record.full_name || 'Unnamed'}</Text>
-                    {record.is_verified && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                </Space>
-            ),
+            render: (_, record) => {
+                const meta = SEGMENT_META[record.segment] ?? SEGMENT_META.new;
+                return (
+                    <Space align="start">
+                        <Avatar
+                            style={{
+                                backgroundColor: record.is_blocked ? '#fee2e2' : '#e0f2fe',
+                                color: record.is_blocked ? '#dc2626' : '#0284c7',
+                                fontWeight: 700,
+                            }}
+                        >
+                            {(record.full_name || record.email || '?').charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Space direction="vertical" size={2}>
+                            <Space size={4}>
+                                <Text strong delete={record.is_blocked}>
+                                    {record.full_name || 'Unnamed'}
+                                </Text>
+                                {record.is_verified && (
+                                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                                )}
+                            </Space>
+                            <Tooltip title={meta.hint}>
+                                <Tag color={meta.color} style={{ marginInlineEnd: 0 }}>
+                                    {meta.label}
+                                </Tag>
+                            </Tooltip>
+                        </Space>
+                    </Space>
+                );
+            },
             sorter: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
+        },
+        {
+            title: 'Completed Orders',
+            key: 'completed_orders',
+            width: 130,
+            render: (_, record) => (
+                <Tooltip title="Delivered orders only. Cancelled and refunded orders are not purchases.">
+                    <span>
+                        <strong>{record.completed_orders}</strong> order
+                        {record.completed_orders === 1 ? '' : 's'}
+                    </span>
+                </Tooltip>
+            ),
+            sorter: (a, b) => a.completed_orders - b.completed_orders,
+        },
+        {
+            title: (
+                <Tooltip title="Lifetime spend on DELIVERED orders. Refunded money is not revenue — this figure used to include it.">
+                    <span>Total Spent (Net)</span>
+                </Tooltip>
+            ),
+            key: 'net_spent',
+            width: 150,
+            render: (_, record) => (
+                <div>
+                    <div style={{ fontWeight: 600 }}>{formatLKR(record.net_spent)}</div>
+                    {record.has_refund && (
+                        <Tooltip
+                            title={`${formatLKR(record.refunded_amount)} refunded and excluded from this figure.`}
+                        >
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>Refund deducted</div>
+                        </Tooltip>
+                    )}
+                </div>
+            ),
+            sorter: (a, b) => a.net_spent - b.net_spent,
         },
         {
             title: 'Email',
@@ -326,6 +439,16 @@ const CustomerList: React.FC = () => {
             </div>
 
             <Card>
+                <Segmented
+                    value={tab}
+                    onChange={(value) => {
+                        setPage(1);
+                        setTab(value as FilterTab);
+                    }}
+                    options={FILTER_TABS}
+                    style={{ marginBottom: 16 }}
+                />
+
                 <div style={{ marginBottom: 16 }}>
                     <DebouncedSearchInput
                         placeholder="Search name, phone, email…"
@@ -360,6 +483,13 @@ const CustomerList: React.FC = () => {
                 />
             </Card>
 
+            <AssignPromoModal
+                open={promoOpen}
+                userId={selectedCustomerId}
+                customerName={profile?.full_name || profile?.email || 'this customer'}
+                onClose={() => setPromoOpen(false)}
+            />
+
             {/* View Profile Drawer */}
             <Drawer
                 title="Customer Profile Details"
@@ -380,18 +510,85 @@ const CustomerList: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <Card size="small" style={{ marginBottom: 16, backgroundColor: '#fafafa' }}>
-                                <Space size="large">
+                            {/* Retention action, above the numbers that justify it:
+                                a manager who has just read "At Risk" should not
+                                have to scroll to do something about it. */}
+                            <Card
+                                size="small"
+                                style={{
+                                    marginBottom: 16,
+                                    background: 'linear-gradient(135deg, #eff6ff, #f5f3ff)',
+                                    borderColor: '#bfdbfe',
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 12,
+                                        flexWrap: 'wrap',
+                                    }}
+                                >
                                     <div>
-                                        <Text type="secondary">Total Spent</Text>
-                                        <Title level={4} style={{ margin: 0 }}>Rs. {profile.stats.total_spent.toLocaleString()}</Title>
+                                        <Text strong style={{ color: '#1e3a8a' }}>
+                                            🎁 Issue exclusive coupon
+                                        </Text>
+                                        <div style={{ fontSize: 12, color: '#3b82f6' }}>
+                                            A code only this customer can redeem, sent straight
+                                            to their wallet.
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Text type="secondary">Total Orders</Text>
-                                        <Title level={4} style={{ margin: 0 }}>{profile.stats.total_orders}</Title>
-                                    </div>
-                                </Space>
+                                    <Button
+                                        type="primary"
+                                        onClick={() => setPromoOpen(true)}
+                                    >
+                                        ⚡ Assign Promo
+                                    </Button>
+                                </div>
                             </Card>
+
+                            <Row gutter={12} style={{ marginBottom: 16 }}>
+                                <Col span={12}>
+                                    <Card size="small">
+                                        <Statistic
+                                            title={
+                                                <Tooltip title="Delivered orders only. Refunded money is excluded — it is not revenue from this customer.">
+                                                    <span>Total Spent (Net)</span>
+                                                </Tooltip>
+                                            }
+                                            value={profile.stats.net_spent}
+                                            precision={2}
+                                            prefix="Rs."
+                                        />
+                                        {profile.stats.has_refund && (
+                                            <Text type="warning" style={{ fontSize: 11 }}>
+                                                {formatLKR(profile.stats.refunded_amount)} refunded
+                                                and excluded
+                                            </Text>
+                                        )}
+                                    </Card>
+                                </Col>
+                                <Col span={12}>
+                                    <Card size="small">
+                                        <Statistic
+                                            title="Completed Orders"
+                                            value={profile.stats.completed_orders}
+                                        />
+                                        <Tag
+                                            color={
+                                                (SEGMENT_META[profile.stats.segment] ??
+                                                    SEGMENT_META.new).color
+                                            }
+                                        >
+                                            {
+                                                (SEGMENT_META[profile.stats.segment] ??
+                                                    SEGMENT_META.new).label
+                                            }
+                                        </Tag>
+                                    </Card>
+                                </Col>
+                            </Row>
 
                             <Descriptions bordered column={1} size="small">
                                 <Descriptions.Item label="Email">{profile.email || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>

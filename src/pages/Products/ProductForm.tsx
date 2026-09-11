@@ -61,6 +61,7 @@ interface ProductFormValues {
     search_keywords?: string;
     is_active: boolean;
     is_featured: boolean;
+    is_perishable: boolean;
 }
 
 const ProductForm: React.FC = () => {
@@ -120,6 +121,7 @@ const ProductForm: React.FC = () => {
                 search_keywords: product.search_keywords ?? undefined,
                 is_active: product.is_active,
                 is_featured: product.is_featured,
+                is_perishable: product.is_perishable ?? false,
             });
             const loaded: GalleryImage[] = product.images
                 .slice()
@@ -189,6 +191,7 @@ const ProductForm: React.FC = () => {
                 search_keywords: values.search_keywords?.trim() || null,
                 is_active: values.is_active,
                 is_featured: values.is_featured,
+                is_perishable: values.is_perishable ?? false,
             };
 
             const saved = isEdit
@@ -563,6 +566,20 @@ const ProductForm: React.FC = () => {
 
                             <Form.Item label="Featured" name="is_featured" valuePropName="checked">
                                 <Switch />
+                            </Form.Item>
+
+                            {/* A catalog-level fact (a carrot is perishable in every
+                                branch), so it lives on the global product rather than
+                                on per-branch inventory. Branch Marketing Managers use
+                                it to see at a glance which of their live Quick Sale
+                                deals are the ones that spoil if they do not move. */}
+                            <Form.Item
+                                label="Perishable"
+                                name="is_perishable"
+                                valuePropName="checked"
+                                tooltip="Short shelf life — prioritised for Quick Sale clearance"
+                            >
+                                <Switch checkedChildren="Perishable" unCheckedChildren="Shelf-stable" />
                             </Form.Item>
                         </Card>
                     </Col>

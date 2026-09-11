@@ -67,6 +67,83 @@ export interface QuickSaleItem {
     images: { imageUrl: string; isPrimary: boolean }[];
 }
 
+// ============================================================================
+// Marketing Dashboard
+// ============================================================================
+
+/**
+ * The dashboard payload is deliberately full of nullable numbers. `null` never
+ * means zero here — it means "this cannot honestly be computed yet":
+ * a branch with no delivery runs configured, a banner with too few impressions
+ * for a CTR to mean anything, a branch with no completed orders in the window.
+ * Render those as a setup prompt or "collecting data", never as 0.
+ */
+export interface DashboardQuickSaleItem {
+    productId: string;
+    name: string;
+    isPerishable: boolean;
+    globalPrice: number;
+    effectivePrice: number;
+    effectiveDiscount: number | null;
+    effectiveDiscountPrice: number | null;
+    stockQuantity: number;
+}
+
+export interface DashboardBannerItem {
+    bannerId: string;
+    title: string;
+    subtitle: string | null;
+    imageUrl: string | null;
+    linkType: string | null;
+    isPlatformWide: boolean;
+    impressions: number;
+    clicks: number;
+    /** null until the banner has enough impressions for the rate to mean anything. */
+    ctr: number | null;
+}
+
+export interface DashboardNextDeliveryRun {
+    label: string;
+    dispatchAt: string;
+    cutoffAt: string;
+    /** Negative would mean the cut-off has passed; the server rolls over instead. */
+    minutesToCutoff: number;
+    isTomorrow: boolean;
+}
+
+export interface MarketingDashboard {
+    branch: { branchId: string; branchName: string };
+    quickSale: {
+        liveCount: number;
+        perishableCount: number;
+        items: DashboardQuickSaleItem[];
+    };
+    banners: {
+        activeCount: number;
+        totalCount: number;
+        averageCtr: number | null;
+        windowDays: number;
+        items: DashboardBannerItem[];
+    };
+    coupons: {
+        activeCount: number;
+        nearLimitCount: number;
+        nearLimit: { code: string; usedCount: number; usageLimit: number }[];
+    };
+    /** null when this branch has not configured its delivery rounds yet. */
+    nextDeliveryRun: DashboardNextDeliveryRun | null;
+    returningCustomers: {
+        /** null when the branch had no completed orders in the window. */
+        rate: number | null;
+        /** Percentage-POINT change vs the previous week; null if either week was empty. */
+        trend: number | null;
+        windowDays: number;
+        trendWindowDays: number;
+        totalCustomers: number;
+        repeatCustomers: number;
+    };
+}
+
 interface ProductListWire {
     success: boolean;
     data: {
@@ -150,5 +227,22 @@ export const marketingApi = {
             params: branchId ? { branch_id: branchId } : undefined,
         });
         return res.data.data.products;
+    },
+
+    /**
+     * The whole Marketing Dashboard in one request.
+     *
+     * Replaces the four parallel calls the page used to make (quick-sale +
+     * banners + coupons + products): those could not produce a branch-scoped
+     * coupon count or a real CTR at all, and each one rendered its own error
+     * state, so a single failure left the page half-filled with plausible
+     * zeros. Throws on failure — callers show a real error state.
+     */
+    getDashboard: async (branchId?: string): Promise<MarketingDashboard> => {
+        const res = await apiClient.get<{ data: MarketingDashboard }>(
+            '/admin/marketing/dashboard',
+            { params: branchId ? { branch_id: branchId } : undefined },
+        );
+        return res.data.data;
     },
 };

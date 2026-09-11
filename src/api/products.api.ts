@@ -8,6 +8,17 @@
  */
 import apiClient from './client';
 
+/**
+ * 30-day sales velocity for this branch. Thresholds live server-side
+ * (sales_velocity_service) so the badge and the filter can never disagree.
+ *
+ * 'slow' is the one that matters: slow-moving stock that is also perishable is
+ * money about to be thrown away, and Quick Sale is how a manager rescues it.
+ */
+export type ProductMovement = 'fast' | 'steady' | 'slow' | 'none';
+
+export type StockState = 'in' | 'low' | 'out';
+
 export interface ProductImage {
     image_id: string;
     image_url: string;
@@ -49,11 +60,36 @@ export interface AdminProduct {
     /** Sinhala/Tamil/Singlish alternate names, common misspellings — search only, never displayed. */
     search_keywords?: string | null;
     sku?: string | null;
+    /**
+     * The price this viewer should see. For a branch-scoped admin the server
+     * has already resolved it to the branch's own price; for a Super Admin it
+     * is the global catalog template value.
+     */
     price: number;
+    /**
+     * This branch's own price, or null when the branch has set no override
+     * (and null always, for an unscoped viewer who has no branch context).
+     * Kept separate from `price` so the table can label the column honestly.
+     */
+    branch_price?: number | null;
+    /** The global catalog price, whatever the viewer's scope. */
+    global_price?: number | null;
     compare_at_price?: number | null;
     stock_quantity: number;
     is_active: boolean;
     is_featured: boolean;
+    /** Short shelf life — the stock Quick Sale exists to clear before it spoils. */
+    is_perishable?: boolean;
+
+    // ---- Branch operations. Present only for a branch-scoped viewer; a Super
+    // Admin is looking at the global catalog and has no single branch's shelf
+    // to report on. ------------------------------------------------------
+    /** Units DELIVERED from this branch in the last 30 days. */
+    units_sold_30d?: number;
+    movement?: ProductMovement;
+    stock_state?: StockState;
+    /** Already discounted in this branch's Quick Sale feed. */
+    is_on_quick_sale?: boolean;
     /**
      * Global cashback % across all branches. null = platform default rate.
      * A branch's Marketing Manager can override it per product.
@@ -95,6 +131,7 @@ export interface ProductPayload {
     low_stock_threshold?: number;
     is_active?: boolean;
     is_featured?: boolean;
+    is_perishable?: boolean;
 }
 
 export interface ProductListParams {
@@ -106,6 +143,16 @@ export interface ProductListParams {
     is_active?: boolean;
     sort_by?: 'created_at' | 'price' | 'name' | 'view_count';
     sort_order?: 'asc' | 'desc';
+    /**
+     * Branch-derived filters. The server applies these to the requested PAGE
+     * (the bands are computed per branch, not stored), so a filtered view can
+     * return fewer than `limit` rows while `total` still reports the
+     * unfiltered count.
+     */
+    movement?: ProductMovement;
+    stock_state?: StockState;
+    on_quick_sale?: boolean;
+    perishable_only?: boolean;
 }
 
 export interface ProductListResult {

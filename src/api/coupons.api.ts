@@ -9,6 +9,10 @@ export type DiscountType = 'percentage' | 'fixed';
 export interface Coupon {
     coupon_id: string;
     code: string;
+    /** Owning branch; null = network-wide (Super Admin only). */
+    branch_id?: string | null;
+    /** Convenience mirror of `branch_id === null`, sent by the server. */
+    is_network_wide?: boolean;
     description: string | null;
     discount_type: DiscountType;
     discount_value: number;
@@ -24,7 +28,40 @@ export interface Coupon {
     valid_until: string;
     is_active: boolean;
     created_at: string | null;
+
+    // ---- Financial protection -------------------------------------------
+    /** Max total discount this campaign may give away. null = uncapped. */
+    budget_cap: number | null;
+    /** Discount given so far. */
+    budget_spent: number;
+    /** budget_spent / budget_cap as a percentage; null when uncapped. */
+    budget_used_percent: number | null;
+    auto_stop_on_budget: boolean;
+    /** Clearance lines count toward neither the discount nor the minimum order. */
+    exclude_quick_sale: boolean;
+
+    // ---- Eligibility ------------------------------------------------------
+    first_order_only: boolean;
+    /** Issued to one named customer via Assign Promo; nobody else can redeem. */
+    target_user_id: string | null;
+    /** Empty = the whole catalog. */
+    category_ids: string[];
+    product_ids: string[];
+
+    // ---- Reporting --------------------------------------------------------
+    /**
+     * Derived server-side from the budget, the dates and is_active — NOT a
+     * stored column, so it is never stale. 'depleted' (the campaign spent its
+     * allowance) is deliberately distinct from 'inactive' (a person switched it
+     * off): only the first one means "this worked, consider funding it again".
+     */
+    status: CouponStatus;
+    /** Gross sales this code brought in, over non-cancelled orders. */
+    revenue_generated: number;
+    orders_count: number;
 }
+
+export type CouponStatus = 'active' | 'scheduled' | 'expired' | 'inactive' | 'depleted';
 
 export interface CouponPayload {
     code: string;
@@ -39,6 +76,17 @@ export interface CouponPayload {
     valid_from: string; // ISO
     valid_until: string; // ISO
     is_active?: boolean;
+
+    budget_cap?: number | null;
+    auto_stop_on_budget?: boolean;
+    exclude_quick_sale?: boolean;
+    first_order_only?: boolean;
+    /**
+     * Catalog eligibility. Omit to leave unchanged on an update; send an empty
+     * array to clear a restriction and widen the coupon back to everything.
+     */
+    category_ids?: string[];
+    product_ids?: string[];
 }
 
 export interface CouponListParams {
@@ -46,6 +94,8 @@ export interface CouponListParams {
     limit?: number;
     search?: string;
     is_active?: boolean;
+    /** Filter tab. Derived server-side; see Coupon.status. */
+    status?: CouponStatus;
 }
 
 export interface CouponListResult {
