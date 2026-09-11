@@ -6,18 +6,49 @@
  */
 import apiClient from './client';
 
+export type BannerLinkType = 'category' | 'product' | 'quick_sale';
+
+/**
+ * Derived server-side from is_active plus the schedule. 'inactive' is a person
+ * having switched the banner off; 'expired' is its own end date having passed.
+ * Keeping them apart stops an admin re-enabling a campaign that is simply over.
+ */
+export type BannerStatus = 'live' | 'scheduled' | 'expired' | 'inactive';
+
 export interface Banner {
     banner_id: string;
     title: string;
     subtitle: string | null;
     image_url: string | null;
-    link_type: 'category' | 'product' | null;
+    /**
+     * Where a tap goes. 'quick_sale' opens a fixed screen and carries no
+     * target_id; 'category'/'product' must have one or the button does
+     * nothing on the customer's phone.
+     */
+    link_type: BannerLinkType | null;
     target_id: string | null;
     branch_id: string | null;
     /** branch_id === null — shown in every branch, editable by Super Admin only. */
     is_platform_wide: boolean;
     sort_order: number;
+    /** The manual on/off switch. The schedule below is the automatic one. */
     is_active: boolean;
+    /** ISO. null = no start bound (live as soon as is_active). */
+    starts_at: string | null;
+    /** ISO. null = never expires. The storefront filters on this. */
+    ends_at: string | null;
+    is_always_active: boolean;
+    status: BannerStatus;
+    /** Over the last `performance_window_days`, scoped to the viewer's branch. */
+    impressions: number;
+    clicks: number;
+    /**
+     * null = too few impressions for the rate to mean anything yet. Render it
+     * as "collecting", never as 0% — a banner nobody has seen is not a banner
+     * nobody clicks.
+     */
+    ctr: number | null;
+    performance_window_days: number;
     created_at: string | null;
 }
 
@@ -35,7 +66,10 @@ export interface BannerPayload {
     title: string;
     subtitle?: string | null;
     image_url?: string | null;
-    link_type?: 'category' | 'product' | null;
+    link_type?: BannerLinkType | null;
+    /** ISO. Omit both for a banner with no expiry. */
+    starts_at?: string | null;
+    ends_at?: string | null;
     target_id?: string | null;
     sort_order?: number;
     is_active?: boolean;

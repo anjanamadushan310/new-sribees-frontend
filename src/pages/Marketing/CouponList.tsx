@@ -21,6 +21,10 @@ import {
     App,
     Typography,
     Tooltip,
+    Progress,
+    Segmented,
+    Divider,
+    Radio,
 } from 'antd';
 import {
     PlusOutlined,
@@ -30,12 +34,15 @@ import {
     TagOutlined,
     DeleteOutlined,
     ExclamationCircleOutlined,
+    WalletOutlined,
+    RiseOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { couponsApi } from '../../api/coupons.api';
-import type { Coupon, CouponPayload, DiscountType } from '../../api/coupons.api';
+import type { Coupon, CouponPayload, CouponStatus, DiscountType } from '../../api/coupons.api';
+import { categoriesApi } from '../../api/categories.api';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -56,16 +63,35 @@ const discountLabel = (c: Coupon): string => {
     return formatLKR(c.discount_value);
 };
 
-// Derived display status from is_active + validity window + usage.
-const couponStatus = (c: Coupon): { label: string; color: string } => {
-    if (!c.is_active) return { label: 'Inactive', color: 'default' };
-    const now = dayjs();
-    if (now.isBefore(dayjs(c.valid_from))) return { label: 'Scheduled', color: 'blue' };
-    if (now.isAfter(dayjs(c.valid_until))) return { label: 'Expired', color: 'red' };
-    if (c.usage_limit != null && c.used_count >= c.usage_limit)
-        return { label: 'Used Up', color: 'orange' };
-    return { label: 'Active', color: 'green' };
+/**
+ * Status comes from the server (`Coupon.status`) rather than being re-derived
+ * here. It has to: 'depleted' depends on the campaign budget, which only the
+ * backend tracks, and a second copy of these rules in TypeScript would drift
+ * from the one checkout actually enforces.
+ */
+const STATUS_META: Record<CouponStatus, { label: string; color: string; hint: string }> = {
+    active: { label: 'Active', color: 'green', hint: 'Live and redeemable now' },
+    scheduled: { label: 'Scheduled', color: 'blue', hint: 'Starts on its valid-from date' },
+    expired: { label: 'Expired', color: 'red', hint: 'Past its end date' },
+    inactive: { label: 'Inactive', color: 'default', hint: 'Switched off by an admin' },
+    depleted: {
+        label: 'Budget Depleted',
+        color: 'orange',
+        hint: 'Gave away its whole campaign budget — it worked, it just ran out',
+    },
 };
+
+const FILTER_TABS: { label: string; value: CouponStatus | 'all' }[] = [
+    { label: 'All Coupons', value: 'all' },
+    { label: 'Active', value: 'active' },
+    { label: 'Budget Depleted', value: 'depleted' },
+    { label: 'Expired', value: 'expired' },
+    { label: 'Inactive', value: 'inactive' },
+];
+
+/** Blue below 70%, amber to 95%, red at the ceiling. */
+const budgetColor = (pct: number): string =>
+    pct >= 95 ? '#dc2626' : pct >= 70 ? '#d97706' : '#1677ff';
 
 interface CouponFormValues {
     code: string;
@@ -79,6 +105,12 @@ interface CouponFormValues {
     is_public?: boolean;
     validity: [Dayjs, Dayjs];
     is_active: boolean;
+    budget_cap?: number | null;
+    auto_stop_on_budget?: boolean;
+    exclude_quick_sale?: boolean;
+    first_order_only?: boolean;
+    eligibility: 'all' | 'categories';
+    category_ids?: string[];
 }
 
 const CouponList: React.FC = () => {
@@ -90,13 +122,28 @@ const CouponList: React.FC = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
+    const [statusTab, setStatusTab] = useState<CouponStatus | 'all'>('all');
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Coupon | null>(null);
+    const eligibility = Form.useWatch('eligibility', form);
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: [COUPONS_KEY, { page, pageSize, search }],
-        queryFn: () => couponsApi.list({ page, limit: pageSize, search: search || undefined }),
+        queryKey: [COUPONS_KEY, { page, pageSize, search, statusTab }],
+        queryFn: () =>
+            couponsApi.list({
+                page,
+                limit: pageSize,
+                search: search || undefined,
+                status: statusTab === 'all' ? undefined : statusTab,
+            }),
         placeholderData: keepPreviousData,
+    });
+
+    // For the catalog-eligibility picker. Only fetched while the modal is open.
+    const categoriesQuery = useQuery({
+        queryKey: ['admin', 'categories', 'for-coupons'],
+        queryFn: () => categoriesApi.list(),
+        enabled: modalOpen,
     });
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: [COUPONS_KEY] });
@@ -153,6 +200,13 @@ const CouponList: React.FC = () => {
             min_order_value: 0,
             per_user_limit: 1,
             is_public: false,
+            // Defaults that protect the branch. A new campaign excludes
+            // clearance stock and stops itself at its budget unless someone
+            // deliberately says otherwise.
+            exclude_quick_sale: true,
+            auto_stop_on_budget: true,
+            first_order_only: false,
+            eligibility: 'all',
         });
         setModalOpen(true);
     };
@@ -171,6 +225,12 @@ const CouponList: React.FC = () => {
             is_public: c.is_public,
             validity: [dayjs(c.valid_from), dayjs(c.valid_until)],
             is_active: c.is_active,
+            budget_cap: c.budget_cap ?? undefined,
+            auto_stop_on_budget: c.auto_stop_on_budget,
+            exclude_quick_sale: c.exclude_quick_sale,
+            first_order_only: c.first_order_only,
+            eligibility: c.category_ids.length ? 'categories' : 'all',
+            category_ids: c.category_ids,
         });
         setModalOpen(true);
     };
@@ -204,8 +264,18 @@ const CouponList: React.FC = () => {
             per_user_limit: values.per_user_limit ?? null,
             is_public: values.is_public ?? false,
             valid_from: from.startOf('day').toISOString(),
+            // End of day, so a coupon dated "to 17 Sep" works all of the 17th
+            // rather than dying at midnight the night before.
             valid_until: to.endOf('day').toISOString(),
             is_active: values.is_active ?? true,
+            budget_cap: values.budget_cap ?? null,
+            auto_stop_on_budget: values.auto_stop_on_budget ?? true,
+            exclude_quick_sale: values.exclude_quick_sale ?? true,
+            first_order_only: values.first_order_only ?? false,
+            // Always sent, including as an empty array: that is the only way to
+            // widen a coupon back to the whole catalog once it was narrowed.
+            category_ids:
+                values.eligibility === 'categories' ? (values.category_ids ?? []) : [],
         };
 
         if (minOrder === 0) {
@@ -231,6 +301,15 @@ const CouponList: React.FC = () => {
                 <Space size={4} wrap>
                     <Tag color="geekblue">{code}</Tag>
                     {c.is_public && <Tag color="purple">In app</Tag>}
+                    {/* Coupons are branch-owned now. A branch admin sees the
+                        network-wide ones alongside their own but cannot edit
+                        them (the server 403s), so say which is which rather
+                        than letting them discover it by being refused. */}
+                    {c.is_network_wide ? (
+                        <Tag color="gold">All branches</Tag>
+                    ) : (
+                        <Tag color="blue">This branch</Tag>
+                    )}
                 </Space>
             ),
         },
@@ -264,6 +343,76 @@ const CouponList: React.FC = () => {
             ),
         },
         {
+            title: (
+                <Tooltip title="Discount given away, against the campaign's budget. Usage limits cap how MANY redemptions; this caps what they COST.">
+                    <span>
+                        <WalletOutlined /> Budget Spend
+                    </span>
+                </Tooltip>
+            ),
+            key: 'budget',
+            width: 170,
+            render: (_, c) => {
+                if (c.budget_cap == null) {
+                    return (
+                        <Tooltip title="No cap — this campaign can give away an unlimited amount of discount.">
+                            <span style={{ color: '#94a3b8', fontSize: 12 }}>No budget cap</span>
+                        </Tooltip>
+                    );
+                }
+                const pct = c.budget_used_percent ?? 0;
+                return (
+                    <div style={{ minWidth: 150 }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 11.5,
+                                marginBottom: 2,
+                            }}
+                        >
+                            <span>{formatLKR(c.budget_spent)}</span>
+                            <strong>{pct}%</strong>
+                        </div>
+                        <Progress
+                            percent={Math.min(100, pct)}
+                            showInfo={false}
+                            size="small"
+                            strokeColor={budgetColor(pct)}
+                        />
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                            of {formatLKR(c.budget_cap)}
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            title: (
+                <Tooltip title="Gross sales placed with this code. The other half of the budget figure: Rs 30,000 of discount that pulled in Rs 612,000 of sales is a campaign worth repeating.">
+                    <span>
+                        <RiseOutlined /> Revenue Generated
+                    </span>
+                </Tooltip>
+            ),
+            key: 'revenue',
+            width: 150,
+            render: (_, c) =>
+                c.orders_count > 0 ? (
+                    <div>
+                        <div style={{ fontWeight: 600, color: '#16a34a' }}>
+                            {formatLKR(c.revenue_generated)}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                            {c.orders_count.toLocaleString()} order
+                            {c.orders_count === 1 ? '' : 's'}
+                        </div>
+                    </div>
+                ) : (
+                    <span style={{ color: '#94a3b8' }}>—</span>
+                ),
+        },
+        {
             title: 'Validity',
             key: 'validity',
             render: (_, c) => (
@@ -276,10 +425,14 @@ const CouponList: React.FC = () => {
         {
             title: 'Status',
             key: 'status',
-            width: 120,
+            width: 140,
             render: (_, c) => {
-                const s = couponStatus(c);
-                return <Tag color={s.color}>{s.label}</Tag>;
+                const meta = STATUS_META[c.status] ?? STATUS_META.inactive;
+                return (
+                    <Tooltip title={meta.hint}>
+                        <Tag color={meta.color}>{meta.label}</Tag>
+                    </Tooltip>
+                );
             },
         },
         {
@@ -287,14 +440,17 @@ const CouponList: React.FC = () => {
             key: 'actions',
             width: 240,
             render: (_, c) => {
-                const isExpired = dayjs().isAfter(dayjs(c.valid_until));
-                const isUsedUp = c.usage_limit != null && c.used_count >= c.usage_limit;
-                const canDeactivate = c.is_active && !isExpired && !isUsedUp;
+                // Gated on the SERVER's status so the button agrees with what
+                // the backend would actually do. Deactivating something already
+                // expired or budget-depleted is a no-op that just looks like it
+                // worked.
+                const canDeactivate = c.status === 'active' || c.status === 'scheduled';
 
                 const getDeactivateReason = () => {
-                    if (isExpired) return 'Coupon is expired and cannot be deactivated';
-                    if (isUsedUp) return 'Coupon usage limit reached (Used Up)';
-                    return 'Coupon is inactive';
+                    if (c.status === 'expired') return 'Already past its end date';
+                    if (c.status === 'depleted')
+                        return 'Campaign budget is spent — it has already stopped itself';
+                    return 'Coupon is already inactive';
                 };
 
                 return (
@@ -359,16 +515,28 @@ const CouponList: React.FC = () => {
             </div>
 
             <Card>
-                <Input.Search
-                    placeholder="Search code or description…"
-                    allowClear
-                    enterButton={<SearchOutlined />}
-                    style={{ width: 320, marginBottom: 16 }}
-                    onSearch={(value) => {
+                <Segmented
+                    value={statusTab}
+                    onChange={(value) => {
                         setPage(1);
-                        setSearch(value);
+                        setStatusTab(value as CouponStatus | 'all');
                     }}
+                    options={FILTER_TABS}
+                    style={{ marginBottom: 16 }}
                 />
+
+                <div>
+                    <Input.Search
+                        placeholder="Search code or description…"
+                        allowClear
+                        enterButton={<SearchOutlined />}
+                        style={{ width: 320, marginBottom: 16 }}
+                        onSearch={(value) => {
+                            setPage(1);
+                            setSearch(value);
+                        }}
+                    />
+                </div>
 
                 <Table
                     rowKey="coupon_id"
@@ -523,6 +691,101 @@ const CouponList: React.FC = () => {
                     >
                         <Switch checkedChildren="Public" unCheckedChildren="Private" />
                     </Form.Item>
+
+                    {/* ============ Financial protection ============
+                        The two controls that stop a promotion becoming a loss.
+                        Usage limits cap how many redemptions; these cap what
+                        they cost, and what they are allowed to be spent on. */}
+                    <Divider titlePlacement="start">
+                        <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
+                            FINANCIAL PROTECTION
+                        </span>
+                    </Divider>
+
+                    <Form.Item
+                        name="exclude_quick_sale"
+                        valuePropName="checked"
+                        extra="Clearance items are already sold at or below cost. With this on, they count toward neither the discount nor the minimum order value."
+                    >
+                        <Switch
+                            checkedChildren="Excluding Quick Sale"
+                            unCheckedChildren="Quick Sale included"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Total campaign budget"
+                        name="budget_cap"
+                        extra="The most discount this coupon may ever give away. Blank = uncapped, which means a usage limit is the only thing between you and an unbounded bill."
+                    >
+                        <InputNumber
+                            min={1}
+                            step={1000}
+                            addonBefore="LKR"
+                            style={{ width: '100%' }}
+                            placeholder="e.g. 50000"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="auto_stop_on_budget"
+                        valuePropName="checked"
+                        extra="Switches the coupon off the moment the budget is gone, rather than leaving a code that reads Active but refuses every customer."
+                    >
+                        <Switch
+                            checkedChildren="Auto-stop at budget"
+                            unCheckedChildren="Keep running"
+                        />
+                    </Form.Item>
+
+                    {/* ============ Scope & eligibility ============ */}
+                    <Divider titlePlacement="start">
+                        <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
+                            SCOPE &amp; ELIGIBILITY
+                        </span>
+                    </Divider>
+
+                    <Form.Item
+                        name="first_order_only"
+                        valuePropName="checked"
+                        extra="Acquisition offer: only a customer with no previous completed order from this branch can use it."
+                    >
+                        <Switch
+                            checkedChildren="First order only"
+                            unCheckedChildren="Any order"
+                        />
+                    </Form.Item>
+
+                    <Form.Item label="Catalog eligibility" name="eligibility">
+                        <Radio.Group
+                            options={[
+                                { label: 'Entire catalog', value: 'all' },
+                                { label: 'Specific categories', value: 'categories' },
+                            ]}
+                            optionType="button"
+                        />
+                    </Form.Item>
+
+                    {eligibility === 'categories' && (
+                        <Form.Item
+                            label="Eligible categories"
+                            name="category_ids"
+                            rules={[{ required: true, message: 'Pick at least one category' }]}
+                            extra="Only lines in these categories are discounted, and only they count toward the minimum order."
+                        >
+                            <Select
+                                mode="multiple"
+                                allowClear
+                                loading={categoriesQuery.isLoading}
+                                placeholder="Choose categories"
+                                optionFilterProp="label"
+                                options={(categoriesQuery.data ?? []).map((c) => ({
+                                    label: c.name,
+                                    value: c.category_id,
+                                }))}
+                            />
+                        </Form.Item>
+                    )}
 
                     <Form.Item
                         label="Validity Period"

@@ -12,7 +12,30 @@
  */
 import apiClient from './client';
 
-export interface Customer {
+/**
+ * Behavioural segment, derived server-side from order history at read time.
+ *
+ * 'at_risk' deliberately outranks 'returning': a customer with seven orders who
+ * has bought nothing in a month is the most valuable person to win back, and
+ * labelling them "Returning" buries them.
+ */
+export type CustomerSegment = 'returning' | 'new' | 'at_risk';
+
+/** Purchasing history for one customer. Net spend counts DELIVERED orders only. */
+export interface CustomerPurchaseStats {
+    completed_orders: number;
+    /**
+     * Lifetime spend, DELIVERED orders only. Refunded money is not revenue —
+     * this used to include it, inflating some customers by nearly 50%.
+     */
+    net_spent: number;
+    refunded_amount: number;
+    has_refund: boolean;
+    last_order_at: string | null;
+    segment: CustomerSegment;
+}
+
+export interface Customer extends CustomerPurchaseStats {
     user_id: string;
     email: string;
     full_name: string | null;
@@ -37,7 +60,13 @@ export interface CustomerAddress {
     is_default: boolean;
 }
 
-export interface CustomerStats {
+export interface CustomerStats extends CustomerPurchaseStats {
+    /**
+     * Kept under the original names for existing callers. Both now mean
+     * DELIVERED-only and are aliases of completed_orders / net_spent — the
+     * profile drawer previously summed every order that was not literally
+     * 'cancelled', so a refunded order counted as money the customer spent.
+     */
     total_orders: number;
     total_spent: number;
 }
@@ -78,6 +107,10 @@ export interface CustomerListParams {
     page?: number;
     limit?: number;
     search?: string;
+    /** Behavioural filter tab. Derived server-side; see CustomerSegment. */
+    segment?: CustomerSegment;
+    /** The Active / Blocked tabs. */
+    is_blocked?: boolean;
 }
 
 export interface CustomerListResult {

@@ -25,6 +25,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { branchesApi } from '../../api/branches.api';
 import { branchCategoriesApi } from '../../api/branchCategories.api';
 import type { BranchCategoryItem } from '../../api/branchCategories.api';
+import DeliveryRunsCard from './DeliveryRunsCard';
 
 const { Title, Text } = Typography;
 
@@ -176,6 +177,11 @@ const MyBranch: React.FC = () => {
                 </Text>
             </Space>
         </Card>
+
+        <DeliveryRunsCard
+            branchId={branch.branch_id}
+            runs={branch.delivery_runs ?? []}
+        />
 
         <Card
             title={

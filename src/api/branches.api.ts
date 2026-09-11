@@ -7,6 +7,21 @@
  */
 import apiClient from './client';
 
+/**
+ * One daily dispatch round.
+ *
+ * `dispatch_time` is 24-hour HH:MM in Asia/Colombo (Sri Lanka has one
+ * timezone and no DST, so a wall-clock string is exact). `cutoff_minutes`
+ * is how long before that ordering closes — the Marketing Dashboard counts
+ * down to the cut-off, not to dispatch, because a run past its cut-off is
+ * already locked.
+ */
+export interface DeliveryRun {
+    label: string;
+    dispatch_time: string;
+    cutoff_minutes: number;
+}
+
 export interface Branch {
     branch_id: string;
     name: string;
@@ -18,6 +33,8 @@ export interface Branch {
     phone?: string | null;
     manager_id?: string | null;
     is_active: boolean;
+    /** Daily dispatch rounds, ordered by dispatch_time. Empty = not set up. */
+    delivery_runs: DeliveryRun[];
     /** Post Offices this branch serves (synced to PostOfficeBranchMapping). */
     coverage_post_offices: string[];
     created_at?: string | null;
@@ -75,6 +92,19 @@ export const branchesApi = {
         const res = await apiClient.patch<BranchMutationWire>(`/admin/branches/${id}/status`, {
             is_active: isActive,
         });
+        return res.data.data;
+    },
+
+    /**
+     * Replace this branch's daily delivery runs (full set, not a patch — the
+     * rounds only make sense relative to each other). Open to the branch's own
+     * manager as well as Super Admin, like setStatus above.
+     */
+    setDeliveryRuns: async (id: string, runs: DeliveryRun[]): Promise<Branch> => {
+        const res = await apiClient.put<BranchMutationWire>(
+            `/admin/branches/${id}/delivery-runs`,
+            { delivery_runs: runs },
+        );
         return res.data.data;
     },
 };
