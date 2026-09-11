@@ -39,6 +39,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { UploadChangeParam, UploadFile } from 'antd/es/upload';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
+import type { BannerLinkType, BannerStatus } from '../../api/banners.api';
 import { categoriesApi } from '../../api/categories.api';
 import { marketingApi } from '../../api/marketing.api';
 import { bannersApi } from '../../api/banners.api';
@@ -621,7 +622,7 @@ const BannerList: React.FC = () => {
                     {/* ============ Click destination ============
                         A banner with no destination is decoration. This is what
                         turns the carousel into a route into the catalog. */}
-                    <Divider orientation="left" orientationMargin={0}>
+                    <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
                             CLICK ACTION (DESTINATION)
                         </span>
@@ -680,7 +681,7 @@ const BannerList: React.FC = () => {
                     )}
 
                     {/* ============ Schedule ============ */}
-                    <Divider orientation="left" orientationMargin={0}>
+                    <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
                             SCHEDULE
                         </span>

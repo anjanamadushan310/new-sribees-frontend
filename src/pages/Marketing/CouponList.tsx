@@ -696,7 +696,7 @@ const CouponList: React.FC = () => {
                         The two controls that stop a promotion becoming a loss.
                         Usage limits cap how many redemptions; these cap what
                         they cost, and what they are allowed to be spent on. */}
-                    <Divider orientation="left" orientationMargin={0}>
+                    <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
                             FINANCIAL PROTECTION
                         </span>
@@ -739,7 +739,7 @@ const CouponList: React.FC = () => {
                     </Form.Item>
 
                     {/* ============ Scope & eligibility ============ */}
-                    <Divider orientation="left" orientationMargin={0}>
+                    <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
                             SCOPE &amp; ELIGIBILITY
                         </span>
