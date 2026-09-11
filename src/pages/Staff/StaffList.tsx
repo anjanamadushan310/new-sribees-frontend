@@ -247,10 +247,18 @@ const StaffList: React.FC = () => {
         {
             title: 'Staff',
             key: 'user',
+            width: 220,
             render: (_, record) => (
-                <Space direction="vertical" size={0}>
+                <Space direction="vertical" size={0} style={{ maxWidth: 220 }}>
                     <Text strong>{record.full_name}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text
+                        type="secondary"
+                        style={{
+                            fontSize: 12,
+                            wordBreak: 'break-word',
+                        }}
+                        ellipsis={{ tooltip: record.email }}
+                    >
                         {record.email}
                     </Text>
                 </Space>
@@ -372,6 +380,7 @@ const StaffList: React.FC = () => {
                     dataSource={filtered}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load staff.' : 'No staff accounts yet.' }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `Total ${t} staff` }}
                 />
             </Card>
