@@ -8,6 +8,7 @@ import { authApi } from '../../api/auth.api';
 import { apiErrorMessage } from '../../utils/analytics';
 import DeliveryZones from './DeliveryZones';
 import MyBranch from './MyBranch';
+import CourierSettings from './CourierSettings';
 
 const Settings: React.FC = () => {
     const [profileForm] = Form.useForm();
@@ -161,6 +162,18 @@ const Settings: React.FC = () => {
                       key: 'my-branch',
                       label: 'My Branch',
                       children: <MyBranch />,
+                  },
+              ]
+            : []),
+        // Courier — the SribeesExpress account plumbing. Super Admin drives the
+        // setup; a Branch Manager sees it read-only for the COD figures, since
+        // they are the ones chasing an overdue payout on their own deliveries.
+        ...(isSuperAdmin || isBranchManager
+            ? [
+                  {
+                      key: 'courier',
+                      label: 'Courier',
+                      children: <CourierSettings />,
                   },
               ]
             : []),

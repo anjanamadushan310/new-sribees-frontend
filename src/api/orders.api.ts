@@ -48,6 +48,14 @@ export interface OrderListItem {
     total_amount: number;
     item_count: number;
     created_at: string | null;
+    /**
+     * Enough courier state to spot a parcel that needs a human without opening
+     * every order. `failed` here is the one that matters: the order sits at
+     * Packed looking normal while no rider has ever been asked to collect it.
+     */
+    courier_booking_status: string | null;
+    courier_waybill: string | null;
+    courier_tracking_status: string | null;
 }
 
 export interface OrderItem {
@@ -146,6 +154,47 @@ export interface OrderEscalation {
 
 export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
 
+/**
+ * The SribeesExpress shipment behind an order, from GET /admin/orders/{id}.
+ *
+ * Booking happens automatically when the order is confirmed, so for most
+ * orders this arrives already populated. The flags exist for the ones it
+ * does not cover: a booking that failed during a courier outage, an address
+ * corrected after the fact, or an order older than the integration.
+ */
+export interface OrderCourier {
+    /** SribeesExpress waybill. Null until booked — the whole panel keys off this. */
+    shipment_id: string | null;
+    waybill: string | null;
+    /** Our side: pending | booked | failed. */
+    booking_status: string | null;
+    /** Their side: booked, picked_up, out_for_delivery, delivered, failed, returned… */
+    tracking_status: string | null;
+    tracking_url: string | null;
+    tracking_updated_at: string | null;
+    /** Where the rider was told to collect, snapshotted at booking time. */
+    pickup_location_name: string | null;
+    handover_required: boolean;
+    handover_verified: boolean | null;
+    /** COD only: `delivered` alone does NOT mean the cash was collected. */
+    cod_collected: boolean;
+    cod_collected_amount: number | null;
+    /** The remittance run that paid this order's COD out to us. Null until settled. */
+    remittance_id: number | null;
+    /** Rider free text on a failed parcel. Never branch logic on its wording. */
+    failure_note: string | null;
+    /** Only meaningful while tracking_status is `failed`. */
+    will_retry: boolean | null;
+    can_request_pickup: boolean;
+    can_refresh_tracking: boolean;
+    /**
+     * Whether the fulfilling branch is registered as a pickup location.
+     * False is a warning, not a blocker: the booking still succeeds, but the
+     * rider is sent to the account default address instead of this branch.
+     */
+    branch_pickup_registered: boolean;
+}
+
 export interface OrderDetail {
     order_id: string;
     order_number: string;
@@ -178,6 +227,7 @@ export interface OrderDetail {
     history?: OrderStatusHistoryItem[];
     fulfilment_contacts?: FulfilmentContacts;
     escalations?: OrderEscalation[];
+    courier?: OrderCourier;
 }
 
 export interface OrderScope {
@@ -419,6 +469,36 @@ export const ordersApi = {
             { status, resolution_note: resolutionNote },
         );
         return res.data.data;
+    },
+
+    // --- SribeesExpress shipment (Branch Manager / Super Admin only) ---
+
+    /**
+     * Ask SribeesExpress to collect this parcel. Idempotent: an order that is
+     * already booked comes back 200 with its existing waybill rather than a
+     * second parcel, so a double-click is harmless.
+     */
+    requestPickup: async (id: string): Promise<{ order: OrderDetail; courier: OrderCourier; message: string }> => {
+        const res = await apiClient.post<{
+            success: boolean;
+            data: { order: OrderDetail; courier: OrderCourier };
+            message: string;
+        }>(`/admin/orders/${id}/courier/request-pickup`);
+        return { ...res.data.data, message: res.data.message };
+    },
+
+    /**
+     * Re-read this one shipment from SribeesExpress. Their webhooks are not
+     * retried, so a single missed push leaves the order on a stale status
+     * until the next reconciliation sweep — this is that sweep for one order.
+     */
+    refreshCourier: async (id: string): Promise<{ order: OrderDetail; courier: OrderCourier; message: string }> => {
+        const res = await apiClient.post<{
+            success: boolean;
+            data: { order: OrderDetail; courier: OrderCourier };
+            message: string;
+        }>(`/admin/orders/${id}/courier/refresh`);
+        return { ...res.data.data, message: res.data.message };
     },
 
     /** Fetch the order's PDF invoice as a Blob (for browser download). */

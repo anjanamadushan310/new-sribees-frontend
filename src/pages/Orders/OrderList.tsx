@@ -192,6 +192,32 @@ const OrderList: React.FC = () => {
             render: (s: OrderStatus) => statusTag(s),
         },
         {
+            // The courier half of the row. A waybill means a rider has been
+            // asked to collect; `failed` means nobody has, and nothing retries
+            // it — that is the cell a Branch Manager is scanning this list for.
+            title: 'Parcel',
+            key: 'parcel',
+            width: 150,
+            render: (_, record) => {
+                if (record.courier_booking_status === 'failed' && !record.courier_waybill) {
+                    return <Tag color="red">Not booked</Tag>;
+                }
+                if (!record.courier_waybill) {
+                    return <Text type="secondary">—</Text>;
+                }
+                return (
+                    <Space direction="vertical" size={0}>
+                        <Text style={{ fontSize: 12 }}>{record.courier_waybill}</Text>
+                        {record.courier_tracking_status && (
+                            <Text type="secondary" style={{ fontSize: 11 }}>
+                                {record.courier_tracking_status.replace(/_/g, ' ')}
+                            </Text>
+                        )}
+                    </Space>
+                );
+            },
+        },
+        {
             title: 'Actions',
             key: 'actions',
             width: 100,

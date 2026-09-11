@@ -53,6 +53,7 @@ import type {
     ReturnResolution,
 } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import CourierPanel from './CourierPanel';
 
 const { Text, Title } = Typography;
 
@@ -475,6 +476,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                             <Text type="secondary">⏳ Rider: Pending Assignment (not dispatched yet)</Text>
                         )}
                     </div>
+
+                    <Divider titlePlacement="start">🚚 SribeesExpress Shipment</Divider>
+                    <CourierPanel order={order} onChanged={invalidateOrder} />
 
                     <Divider titlePlacement="start">Items</Divider>
                     <Table
