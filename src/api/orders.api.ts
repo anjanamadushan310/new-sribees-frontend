@@ -195,6 +195,37 @@ export interface OrderCourier {
     branch_pickup_registered: boolean;
 }
 
+/**
+ * The rows a shipping label needs, from GET /admin/orders/{id}/courier/label.
+ *
+ * Mirrors SribeesExpress's own `ShippingLabelOut` field for field. Their label
+ * builder lives on a staff-authenticated endpoint a merchant key cannot reach,
+ * and returns data rather than a rendered label anyway — the barcode is meant
+ * to be drawn client-side from `waybill_id`.
+ */
+export interface CourierLabel {
+    waybill_id: string;
+    order_number: string;
+    booked_at: string | null;
+    sender_name: string | null;
+    sender_phone: string | null;
+    origin_branch: string | null;
+    recipient_name: string;
+    recipient_phone: string;
+    recipient_address: string;
+    destination_city: string | null;
+    destination_district: string | null;
+    postal_code: string | null;
+    weight_kg: string;
+    cod_amount: string;
+    is_cod: boolean;
+    delivery_charge: string;
+    item_count: number;
+    status_name: string | null;
+    requires_handover_code: boolean;
+    tracking_url: string | null;
+}
+
 export interface OrderDetail {
     order_id: string;
     order_number: string;
@@ -499,6 +530,18 @@ export const ordersApi = {
             message: string;
         }>(`/admin/orders/${id}/courier/refresh`);
         return { ...res.data.data, message: res.data.message };
+    },
+
+    /**
+     * Label rows for a booked parcel. 404s until a pickup has been requested —
+     * a label with no waybill routes nothing, and printing one is worse than
+     * printing none.
+     */
+    courierLabel: async (id: string): Promise<CourierLabel> => {
+        const res = await apiClient.get<{ success: boolean; data: CourierLabel }>(
+            `/admin/orders/${id}/courier/label`,
+        );
+        return res.data.data;
     },
 
     /** Fetch the order's PDF invoice as a Blob (for browser download). */

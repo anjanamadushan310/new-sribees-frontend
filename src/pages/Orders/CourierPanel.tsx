@@ -18,14 +18,15 @@
  * machine. Customer Support sees the panel read-only: they hold orders:update
  * so they can annotate and escalate, not so they can send a rider.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, App, Button, Descriptions, Space, Tag, Typography } from 'antd';
-import { CarOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import { CarOutlined, PrinterOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../api/orders.api';
 import type { OrderCourier, OrderDetail } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import ShippingLabel from './ShippingLabel';
 
 const { Text } = Typography;
 
@@ -69,6 +70,7 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
     const { isSuperAdmin, isBranchManager } = usePermissions();
+    const [labelOpen, setLabelOpen] = useState(false);
     const canDispatch = isSuperAdmin || isBranchManager;
 
     const courier: OrderCourier | undefined = order.courier;
@@ -271,8 +273,21 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                             Refresh Tracking
                         </Button>
                     )}
+                    {/* The sticker that goes on the parcel. Only once there is
+                        a waybill to put on it. */}
+                    {booked && (
+                        <Button icon={<PrinterOutlined />} onClick={() => setLabelOpen(true)}>
+                            Print Label
+                        </Button>
+                    )}
                 </Space>
             )}
+
+            <ShippingLabel
+                orderId={order.order_id}
+                open={labelOpen}
+                onClose={() => setLabelOpen(false)}
+            />
 
             {/* A booked parcel still has to physically leave, and only the
                 person who hands it over can say it did — that is the status

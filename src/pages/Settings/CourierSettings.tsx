@@ -52,6 +52,7 @@ import type {
     WebhookRegistration,
 } from '../../api/courier.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import CourierKeysCard from './CourierKeysCard';
 
 const { Text, Paragraph } = Typography;
 
@@ -221,6 +222,9 @@ const CourierSettings: React.FC = () => {
 
             {isSuperAdmin && (
                 <>
+                    {/* 0. Credentials -- which account anything below even talks to. */}
+                    <CourierKeysCard />
+
                     {/* 1. Coverage */}
                     <Card
                         size="small"

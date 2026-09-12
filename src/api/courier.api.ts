@@ -66,10 +66,92 @@ export interface WebhookRegistration {
     [key: string]: unknown;
 }
 
+/**
+ * One credential slot, described without ever revealing it.
+ *
+ * `masked` keeps the `sk_test_` / `sk_live_` prefix on purpose: which
+ * environment a key books in is the most consequential thing about it, and
+ * "did go-live actually happen?" should be answerable at a glance.
+ *
+ * `source` is where the key this scope ACTUALLY uses comes from, which is not
+ * the same question as `is_set` — a branch with no key of its own still books
+ * somewhere, and that is what an operator needs to see.
+ */
+export interface CourierKeyStatus {
+    scope: 'account' | 'branch';
+    branch_id: string | null;
+    branch_code: string | null;
+    branch_name: string | null;
+    is_set: boolean;
+    masked: string | null;
+    environment: 'test' | 'live' | 'unknown' | null;
+    source: 'branch' | 'account' | 'environment' | 'none';
+    set_at: string | null;
+    set_by: string | null;
+}
+
+export interface CourierCredentials {
+    account: CourierKeyStatus;
+    branches: CourierKeyStatus[];
+}
+
+export interface CourierKeyTestResult {
+    ok: boolean;
+    environment: 'test' | 'live' | 'unknown' | null;
+    detail: string;
+    post_offices: number | null;
+}
+
 export type CodBalance = Record<string, unknown>;
 export type Remittance = Record<string, unknown>;
 
 export const courierApi = {
+    // --- Merchant credentials (Super Admin only) ---
+
+    /**
+     * Which SribeesExpress account each branch books against. Masks only —
+     * there is no endpoint that reads a key back, just ones that replace it.
+     */
+    getCredentials: async (): Promise<CourierCredentials> => {
+        const res = await apiClient.get<CourierCredentials>('/admin/courier/credentials');
+        return res.data;
+    },
+
+    /**
+     * Set the account-wide key — the one every branch without its own books
+     * against, and the one the sandbox → live switch turns. An empty value
+     * clears it back to the deployment's own COURIER_API_KEY.
+     */
+    setAccountKey: async (apiKey: string): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>('/admin/courier/credentials', {
+            api_key: apiKey,
+        });
+        return res.data;
+    },
+
+    /**
+     * Give one branch its own SribeesExpress account, or take it back.
+     * After setting one, re-run the pickup-location sync: the branch's pickup
+     * address exists in the old account, not the new one.
+     */
+    setBranchKey: async (branchId: string, apiKey: string): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>(
+            `/admin/courier/credentials/branches/${branchId}`,
+            { api_key: apiKey },
+        );
+        return res.data;
+    },
+
+    /** Make a real, side-effect-free call with whichever key serves this scope. */
+    testKey: async (branchId?: string): Promise<CourierKeyTestResult> => {
+        const res = await apiClient.post<CourierKeyTestResult>(
+            '/admin/courier/credentials/test',
+            null,
+            { params: branchId ? { branch_id: branchId } : {} },
+        );
+        return res.data;
+    },
+
     /**
      * Rebuild post_office_directory from GET /ecommerce/coverage.
      * Run this before the first live order: the directory was hand-seeded and
