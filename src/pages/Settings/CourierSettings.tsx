@@ -92,7 +92,19 @@ const CourierSettings: React.FC = () => {
     const [coverage, setCoverage] = useState<CoverageSyncResponse | null>(null);
     const [pickup, setPickup] = useState<PickupLocationSyncResponse | null>(null);
     const [webhook, setWebhook] = useState<WebhookRegistration | null>(null);
-    const [webhookUrl, setWebhookUrl] = useState('');
+    // Defaulted from the API base this dashboard already talks to: the
+    // endpoint is ours, its path is fixed, and hand-typing it is how a
+    // registration ends up pointing at nothing.
+    const [webhookUrl, setWebhookUrl] = useState(() => {
+        // VITE_API_URL is absolute in a split deployment and relative when the
+        // API is proxied under the dashboard's own origin, so both are handled
+        // rather than assuming one.
+        const base = (import.meta.env.VITE_API_URL as string | undefined) || '';
+        const origin = base.startsWith('http')
+            ? base.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')
+            : window.location.origin;
+        return `${origin}/api/v1/courier/webhooks/shipment-status`;
+    });
 
     const coverageMut = useMutation({
         mutationFn: () => courierApi.syncCoverage(),
@@ -360,6 +372,14 @@ const CourierSettings: React.FC = () => {
                                 value={webhookUrl}
                                 onChange={(e) => setWebhookUrl(e.target.value)}
                                 placeholder="https://api.example.com/api/v1/courier/webhooks/shipment-status"
+                                // Chrome autofilled this with the signed-in
+                                // admin's email, which is a confusing thing to
+                                // find in a field that mints a secret. A URL
+                                // type and an explicit name it does not
+                                // recognise keep the password manager out.
+                                type="url"
+                                name="sxp-webhook-endpoint"
+                                autoComplete="off"
                             />
                             <Button
                                 danger

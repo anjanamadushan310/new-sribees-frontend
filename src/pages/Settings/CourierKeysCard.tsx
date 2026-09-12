@@ -437,6 +437,46 @@ const CourierKeysCard: React.FC = () => {
                                 description="It works, but rotating the JWT secret would make every stored courier key unreadable. Set a dedicated CREDENTIAL_ENCRYPTION_KEY before storing a live key."
                             />
                         )}
+                        {/* A branch key alone books nothing. Address
+                            resolution, coverage, COD, the webhook and the
+                            sweep are all account-level, so without an account
+                            key for the environment in use, an address never
+                            resolves to a city and no quote or booking can
+                            happen -- including for a branch that has its own
+                            key. Worth saying outright: the page otherwise
+                            shows a branch key set and everything looking
+                            almost right. */}
+                        {(() => {
+                            const active = data.environments.find(
+                                (e) => e.environment === data.environment,
+                            );
+                            if (!active || active.api_key_set) return null;
+                            const withOwnKey = data.branches.filter((b) =>
+                                data.environment === 'test' ? b.test_key_set : b.live_key_set,
+                            ).length;
+                            return (
+                                <Alert
+                                    type="error"
+                                    showIcon
+                                    style={{ marginBottom: 12 }}
+                                    message={`No account-wide ${data.environment} key — nothing can book yet`}
+                                    description={
+                                        <>
+                                            Resolving a customer's address to a SribeesExpress
+                                            city, syncing coverage, registering the webhook, the
+                                            reconciliation sweep and the COD figures are all
+                                            account-level. Until the {data.environment} account
+                                            key is set, an address never resolves, so no order can
+                                            be quoted or booked
+                                            {withOwnKey > 0
+                                                ? ` — including the ${withOwnKey} branch(es) that already have their own key.`
+                                                : '.'}
+                                        </>
+                                    }
+                                />
+                            );
+                        })()}
+
                         {!data.webhook_secret_configured && (
                             <Alert
                                 type="warning"
