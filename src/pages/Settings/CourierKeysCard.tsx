@@ -26,7 +26,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { courierApi } from '../../api/courier.api';
-import type { CourierKeyStatus } from '../../api/courier.api';
+import type { CourierConfigStatus, CourierKeyStatus } from '../../api/courier.api';
 
 const { Text, Paragraph } = Typography;
 
@@ -43,6 +43,72 @@ const envTag = (env: string | null) => {
     if (env === 'live') return <Tag color="red">LIVE</Tag>;
     if (env === 'test') return <Tag color="gold">sandbox</Tag>;
     return <Tag>unrecognised prefix</Tag>;
+};
+
+/**
+ * What the deployment this dashboard is talking to actually has configured.
+ *
+ * Exists because the alternative is an SSH session and a look at the server's
+ * .env — and the two things it reports are exactly the two that fail silently:
+ * a base URL with the path prefix already in it 404s every call, and a missing
+ * webhook secret means every inbound status push is rejected while the orders
+ * still look fine until someone notices they stopped moving.
+ */
+const ConfigSummary: React.FC<{ config: CourierConfigStatus }> = ({ config }) => {
+    const problems: React.ReactNode[] = [];
+
+    if (!config.base_url) {
+        problems.push('No COURIER_BASE_URL is set — every courier call fails immediately.');
+    } else if (!config.base_url_ok) {
+        problems.push(
+            'COURIER_BASE_URL already contains /api/v1/ecommerce. The backend appends that ' +
+                'itself, so the path is doubled and every call 404s. Set it to the origin only.',
+        );
+    }
+    if (!config.api_key_configured) {
+        problems.push('No API key anywhere — set the account-wide key below.');
+    }
+    if (!config.webhook_secret_configured) {
+        problems.push(
+            'No COURIER_WEBHOOK_SECRET — SribeesExpress status pushes are all rejected. ' +
+                'Orders will only move when the reconciliation sweep runs.',
+        );
+    }
+
+    return (
+        <div style={{ marginBottom: 16 }}>
+            <Space wrap size={[6, 6]} style={{ marginBottom: problems.length ? 10 : 0 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                    This server:
+                </Text>
+                <Tag color={config.base_url_ok ? 'default' : 'red'}>
+                    {config.base_url ?? 'no base URL'}
+                </Tag>
+                {config.api_key_environment === 'live' && <Tag color="red">LIVE</Tag>}
+                {config.api_key_environment === 'test' && <Tag color="gold">sandbox</Tag>}
+                <Tag color={config.webhook_secret_configured ? 'green' : 'red'}>
+                    {config.webhook_secret_configured
+                        ? 'webhooks verified'
+                        : 'webhook secret missing'}
+                </Tag>
+                <Tag>{config.request_timeout_seconds}s timeout</Tag>
+            </Space>
+            {problems.length > 0 && (
+                <Alert
+                    type="warning"
+                    showIcon
+                    message="This deployment is not fully wired up"
+                    description={
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {problems.map((p, i) => (
+                                <li key={i}>{p}</li>
+                            ))}
+                        </ul>
+                    }
+                />
+            )}
+        </div>
+    );
 };
 
 interface EditTarget {
@@ -209,6 +275,8 @@ const CourierKeysCard: React.FC = () => {
                 />
             ) : (
                 <>
+                    {data?.config && <ConfigSummary config={data.config} />}
+
                     <Paragraph type="secondary" style={{ marginBottom: 12 }}>
                         A branch with no key of its own books against the account-wide key. Give a
                         branch its own key only when it holds its own SribeesExpress merchant

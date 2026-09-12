@@ -67,6 +67,30 @@ export interface WebhookRegistration {
 }
 
 /**
+ * What the running backend is actually configured with — the question that
+ * otherwise needs an SSH session and a look at the server's .env.
+ *
+ * Presence and shape only, never values.
+ */
+export interface CourierConfigStatus {
+    base_url: string | null;
+    /**
+     * False when the base URL already carries the /api/v1/ecommerce prefix the
+     * client appends itself, which doubles the path and 404s every call.
+     */
+    base_url_ok: boolean;
+    api_key_configured: boolean;
+    api_key_environment: 'test' | 'live' | 'unknown' | null;
+    /**
+     * False means every webhook SribeesExpress sends is rejected, and orders
+     * only move when the reconciliation sweep runs.
+     */
+    webhook_secret_configured: boolean;
+    webhook_tolerance_seconds: number;
+    request_timeout_seconds: number;
+}
+
+/**
  * One credential slot, described without ever revealing it.
  *
  * `masked` keeps the `sk_test_` / `sk_live_` prefix on purpose: which
@@ -91,6 +115,7 @@ export interface CourierKeyStatus {
 }
 
 export interface CourierCredentials {
+    config: CourierConfigStatus;
     account: CourierKeyStatus;
     branches: CourierKeyStatus[];
 }
