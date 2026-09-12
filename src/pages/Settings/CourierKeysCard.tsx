@@ -1,128 +1,168 @@
 /**
- * Settings → Courier → merchant API keys.
+ * Settings → Courier → merchant credentials.
  *
- * Two things this card exists to make possible:
+ * The deployment holds BOTH SribeesExpress environments at once and an
+ * operator flips between them. That shape is deliberate:
  *
- * 1. **Go-live without a redeploy.** The sandbox → live switch is one key
- *    change, and it is the change most likely to be made under time pressure.
- *    Requiring an engineer and a deploy for it is how a launch slips.
- * 2. **A branch with its own SribeesExpress account.** A branch that signs
- *    with them in its own name has its own key — and with it its own pickup
- *    locations and its own COD ledger. A branch with no key of its own books
- *    against the account-wide one.
+ * * Go-live is one switch, not a redeploy. It is the change most likely to be
+ *   made under time pressure, and needing an engineer for it is how a launch
+ *   slips.
+ * * A branch that signs with SribeesExpress in its own name has its own key —
+ *   and with it its own pickup locations and its own COD ledger. A branch with
+ *   no key of its own books against the account-wide one.
+ * * A branch can be pinned to an environment on its own, so the first branch
+ *   can go live while the rest stay in the sandbox.
  *
- * Keys are write-only here. The API returns masks and never the value, so
- * there is nothing on this screen to steal; the mask keeps the
- * `sk_test_`/`sk_live_` prefix because "did go-live actually happen?" should
- * be answerable at a glance.
+ * Keys are write-only. The API returns masks and never the value, and the
+ * values themselves are encrypted at rest, so there is nothing on this screen
+ * or in the database to steal. The mask keeps the `sk_test_` / `sk_live_`
+ * prefix because "did go-live actually happen?" should be answerable at a
+ * glance.
  *
- * Super Admin only, and the server enforces that independently — this key
- * decides where every branch's parcels go.
+ * Super Admin only, enforced independently by the server.
  */
 import React, { useState } from 'react';
-import { Alert, App, Button, Card, Input, Modal, Space, Table, Tag, Typography } from 'antd';
-import { ApiOutlined, KeyOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import {
+    Alert,
+    App,
+    Button,
+    Card,
+    Input,
+    Modal,
+    Segmented,
+    Space,
+    Table,
+    Tag,
+    Typography,
+} from 'antd';
+import { ApiOutlined, KeyOutlined, LinkOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { courierApi } from '../../api/courier.api';
-import type { CourierConfigStatus, CourierKeyStatus } from '../../api/courier.api';
+import type {
+    CourierBranchKeyStatus,
+    CourierCredentials,
+    CourierEnvironmentConfig,
+} from '../../api/courier.api';
 
 const { Text, Paragraph } = Typography;
 
-/** Where the key this row actually uses comes from — not the same as "is one set here". */
-const SOURCE_META: Record<string, { label: string; color: string }> = {
-    branch: { label: 'Own account', color: 'purple' },
-    account: { label: 'Account key', color: 'blue' },
-    environment: { label: 'Server .env', color: 'default' },
-    none: { label: 'Not configured', color: 'red' },
-};
+type Env = 'test' | 'live';
 
-const envTag = (env: string | null) => {
-    if (!env) return null;
+const envTag = (env: string | null | undefined) => {
     if (env === 'live') return <Tag color="red">LIVE</Tag>;
     if (env === 'test') return <Tag color="gold">sandbox</Tag>;
-    return <Tag>unrecognised prefix</Tag>;
+    if (env === 'unknown') return <Tag color="volcano">unrecognised prefix</Tag>;
+    return null;
 };
 
-/**
- * What the deployment this dashboard is talking to actually has configured.
- *
- * Exists because the alternative is an SSH session and a look at the server's
- * .env — and the two things it reports are exactly the two that fail silently:
- * a base URL with the path prefix already in it 404s every call, and a missing
- * webhook secret means every inbound status push is rejected while the orders
- * still look fine until someone notices they stopped moving.
- */
-const ConfigSummary: React.FC<{ config: CourierConfigStatus }> = ({ config }) => {
-    const problems: React.ReactNode[] = [];
-
-    if (!config.base_url) {
-        problems.push('No COURIER_BASE_URL is set — every courier call fails immediately.');
-    } else if (!config.base_url_ok) {
-        problems.push(
-            'COURIER_BASE_URL already contains /api/v1/ecommerce. The backend appends that ' +
-                'itself, so the path is doubled and every call 404s. Set it to the origin only.',
-        );
-    }
-    if (!config.api_key_configured) {
-        problems.push('No API key anywhere — set the account-wide key below.');
-    }
-    if (!config.webhook_secret_configured) {
-        problems.push(
-            'No COURIER_WEBHOOK_SECRET — SribeesExpress status pushes are all rejected. ' +
-                'Orders will only move when the reconciliation sweep runs.',
-        );
-    }
-
-    return (
-        <div style={{ marginBottom: 16 }}>
-            <Space wrap size={[6, 6]} style={{ marginBottom: problems.length ? 10 : 0 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                    This server:
-                </Text>
-                <Tag color={config.base_url_ok ? 'default' : 'red'}>
-                    {config.base_url ?? 'no base URL'}
-                </Tag>
-                {config.api_key_environment === 'live' && <Tag color="red">LIVE</Tag>}
-                {config.api_key_environment === 'test' && <Tag color="gold">sandbox</Tag>}
-                <Tag color={config.webhook_secret_configured ? 'green' : 'red'}>
-                    {config.webhook_secret_configured
-                        ? 'webhooks verified'
-                        : 'webhook secret missing'}
-                </Tag>
-                <Tag>{config.request_timeout_seconds}s timeout</Tag>
+/** One environment's host + key, and whether it is ready to be switched to. */
+const EnvironmentCard: React.FC<{
+    config: CourierEnvironmentConfig;
+    isDefault: boolean;
+    onEditKey: () => void;
+    onEditUrl: () => void;
+    onTest: () => void;
+    testing: boolean;
+}> = ({ config, isDefault, onEditKey, onEditUrl, onTest, testing }) => (
+    <Card
+        size="small"
+        style={{ flex: 1, minWidth: 280 }}
+        title={
+            <Space>
+                {envTag(config.environment)}
+                {isDefault && <Tag color="blue">in use</Tag>}
             </Space>
-            {problems.length > 0 && (
+        }
+        extra={
+            <Button size="small" icon={<ThunderboltOutlined />} loading={testing} onClick={onTest}>
+                Test
+            </Button>
+        }
+    >
+        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+            <Space size={6} wrap>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                    Host
+                </Text>
+                {config.base_url ? (
+                    <Text code style={{ fontSize: 12 }}>
+                        {config.base_url}
+                    </Text>
+                ) : (
+                    <Text type="secondary">not set</Text>
+                )}
+                <Button size="small" type="link" icon={<LinkOutlined />} onClick={onEditUrl}>
+                    Edit
+                </Button>
+            </Space>
+
+            {!config.base_url_ok && config.base_url && (
                 <Alert
-                    type="warning"
+                    type="error"
                     showIcon
-                    message="This deployment is not fully wired up"
-                    description={
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {problems.map((p, i) => (
-                                <li key={i}>{p}</li>
-                            ))}
-                        </ul>
-                    }
+                    message="This URL already contains /api/v1/ecommerce"
+                    description="The backend appends that itself, so every call 404s. Enter the origin only."
                 />
             )}
-        </div>
-    );
-};
 
-interface EditTarget {
-    /** null = the account-wide key. */
+            <Space size={6} wrap>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                    Key
+                </Text>
+                {config.api_key_unreadable ? (
+                    <Tag color="red">stored but unreadable</Tag>
+                ) : config.api_key_set ? (
+                    <>
+                        <Text code style={{ fontSize: 12 }}>
+                            {config.api_key_masked}
+                        </Text>
+                        {config.api_key_environment !== config.environment &&
+                            envTag(config.api_key_environment)}
+                    </>
+                ) : (
+                    <Text type="secondary">not set</Text>
+                )}
+                <Button size="small" type="link" icon={<KeyOutlined />} onClick={onEditKey}>
+                    {config.api_key_set ? 'Replace' : 'Set'}
+                </Button>
+            </Space>
+
+            {/* A live key in the sandbox slot (or the reverse) authenticates
+                against the wrong environment and is caught only by a booking. */}
+            {config.api_key_set &&
+                !config.api_key_unreadable &&
+                config.api_key_environment !== config.environment && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        message={`This is a ${config.api_key_environment} key in the ${config.environment} slot`}
+                    />
+                )}
+        </Space>
+    </Card>
+);
+
+interface KeyEdit {
+    environment: Env;
     branchId: string | null;
     title: string;
+}
+
+interface UrlEdit {
+    environment: Env;
+    current: string;
 }
 
 const CourierKeysCard: React.FC = () => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
 
-    const [edit, setEdit] = useState<EditTarget | null>(null);
-    const [draftKey, setDraftKey] = useState('');
+    const [keyEdit, setKeyEdit] = useState<KeyEdit | null>(null);
+    const [urlEdit, setUrlEdit] = useState<UrlEdit | null>(null);
+    const [draft, setDraft] = useState('');
+    const [testing, setTesting] = useState<string | null>(null);
 
     const { data, isLoading, error } = useQuery({
         queryKey: ['admin', 'courier', 'credentials'],
@@ -133,51 +173,104 @@ const CourierKeysCard: React.FC = () => {
     const invalidate = () =>
         queryClient.invalidateQueries({ queryKey: ['admin', 'courier', 'credentials'] });
 
-    const saveMut = useMutation({
-        mutationFn: ({ branchId, key }: { branchId: string | null; key: string }) =>
-            branchId ? courierApi.setBranchKey(branchId, key) : courierApi.setAccountKey(key),
-        onSuccess: (_r, v) => {
-            message.success(v.key.trim() ? 'Key saved.' : 'Key cleared.');
-            setEdit(null);
-            setDraftKey('');
-            invalidate();
-        },
-        onError: (err: any) => message.error(err.response?.data?.detail || 'Could not save the key.'),
+    const onSaved = (msg: string) => {
+        message.success(msg);
+        setKeyEdit(null);
+        setUrlEdit(null);
+        setDraft('');
+        invalidate();
+    };
+    const onFailed = (err: any) =>
+        message.error(err.response?.data?.detail || 'Could not save that.');
+
+    const keyMut = useMutation({
+        mutationFn: ({ environment, branchId, value }: KeyEdit & { value: string }) =>
+            branchId
+                ? courierApi.setBranchKey(branchId, environment, value)
+                : courierApi.setAccountKey(environment, value),
+        onSuccess: (_r, v) => onSaved(v.value.trim() ? 'Key saved.' : 'Key cleared.'),
+        onError: onFailed,
     });
 
-    const testMut = useMutation({
-        mutationFn: (branchId?: string) => courierApi.testKey(branchId),
-        onSuccess: (res) => {
+    const urlMut = useMutation({
+        mutationFn: ({ environment, value }: { environment: Env; value: string }) =>
+            courierApi.setBaseUrl(environment, value),
+        onSuccess: () => onSaved('Host saved.'),
+        onError: onFailed,
+    });
+
+    const envMut = useMutation({
+        mutationFn: (environment: Env) => courierApi.setEnvironment(environment),
+        onSuccess: (_r, v) => onSaved(`Every branch now books in the ${v} environment.`),
+        onError: onFailed,
+    });
+
+    const branchEnvMut = useMutation({
+        mutationFn: ({ branchId, environment }: { branchId: string; environment: Env | null }) =>
+            courierApi.setBranchEnvironment(branchId, environment),
+        onSuccess: () => onSaved('Branch environment updated.'),
+        onError: onFailed,
+    });
+
+    const runTest = async (branchId?: string) => {
+        setTesting(branchId ?? 'account');
+        try {
+            const res = await courierApi.testKey(branchId);
             if (res.ok) message.success(res.detail);
             else message.error(res.detail);
-        },
-        onError: (err: any) => message.error(err.response?.data?.detail || 'Test failed.'),
-    });
+        } catch (err: any) {
+            message.error(err.response?.data?.detail || 'Test failed.');
+        } finally {
+            setTesting(null);
+        }
+    };
 
-    const confirmSave = () => {
-        if (!edit) return;
-        const key = draftKey.trim();
-        // A live key is the one change on this screen that moves real parcels
+    const saveKey = () => {
+        if (!keyEdit) return;
+        const value = draft.trim();
+        // A live key is the one change here that starts moving real parcels
         // and real money, so it gets a second look rather than one click.
-        if (key.startsWith('sk_live_')) {
+        if (value.startsWith('sk_live_')) {
             modal.confirm({
-                title: 'Switch to the LIVE SribeesExpress environment?',
+                title: 'Save a LIVE SribeesExpress key?',
                 content: (
                     <span>
                         This key books <b>real parcels</b> and collects <b>real cash</b> for{' '}
-                        <b>{edit.title}</b>. Sandbox orders will no longer be created.
+                        <b>{keyEdit.title}</b>. It takes effect as soon as that scope is booking in
+                        the live environment.
                     </span>
                 ),
-                okText: 'Go live',
+                okText: 'Save live key',
                 okButtonProps: { danger: true },
-                onOk: () => saveMut.mutateAsync({ branchId: edit.branchId, key }),
+                onOk: () => keyMut.mutateAsync({ ...keyEdit, value }),
             });
             return;
         }
-        saveMut.mutate({ branchId: edit.branchId, key });
+        keyMut.mutate({ ...keyEdit, value });
     };
 
-    const columns: ColumnsType<CourierKeyStatus> = [
+    const confirmGoLive = (credentials: CourierCredentials, target: Env) => {
+        if (target === credentials.environment) return;
+        if (target === 'test') {
+            envMut.mutate(target);
+            return;
+        }
+        modal.confirm({
+            title: 'Switch every branch to LIVE?',
+            content: (
+                <span>
+                    From now on, orders create <b>real SribeesExpress parcels</b> and riders
+                    collect <b>real cash</b>. Branches pinned to their own environment are not
+                    affected. This can be switched back.
+                </span>
+            ),
+            okText: 'Go live',
+            okButtonProps: { danger: true },
+            onOk: () => envMut.mutateAsync(target),
+        });
+    };
+
+    const branchColumns: ColumnsType<CourierBranchKeyStatus> = [
         {
             title: 'Branch',
             key: 'branch',
@@ -187,70 +280,120 @@ const CourierKeysCard: React.FC = () => {
                     <Text type="secondary" style={{ fontSize: 12 }}>
                         {r.branch_code}
                     </Text>
+                    {/* Who last touched this branch's keys. The key itself is
+                        not recoverable; who changed it is. */}
+                    {r.set_at && (
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                            {dayjs(r.set_at).format('DD MMM YYYY')}
+                            {r.set_by ? ` · ${r.set_by}` : ''}
+                        </Text>
+                    )}
                 </Space>
             ),
         },
         {
-            title: 'Books against',
-            key: 'source',
-            width: 150,
-            render: (_, r) => {
-                const meta = SOURCE_META[r.source] ?? SOURCE_META.none;
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-            },
-        },
-        {
-            title: 'Own key',
-            key: 'masked',
-            width: 190,
-            render: (_, r) =>
-                r.is_set ? (
-                    <Space direction="vertical" size={0}>
-                        <Space size={4}>
-                            <Text code>{r.masked}</Text>
-                            {envTag(r.environment)}
-                        </Space>
-                        {r.set_at && (
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                                {dayjs(r.set_at).format('DD MMM YYYY')}
-                                {r.set_by ? ` · ${r.set_by}` : ''}
-                            </Text>
-                        )}
-                    </Space>
-                ) : (
-                    <Text type="secondary">—</Text>
-                ),
-        },
-        {
-            title: 'Actions',
-            key: 'actions',
-            width: 190,
+            title: 'Books in',
+            key: 'env',
+            width: 200,
             render: (_, r) => (
-                <Space>
+                <Space direction="vertical" size={2}>
+                    <Segmented
+                        size="small"
+                        value={r.environment_override ?? 'follow'}
+                        onChange={(v) =>
+                            branchEnvMut.mutate({
+                                branchId: r.branch_id,
+                                environment: v === 'follow' ? null : (v as Env),
+                            })
+                        }
+                        options={[
+                            { label: 'Follow', value: 'follow' },
+                            { label: 'Sandbox', value: 'test' },
+                            { label: 'Live', value: 'live' },
+                        ]}
+                    />
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                        {r.effective_environment} · {r.key_source} key
+                    </Text>
+                </Space>
+            ),
+        },
+        {
+            title: 'Own sandbox key',
+            key: 'test',
+            width: 180,
+            render: (_, r) => (
+                <Space size={4}>
+                    {r.test_key_set ? (
+                        <Text code style={{ fontSize: 12 }}>
+                            {r.test_key_masked ?? 'unreadable'}
+                        </Text>
+                    ) : (
+                        <Text type="secondary">—</Text>
+                    )}
                     <Button
                         size="small"
-                        icon={<KeyOutlined />}
+                        type="link"
                         onClick={() => {
-                            setEdit({ branchId: r.branch_id, title: r.branch_name ?? 'this branch' });
-                            setDraftKey('');
+                            setKeyEdit({
+                                environment: 'test',
+                                branchId: r.branch_id,
+                                title: `${r.branch_name} (sandbox)`,
+                            });
+                            setDraft('');
                         }}
                     >
-                        {r.is_set ? 'Replace' : 'Set key'}
-                    </Button>
-                    <Button
-                        size="small"
-                        icon={<ThunderboltOutlined />}
-                        loading={testMut.isPending && testMut.variables === r.branch_id}
-                        onClick={() => testMut.mutate(r.branch_id ?? undefined)}
-                    >
-                        Test
+                        {r.test_key_set ? 'Replace' : 'Set'}
                     </Button>
                 </Space>
+            ),
+        },
+        {
+            title: 'Own live key',
+            key: 'live',
+            width: 180,
+            render: (_, r) => (
+                <Space size={4}>
+                    {r.live_key_set ? (
+                        <Text code style={{ fontSize: 12 }}>
+                            {r.live_key_masked ?? 'unreadable'}
+                        </Text>
+                    ) : (
+                        <Text type="secondary">—</Text>
+                    )}
+                    <Button
+                        size="small"
+                        type="link"
+                        onClick={() => {
+                            setKeyEdit({
+                                environment: 'live',
+                                branchId: r.branch_id,
+                                title: `${r.branch_name} (live)`,
+                            });
+                            setDraft('');
+                        }}
+                    >
+                        {r.live_key_set ? 'Replace' : 'Set'}
+                    </Button>
+                </Space>
+            ),
+        },
+        {
+            title: '',
+            key: 'test-action',
+            width: 90,
+            render: (_, r) => (
+                <Button
+                    size="small"
+                    icon={<ThunderboltOutlined />}
+                    loading={testing === r.branch_id}
+                    onClick={() => runTest(r.branch_id)}
+                >
+                    Test
+                </Button>
             ),
         },
     ];
-
-    const account = data?.account;
 
     return (
         <Card
@@ -259,7 +402,7 @@ const CourierKeysCard: React.FC = () => {
             title={
                 <Space>
                     <ApiOutlined />
-                    <span>SribeesExpress API keys</span>
+                    <span>SribeesExpress credentials</span>
                 </Space>
             }
         >
@@ -274,107 +417,146 @@ const CourierKeysCard: React.FC = () => {
                     }
                 />
             ) : (
-                <>
-                    {data?.config && <ConfigSummary config={data.config} />}
+                data && (
+                    <>
+                        {data.any_key_unreadable && (
+                            <Alert
+                                type="error"
+                                showIcon
+                                style={{ marginBottom: 12 }}
+                                message="A stored key cannot be decrypted"
+                                description="CREDENTIAL_ENCRYPTION_KEY changed since it was saved. Nothing can book until every slot marked unreadable is re-entered."
+                            />
+                        )}
+                        {data.credential_encryption === 'derived' && (
+                            <Alert
+                                type="warning"
+                                showIcon
+                                style={{ marginBottom: 12 }}
+                                message="Keys are encrypted with a key derived from JWT_SECRET_KEY"
+                                description="It works, but rotating the JWT secret would make every stored courier key unreadable. Set a dedicated CREDENTIAL_ENCRYPTION_KEY before storing a live key."
+                            />
+                        )}
+                        {!data.webhook_secret_configured && (
+                            <Alert
+                                type="warning"
+                                showIcon
+                                style={{ marginBottom: 12 }}
+                                message="No webhook secret on this server"
+                                description="SribeesExpress status pushes are all rejected. Orders will only move when the reconciliation sweep runs."
+                            />
+                        )}
 
-                    <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                        A branch with no key of its own books against the account-wide key. Give a
-                        branch its own key only when it holds its own SribeesExpress merchant
-                        account — its pickup locations and COD ledger then live there too, so
-                        re-run the pickup-location sync after changing one.
-                    </Paragraph>
+                        <Space wrap style={{ marginBottom: 12 }}>
+                            <Text strong>Every branch books in:</Text>
+                            <Segmented
+                                value={data.environment}
+                                onChange={(v) => confirmGoLive(data, v as Env)}
+                                options={[
+                                    { label: 'Sandbox', value: 'test' },
+                                    { label: 'Live', value: 'live' },
+                                ]}
+                            />
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                unless a branch below is pinned
+                            </Text>
+                        </Space>
 
-                    {account && (
-                        <div
-                            style={{
-                                border: '1px solid #f0f0f0',
-                                borderRadius: 6,
-                                padding: 12,
-                                marginBottom: 16,
-                            }}
-                        >
-                            <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-                                <Space direction="vertical" size={0}>
-                                    <Text strong>Account-wide key</Text>
-                                    <Space size={6}>
-                                        {account.is_set ? (
-                                            <Text code>{account.masked}</Text>
-                                        ) : (
-                                            <Text type="secondary">not set</Text>
-                                        )}
-                                        {envTag(account.environment)}
-                                        <Tag color={(SOURCE_META[account.source] ?? SOURCE_META.none).color}>
-                                            {(SOURCE_META[account.source] ?? SOURCE_META.none).label}
-                                        </Tag>
-                                    </Space>
-                                </Space>
-                                <Space>
-                                    <Button
-                                        icon={<KeyOutlined />}
-                                        onClick={() => {
-                                            setEdit({ branchId: null, title: 'every branch' });
-                                            setDraftKey('');
-                                        }}
-                                    >
-                                        {account.is_set ? 'Replace' : 'Set key'}
-                                    </Button>
-                                    <Button
-                                        icon={<ThunderboltOutlined />}
-                                        loading={testMut.isPending && !testMut.variables}
-                                        onClick={() => testMut.mutate(undefined)}
-                                    >
-                                        Test
-                                    </Button>
-                                </Space>
-                            </Space>
-                            {account.source === 'environment' && (
-                                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
-                                    Currently using the key baked into the server's environment.
-                                    Setting one here overrides it without a redeploy; clearing it
-                                    falls back here again.
-                                </Text>
-                            )}
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                            {data.environments.map((cfg) => (
+                                <EnvironmentCard
+                                    key={cfg.environment}
+                                    config={cfg}
+                                    isDefault={cfg.environment === data.environment}
+                                    testing={testing === 'account' && cfg.environment === data.environment}
+                                    onTest={() => runTest()}
+                                    onEditKey={() => {
+                                        setKeyEdit({
+                                            environment: cfg.environment,
+                                            branchId: null,
+                                            title: `every branch (${cfg.environment})`,
+                                        });
+                                        setDraft('');
+                                    }}
+                                    onEditUrl={() => {
+                                        setUrlEdit({
+                                            environment: cfg.environment,
+                                            current: cfg.base_url ?? '',
+                                        });
+                                        setDraft(cfg.base_url ?? '');
+                                    }}
+                                />
+                            ))}
                         </div>
-                    )}
 
-                    <Table
-                        columns={columns}
-                        dataSource={data?.branches ?? []}
-                        rowKey={(r) => r.branch_id ?? 'account'}
-                        size="small"
-                        pagination={false}
-                    />
-                </>
+                        <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                            Give a branch its own key only when it holds its own SribeesExpress
+                            merchant account — its pickup locations and COD ledger then live
+                            there too, so re-run the pickup-location sync after changing one.
+                        </Paragraph>
+                        <Table
+                            columns={branchColumns}
+                            dataSource={data.branches}
+                            rowKey="branch_id"
+                            size="small"
+                            pagination={false}
+                            scroll={{ x: true }}
+                        />
+                    </>
+                )
             )}
 
             <Modal
-                title={`Set the SribeesExpress key for ${edit?.title ?? ''}`}
-                open={!!edit}
-                onCancel={() => setEdit(null)}
-                onOk={confirmSave}
+                title={`Set the SribeesExpress key for ${keyEdit?.title ?? ''}`}
+                open={!!keyEdit}
+                onCancel={() => setKeyEdit(null)}
+                onOk={saveKey}
                 okText="Save key"
-                confirmLoading={saveMut.isPending}
+                confirmLoading={keyMut.isPending}
             >
                 <Paragraph type="secondary">
-                    Paste the merchant key from SribeesExpress. It is stored write-only — this
-                    screen will only ever show it masked again, so keep your own copy.
-                    {edit?.branchId && ' Leave it empty to return this branch to the account-wide key.'}
+                    Paste the merchant key from SribeesExpress. It is encrypted before it is
+                    stored and this screen will only ever show it masked again, so keep your own
+                    copy. Leave it empty to clear the slot.
                 </Paragraph>
                 <Input.Password
-                    value={draftKey}
-                    onChange={(e) => setDraftKey(e.target.value)}
-                    placeholder="sk_test_… or sk_live_…"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder={keyEdit?.environment === 'live' ? 'sk_live_…' : 'sk_test_…'}
                     autoFocus
                 />
-                {draftKey.trim().startsWith('sk_live_') && (
+                {draft.trim().startsWith('sk_live_') && (
                     <Alert
                         type="warning"
                         showIcon
                         style={{ marginTop: 12 }}
                         message="This is a LIVE key"
-                        description="Saving it means real parcels and real cash collection for this scope."
+                        description="Real parcels and real cash collection for this scope."
                     />
                 )}
+            </Modal>
+
+            <Modal
+                title={`SribeesExpress ${urlEdit?.environment ?? ''} host`}
+                open={!!urlEdit}
+                onCancel={() => setUrlEdit(null)}
+                onOk={() =>
+                    urlEdit && urlMut.mutate({ environment: urlEdit.environment, value: draft.trim() })
+                }
+                okText="Save host"
+                confirmLoading={urlMut.isPending}
+            >
+                <Paragraph type="secondary">
+                    The origin only — <Text code>https://devapiexpress.sribees.com</Text>. The
+                    backend adds <Text code>/api/v1/ecommerce</Text> itself; including it here
+                    doubles the path and every call fails.
+                </Paragraph>
+                <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="https://…"
+                    autoFocus
+                />
             </Modal>
         </Card>
     );

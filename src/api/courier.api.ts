@@ -66,63 +66,70 @@ export interface WebhookRegistration {
     [key: string]: unknown;
 }
 
-/**
- * What the running backend is actually configured with — the question that
- * otherwise needs an SSH session and a look at the server's .env.
- *
- * Presence and shape only, never values.
- */
-export interface CourierConfigStatus {
+/** One environment's account-wide setup, described without its secret. */
+export interface CourierEnvironmentConfig {
+    environment: 'test' | 'live';
+    /** Origin only — the /api/v1/ecommerce path is appended by the backend. */
     base_url: string | null;
     /**
-     * False when the base URL already carries the /api/v1/ecommerce prefix the
-     * client appends itself, which doubles the path and 404s every call.
+     * False when the stored URL already carries the /api/v1/ecommerce prefix,
+     * which doubles the path and 404s every call.
      */
     base_url_ok: boolean;
-    api_key_configured: boolean;
-    api_key_environment: 'test' | 'live' | 'unknown' | null;
+    api_key_set: boolean;
+    api_key_masked: string | null;
     /**
-     * False means every webhook SribeesExpress sends is rejected, and orders
-     * only move when the reconciliation sweep runs.
+     * The environment the key's own prefix claims. A mismatch with
+     * `environment` means a live key is sitting in the sandbox slot.
      */
-    webhook_secret_configured: boolean;
-    webhook_tolerance_seconds: number;
-    request_timeout_seconds: number;
+    api_key_environment: 'test' | 'live' | 'unknown' | null;
+    /** A key IS stored but will not decrypt — the master key changed. Re-enter it. */
+    api_key_unreadable: boolean;
+    usable: boolean;
 }
 
-/**
- * One credential slot, described without ever revealing it.
- *
- * `masked` keeps the `sk_test_` / `sk_live_` prefix on purpose: which
- * environment a key books in is the most consequential thing about it, and
- * "did go-live actually happen?" should be answerable at a glance.
- *
- * `source` is where the key this scope ACTUALLY uses comes from, which is not
- * the same question as `is_set` — a branch with no key of its own still books
- * somewhere, and that is what an operator needs to see.
- */
-export interface CourierKeyStatus {
-    scope: 'account' | 'branch';
-    branch_id: string | null;
-    branch_code: string | null;
-    branch_name: string | null;
-    is_set: boolean;
-    masked: string | null;
-    environment: 'test' | 'live' | 'unknown' | null;
-    source: 'branch' | 'account' | 'environment' | 'none';
+/** One branch's own credentials and which environment it books in. */
+export interface CourierBranchKeyStatus {
+    branch_id: string;
+    branch_code: string;
+    branch_name: string;
+    /** Null when the branch follows the account default. */
+    environment_override: 'test' | 'live' | null;
+    effective_environment: 'test' | 'live';
+    test_key_set: boolean;
+    test_key_masked: string | null;
+    live_key_set: boolean;
+    live_key_masked: string | null;
+    key_unreadable: boolean;
+    /** branch | account — where the key it actually books with comes from. */
+    key_source: 'branch' | 'account';
     set_at: string | null;
     set_by: string | null;
 }
 
 export interface CourierCredentials {
-    config: CourierConfigStatus;
-    account: CourierKeyStatus;
-    branches: CourierKeyStatus[];
+    /** The environment branches book in unless they override it. */
+    environment: 'test' | 'live';
+    environments: CourierEnvironmentConfig[];
+    branches: CourierBranchKeyStatus[];
+    /**
+     * False means every webhook SribeesExpress sends is rejected, and orders
+     * only move when the reconciliation sweep runs.
+     */
+    webhook_secret_configured: boolean;
+    any_key_unreadable: boolean;
+    /**
+     * dedicated — CREDENTIAL_ENCRYPTION_KEY is set. derived — it comes from
+     * JWT_SECRET_KEY, which works but means rotating that secret would make
+     * every stored key unreadable.
+     */
+    credential_encryption: 'dedicated' | 'derived';
 }
 
 export interface CourierKeyTestResult {
     ok: boolean;
-    environment: 'test' | 'live' | 'unknown' | null;
+    environment: 'test' | 'live' | null;
+    key_source: 'branch' | 'account' | null;
     detail: string;
     post_offices: number | null;
 }
@@ -134,8 +141,9 @@ export const courierApi = {
     // --- Merchant credentials (Super Admin only) ---
 
     /**
-     * Which SribeesExpress account each branch books against. Masks only —
-     * there is no endpoint that reads a key back, just ones that replace it.
+     * Which SribeesExpress account and environment each branch books against.
+     * Masks only — there is no endpoint that reads a key back, just ones that
+     * replace it.
      */
     getCredentials: async (): Promise<CourierCredentials> => {
         const res = await apiClient.get<CourierCredentials>('/admin/courier/credentials');
@@ -143,31 +151,76 @@ export const courierApi = {
     },
 
     /**
-     * Set the account-wide key — the one every branch without its own books
-     * against, and the one the sandbox → live switch turns. An empty value
-     * clears it back to the deployment's own COURIER_API_KEY.
+     * Set the account-wide key for one environment. Both are held at once, so
+     * going live later is a switch rather than a re-entry. An empty value
+     * clears the slot. Stored encrypted.
      */
-    setAccountKey: async (apiKey: string): Promise<CourierCredentials> => {
-        const res = await apiClient.put<CourierCredentials>('/admin/courier/credentials', {
+    setAccountKey: async (
+        environment: 'test' | 'live',
+        apiKey: string,
+    ): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>('/admin/courier/credentials/key', {
+            environment,
             api_key: apiKey,
         });
         return res.data;
     },
 
-    /**
-     * Give one branch its own SribeesExpress account, or take it back.
-     * After setting one, re-run the pickup-location sync: the branch's pickup
-     * address exists in the old account, not the new one.
-     */
-    setBranchKey: async (branchId: string, apiKey: string): Promise<CourierCredentials> => {
+    /** Set the SribeesExpress host for one environment. Origin only. */
+    setBaseUrl: async (
+        environment: 'test' | 'live',
+        baseUrl: string,
+    ): Promise<CourierCredentials> => {
         const res = await apiClient.put<CourierCredentials>(
-            `/admin/courier/credentials/branches/${branchId}`,
-            { api_key: apiKey },
+            '/admin/courier/credentials/base-url',
+            { environment, base_url: baseUrl },
         );
         return res.data;
     },
 
-    /** Make a real, side-effect-free call with whichever key serves this scope. */
+    /**
+     * Switch every branch without an override between sandbox and live.
+     * This is go-live. The server refuses it unless that environment is
+     * actually usable.
+     */
+    setEnvironment: async (environment: 'test' | 'live'): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>(
+            '/admin/courier/credentials/environment',
+            { environment },
+        );
+        return res.data;
+    },
+
+    /**
+     * Give one branch its own SribeesExpress account for an environment.
+     * After setting one, re-run the pickup-location sync: the branch's pickup
+     * address exists in the old account, not the new one.
+     */
+    setBranchKey: async (
+        branchId: string,
+        environment: 'test' | 'live',
+        apiKey: string,
+    ): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>(
+            `/admin/courier/credentials/branches/${branchId}/key`,
+            { environment, api_key: apiKey },
+        );
+        return res.data;
+    },
+
+    /** Pin one branch to an environment, or (null) return it to following the account. */
+    setBranchEnvironment: async (
+        branchId: string,
+        environment: 'test' | 'live' | null,
+    ): Promise<CourierCredentials> => {
+        const res = await apiClient.put<CourierCredentials>(
+            `/admin/courier/credentials/branches/${branchId}/environment`,
+            { environment },
+        );
+        return res.data;
+    },
+
+    /** Make a real, side-effect-free call with whichever credentials serve this scope. */
     testKey: async (branchId?: string): Promise<CourierKeyTestResult> => {
         const res = await apiClient.post<CourierKeyTestResult>(
             '/admin/courier/credentials/test',
