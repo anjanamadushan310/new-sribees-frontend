@@ -31,19 +31,19 @@ import ShippingLabel from './ShippingLabel';
 const { Text } = Typography;
 
 /**
- * SribeesExpress's own status vocabulary (contract §8), which is longer and
- * more granular than ours — our order status collapses the middle of it into
- * "shipped". Shown verbatim because this is the courier's answer, not ours;
- * an unknown value falls through to itself rather than being hidden.
+ * SribeesExpress's external status vocabulary — the eight values a merchant
+ * can actually receive (contract §8).
+ *
+ * They track more granular states internally (sorting centre, dispatch,
+ * destination hub) and collapse them onto these on the way out, so everything
+ * between pickup and out-for-delivery arrives as `in_transit` and consecutive
+ * history entries can repeat a status. An unrecognised value falls through to
+ * itself rather than being hidden: their vocabulary is theirs to extend.
  */
 const TRACKING_META: Record<string, { label: string; color: string }> = {
-    pending: { label: 'Pending pickup', color: 'gold' },
     booked: { label: 'Booked', color: 'blue' },
-    pickup_scheduled: { label: 'Pickup scheduled', color: 'blue' },
     picked_up: { label: 'Picked up', color: 'cyan' },
-    collected_at_sorting_center: { label: 'At sorting centre', color: 'cyan' },
-    dispatched_to_destination: { label: 'In transit', color: 'cyan' },
-    received_at_destination: { label: 'At destination hub', color: 'geekblue' },
+    in_transit: { label: 'In transit', color: 'cyan' },
     out_for_delivery: { label: 'Out for delivery', color: 'purple' },
     delivered: { label: 'Delivered', color: 'green' },
     failed: { label: 'Delivery failed', color: 'volcano' },
