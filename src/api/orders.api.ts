@@ -10,6 +10,7 @@ export type OrderStatus =
     | 'processing'
     | 'packing'
     | 'packed'
+    | 'ready_for_pickup'
     | 'handed_to_courier'
     | 'shipped'
     | 'out_for_delivery'
@@ -89,7 +90,7 @@ export interface OrderCustomer {
 export interface OrderDeliveryAddress {
     address_line1: string;
     address_line2: string | null;
-    post_office: string;
+    postal_city: string;
     district: string;
     province: string;
     postal_code: string;
@@ -157,15 +158,26 @@ export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
 /**
  * The SribeesExpress shipment behind an order, from GET /admin/orders/{id}.
  *
- * Booking happens automatically when the order is confirmed, so for most
- * orders this arrives already populated. The flags exist for the ones it
- * does not cover: a booking that failed during a courier outage, an address
- * corrected after the fact, or an order older than the integration.
+ * Nothing is booked at checkout. Checkout confirms SribeesExpress's delivery
+ * quote (the price is held for a week); the parcel is booked when the branch
+ * marks it ready for pickup, with that quote and how the customer pays.
  */
 export interface OrderCourier {
     /** SribeesExpress waybill. Null until booked — the whole panel keys off this. */
     shipment_id: string | null;
     waybill: string | null;
+    /** cod — the rider collects `cod_amount`; prepaid — nothing to collect. */
+    payment_method: 'cod' | 'prepaid';
+    cod_amount: number;
+    /** The checkout quote SribeesExpress confirmed for this order. */
+    quote_id: string | null;
+    /**
+     * What SribeesExpress agreed to bill for delivery. Equals the customer's
+     * shipping charge, unless a booking had to re-quote after the hold lapsed.
+     */
+    quote_amount: number | null;
+    quote_expires_at: string | null;
+    quote_confirmed_at: string | null;
     /** Our side: pending | booked | failed. */
     booking_status: string | null;
     /** Their side: booked, picked_up, out_for_delivery, delivered, failed, returned… */
@@ -185,12 +197,14 @@ export interface OrderCourier {
     failure_note: string | null;
     /** Only meaningful while tracking_status is `failed`. */
     will_retry: boolean | null;
+    /** The order is packed (pressing books it) or ready but not booked (a retry). */
     can_request_pickup: boolean;
     can_refresh_tracking: boolean;
     /**
-     * Whether the fulfilling branch is registered as a pickup location.
-     * False is a warning, not a blocker: the booking still succeeds, but the
-     * rider is sent to the account default address instead of this branch.
+     * Whether SribeesExpress knows where to collect: the branch books with its
+     * own key, or is registered as an outlet of the shared account. False is a
+     * warning, not a blocker: the booking still succeeds, but the rider is sent
+     * to the shared account's address instead of this branch.
      */
     branch_pickup_registered: boolean;
 }
@@ -236,6 +250,7 @@ export interface OrderDetail {
     branch_name: string | null;
     created_at: string | null;
     packed_at: string | null;
+    ready_for_pickup_at: string | null;
     handed_to_courier_at: string | null;
     shipped_at: string | null;
     delivered_at: string | null;
@@ -339,8 +354,9 @@ export const ORDER_TABS: OrderTab[] = [
     {
         key: 'logistics',
         label: 'Logistics',
-        statuses: ['handed_to_courier', 'shipped', 'out_for_delivery'],
+        statuses: ['ready_for_pickup', 'handed_to_courier', 'shipped', 'out_for_delivery'],
         subPills: [
+            { key: 'awaiting', label: 'Awaiting Courier', statuses: ['ready_for_pickup'] },
             { key: 'handed', label: 'Handed to Courier', statuses: ['handed_to_courier'] },
             { key: 'shipped', label: 'Shipped', statuses: ['shipped'] },
             { key: 'ofd', label: 'Out for Delivery', statuses: ['out_for_delivery'] },
@@ -388,6 +404,7 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     processing: { label: 'Processing', color: 'geekblue' },
     packing: { label: 'Packing', color: 'geekblue' },
     packed: { label: 'Packed', color: 'lime' },
+    ready_for_pickup: { label: 'Awaiting Courier', color: 'blue' },
     handed_to_courier: { label: 'Handed to Courier', color: 'cyan' },
     shipped: { label: 'Shipped', color: 'cyan' },
     out_for_delivery: { label: 'Out for Delivery', color: 'purple' },

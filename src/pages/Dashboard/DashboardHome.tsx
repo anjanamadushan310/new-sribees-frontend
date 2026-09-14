@@ -49,6 +49,7 @@ const OPEN_STATUSES = new Set([
     'processing',
     'packing',
     'packed',
+    'ready_for_pickup',
     'handed_to_courier',
     'shipped',
     'out_for_delivery',

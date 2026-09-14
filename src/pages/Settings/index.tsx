@@ -144,7 +144,7 @@ const Settings: React.FC = () => {
                 </Form>
             ),
         },
-        // Delivery Zones (master Post Office directory) — Super Admin only.
+        // Delivery Zones (master Postal City directory) — Super Admin only.
         ...(isSuperAdmin
             ? [
                   {

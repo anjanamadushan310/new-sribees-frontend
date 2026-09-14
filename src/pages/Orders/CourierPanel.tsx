@@ -1,26 +1,30 @@
 /**
  * SribeesExpress shipment panel — the Branch Manager's dispatch control.
  *
- * The parcel is booked automatically when an order is confirmed, so on a good
- * day this panel is a read-out: waybill, where the rider was told to collect,
- * and how far along the parcel is. It earns its place on the bad days, which
- * are the ones a branch actually has to handle:
+ * Nothing is booked at checkout. Checkout confirms SribeesExpress's delivery
+ * quote, which holds the price the customer paid for a week. The parcel is
+ * booked the moment the branch says it is **ready for pickup** — the button
+ * below, or the same action in the status bar — and that booking carries the
+ * agreed quote and how the customer pays: COD with the amount the rider
+ * collects, or prepaid with nothing to collect. From then on SribeesExpress
+ * drives the status: their rider collecting the parcel is what makes it
+ * "Handed to Courier".
  *
- * * the booking failed (courier outage, an address that never resolved to a
- *   serviceable city) and nothing retries it — **Request Pickup** is that retry;
+ * The panel also covers the bad days:
+ *
+ * * a booking the courier refused — the reason is shown, and the order stays
+ *   Packed rather than claiming a rider is coming;
  * * a webhook was missed, so the dashboard and the customer disagree about
  *   where the parcel is — **Refresh** re-reads that one shipment;
- * * the branch was never registered as a pickup location, so the rider is
- *   being sent to another branch's address — warned before dispatch, not
- *   discovered when the parcel is not collected.
+ * * SribeesExpress does not know where this branch is — warned before
+ *   dispatch, not discovered when nobody collects.
  *
  * Dispatch is Branch Manager / Super Admin only, matching the fulfilment state
- * machine. Customer Support sees the panel read-only: they hold orders:update
- * so they can annotate and escalate, not so they can send a rider.
+ * machine. Customer Support sees the panel read-only.
  */
 import React, { useState } from 'react';
 import { Alert, App, Button, Descriptions, Space, Tag, Typography } from 'antd';
-import { CarOutlined, PrinterOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import { PrinterOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../api/orders.api';
@@ -41,7 +45,7 @@ const { Text } = Typography;
  * itself rather than being hidden: their vocabulary is theirs to extend.
  */
 const TRACKING_META: Record<string, { label: string; color: string }> = {
-    booked: { label: 'Booked', color: 'blue' },
+    booked: { label: 'Booked — awaiting rider', color: 'blue' },
     picked_up: { label: 'Picked up', color: 'cyan' },
     in_transit: { label: 'In transit', color: 'cyan' },
     out_for_delivery: { label: 'Out for delivery', color: 'purple' },
@@ -83,9 +87,9 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
             onChanged();
         },
         onError: (err: any) =>
-            // The backend answers a courier refusal with the reason it was
-            // given, so show that rather than a generic failure — it is the
-            // only thing that tells the manager what to fix.
+            // The backend answers a refusal with the reason it was given —
+            // payment not in, or what SribeesExpress said — so show that: it is
+            // the only thing that tells the manager what to fix.
             message.error(err.response?.data?.detail || 'Could not reach SribeesExpress.'),
     });
 
@@ -105,27 +109,51 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
     }
 
     const booked = !!courier.shipment_id;
+    const isCod = courier.payment_method === 'cod';
+    const repriced =
+        courier.quote_amount !== null &&
+        Math.abs(courier.quote_amount - order.pricing.shipping_amount) >= 0.005;
 
     const confirmPickup = () => {
         modal.confirm({
-            title: 'Request pickup from SribeesExpress?',
+            title: 'Ready for courier pickup?',
             content: (
-                <span>
-                    A rider will be sent to collect <b>{order.order_number}</b>
-                    {courier.branch_pickup_registered ? (
-                        <> from {order.branch_name ?? 'this branch'}.</>
-                    ) : (
-                        <>
-                            {' '}
-                            — but this branch is <b>not registered</b> as a pickup location, so
-                            SribeesExpress will send the rider to the account's default address
-                            instead. Register it under Settings → Courier first unless you know
-                            that address is right.
-                        </>
+                <Space direction="vertical" size={6}>
+                    <span>
+                        <b>{order.order_number}</b> will be booked with SribeesExpress and a rider
+                        sent to collect it
+                        {courier.branch_pickup_registered ? (
+                            <> from {order.branch_name ?? 'this branch'}.</>
+                        ) : (
+                            <>
+                                {' '}
+                                — but SribeesExpress does <b>not know this branch's address</b>, so
+                                the rider will go to the shared account's address instead. Enter the
+                                branch's own key, or register it as an outlet, under Settings →
+                                Courier first unless you know that address is right.
+                            </>
+                        )}
+                    </span>
+                    <span>
+                        {isCod ? (
+                            <>
+                                <Tag color="gold">COD</Tag> the rider collects{' '}
+                                <b>{formatLKR(courier.cod_amount)}</b>
+                            </>
+                        ) : (
+                            <>
+                                <Tag color="green">Prepaid</Tag> nothing to collect
+                            </>
+                        )}
+                    </span>
+                    {courier.quote_amount !== null && (
+                        <Text type="secondary">
+                            Delivery charge agreed at checkout: {formatLKR(courier.quote_amount)}
+                        </Text>
                     )}
-                </span>
+                </Space>
             ),
-            okText: 'Request Pickup',
+            okText: 'Book Pickup',
             okButtonProps: { danger: !courier.branch_pickup_registered },
             onOk: () => pickupMut.mutateAsync(),
         });
@@ -133,14 +161,14 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
 
     return (
         <>
-            {/* The booking failed and nothing retries it on its own. */}
+            {/* The courier refused the booking; the order stayed where it was. */}
             {!booked && courier.booking_status === 'failed' && (
                 <Alert
                     type="error"
                     showIcon
                     style={{ marginBottom: 12 }}
-                    message="Automatic booking failed"
-                    description="SribeesExpress was not reachable, or refused this parcel, when the order was confirmed. Nothing retries it automatically — use Request Pickup below, and the reason will be shown if it fails again."
+                    message="The pickup booking was refused"
+                    description="SribeesExpress was not reachable, or refused this parcel, when it was marked ready. The order is still Packed. Try again below — the reason is shown if it fails again."
                 />
             )}
 
@@ -150,8 +178,8 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                     type="warning"
                     showIcon
                     style={{ marginBottom: 12 }}
-                    message="This branch has no registered pickup location"
-                    description="The parcel can still be booked, but the rider will be sent to the account's default address rather than this branch. A Super Admin can register it under Settings → Courier."
+                    message="SribeesExpress does not know where this branch is"
+                    description="The parcel can still be booked, but the rider will be sent to the shared account's address rather than this branch. A Super Admin can enter this branch's own key, or register it as an outlet, under Settings → Courier."
                 />
             )}
 
@@ -182,73 +210,109 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                 />
             )}
 
-            {booked ? (
-                <Descriptions column={1} size="small" bordered>
-                    <Descriptions.Item label="Waybill">
+            <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="Payment">
+                    {isCod ? (
                         <Space>
-                            <Text copyable strong>
-                                {courier.waybill ?? courier.shipment_id}
-                            </Text>
-                            {courier.tracking_url && (
-                                <a href={courier.tracking_url} target="_blank" rel="noreferrer">
-                                    Track
-                                </a>
-                            )}
+                            <Tag color="gold">COD</Tag>
+                            <Text>Rider collects {formatLKR(courier.cod_amount)}</Text>
                         </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Courier Status">
-                        <Space>
-                            {trackingTag(courier.tracking_status)}
-                            {courier.tracking_updated_at && (
+                    ) : (
+                        <Tag color="green">Prepaid — nothing to collect</Tag>
+                    )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Delivery Charge">
+                    {courier.quote_amount !== null ? (
+                        <Space direction="vertical" size={0}>
+                            <Text>{formatLKR(courier.quote_amount)} (SribeesExpress quote)</Text>
+                            {repriced && (
+                                <Text type="warning" style={{ fontSize: 12 }}>
+                                    Re-quoted after the price hold lapsed — the customer paid{' '}
+                                    {formatLKR(order.pricing.shipping_amount)}.
+                                </Text>
+                            )}
+                            {!booked && courier.quote_expires_at && (
                                 <Text type="secondary" style={{ fontSize: 12 }}>
-                                    {dayjs(courier.tracking_updated_at).format('MMM DD, HH:mm')}
+                                    Price held until{' '}
+                                    {dayjs(courier.quote_expires_at).format('MMM DD, HH:mm')}
                                 </Text>
                             )}
                         </Space>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Collect From">
-                        {courier.pickup_location_name ?? (
-                            <Text type="warning">
-                                Account default address — not this branch
-                            </Text>
-                        )}
-                    </Descriptions.Item>
-                    {courier.handover_required && (
-                        <Descriptions.Item label="Handover Code">
-                            {courier.handover_verified === true ? (
-                                <Tag color="green">Verified by the rider</Tag>
-                            ) : (
-                                <Tag color="gold">Awaiting the customer's code</Tag>
-                            )}
-                        </Descriptions.Item>
+                    ) : (
+                        <Text type="secondary">No quote on this order (placed before quotes were held)</Text>
                     )}
-                    {/* COD: `delivered` alone does not mean the cash reached us. */}
-                    {(courier.cod_collected || courier.cod_collected_amount !== null) && (
-                        <Descriptions.Item label="Cash Collected">
+                </Descriptions.Item>
+                {booked && (
+                    <>
+                        <Descriptions.Item label="Waybill">
                             <Space>
-                                {courier.cod_collected ? (
-                                    <Tag color="green">
-                                        {courier.cod_collected_amount !== null
-                                            ? formatLKR(courier.cod_collected_amount)
-                                            : 'Collected'}
-                                    </Tag>
-                                ) : (
-                                    <Tag color="gold">Not collected</Tag>
+                                <Text copyable strong>
+                                    {courier.waybill ?? courier.shipment_id}
+                                </Text>
+                                {courier.tracking_url && (
+                                    <a href={courier.tracking_url} target="_blank" rel="noreferrer">
+                                        Track
+                                    </a>
                                 )}
-                                {courier.cod_collected && (
+                            </Space>
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Courier Status">
+                            <Space>
+                                {trackingTag(courier.tracking_status)}
+                                {courier.tracking_updated_at && (
                                     <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {courier.remittance_id
-                                            ? `Remitted to us (run #${courier.remittance_id})`
-                                            : 'Not yet remitted to us'}
+                                        {dayjs(courier.tracking_updated_at).format('MMM DD, HH:mm')}
                                     </Text>
                                 )}
                             </Space>
                         </Descriptions.Item>
-                    )}
-                </Descriptions>
-            ) : (
-                <Text type="secondary">
-                    No parcel booked with SribeesExpress yet.
+                        <Descriptions.Item label="Collect From">
+                            {courier.pickup_location_name ?? (
+                                <Text type="warning">
+                                    Shared account address — not this branch
+                                </Text>
+                            )}
+                        </Descriptions.Item>
+                        {courier.handover_required && (
+                            <Descriptions.Item label="Handover Code">
+                                {courier.handover_verified === true ? (
+                                    <Tag color="green">Verified by the rider</Tag>
+                                ) : (
+                                    <Tag color="gold">Awaiting the customer's code</Tag>
+                                )}
+                            </Descriptions.Item>
+                        )}
+                        {/* COD: `delivered` alone does not mean the cash reached us. */}
+                        {(courier.cod_collected || courier.cod_collected_amount !== null) && (
+                            <Descriptions.Item label="Cash Collected">
+                                <Space>
+                                    {courier.cod_collected ? (
+                                        <Tag color="green">
+                                            {courier.cod_collected_amount !== null
+                                                ? formatLKR(courier.cod_collected_amount)
+                                                : 'Collected'}
+                                        </Tag>
+                                    ) : (
+                                        <Tag color="gold">Not collected</Tag>
+                                    )}
+                                    {courier.cod_collected && (
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                            {courier.remittance_id
+                                                ? `Remitted to us (run #${courier.remittance_id})`
+                                                : 'Not yet remitted to us'}
+                                        </Text>
+                                    )}
+                                </Space>
+                            </Descriptions.Item>
+                        )}
+                    </>
+                )}
+            </Descriptions>
+
+            {!booked && (
+                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                    Not booked with SribeesExpress yet — it is booked when the order is marked
+                    ready for pickup.
                 </Text>
             )}
 
@@ -261,7 +325,7 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                             loading={pickupMut.isPending}
                             onClick={confirmPickup}
                         >
-                            Request Pickup
+                            {order.status === 'packed' ? 'Ready for Courier Pickup' : 'Retry Booking'}
                         </Button>
                     )}
                     {courier.can_refresh_tracking && (
@@ -288,21 +352,6 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                 open={labelOpen}
                 onClose={() => setLabelOpen(false)}
             />
-
-            {/* A booked parcel still has to physically leave, and only the
-                person who hands it over can say it did — that is the status
-                machine's `handed_to_courier`, not anything SribeesExpress
-                tells us. Say so, so nobody waits for it to happen by itself. */}
-            {booked && canDispatch && order.status === 'packed' && (
-                <Alert
-                    type="info"
-                    showIcon
-                    icon={<CarOutlined />}
-                    style={{ marginTop: 12 }}
-                    message="Mark it handed over once the rider has the parcel"
-                    description="The waybill is issued, but the order stays in Packed until someone confirms the rider actually collected it. Use the Handed to Courier action above."
-                />
-            )}
         </>
     );
 };

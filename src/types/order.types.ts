@@ -49,7 +49,7 @@ export interface OrderAddress {
     phone: string;
     address_line1: string;
     address_line2?: string;
-    post_office: string;
+    postal_city: string;
     district: string;
     postal_code: string;
     province: string;
