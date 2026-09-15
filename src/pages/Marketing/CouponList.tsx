@@ -388,7 +388,7 @@ const CouponList: React.FC = () => {
                         <div
                             style={{
                                 display: 'flex',
-                                justify-content: 'space-between',
+                                justifyContent: 'space-between',
                                 fontSize: 11.5,
                                 marginBottom: 2,
                             }}
