@@ -132,6 +132,7 @@ export interface ProductPayload {
     is_active?: boolean;
     is_featured?: boolean;
     is_perishable?: boolean;
+    images?: ImageLinkPayload[];
 }
 
 export interface ProductListParams {

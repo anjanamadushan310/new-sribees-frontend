@@ -44,7 +44,7 @@ const slugify = (text: string): string =>
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-interface ProductFormValues {
+    interface ProductFormValues {
     name: string;
     name_si?: string;
     name_ta?: string;
@@ -62,6 +62,7 @@ interface ProductFormValues {
     is_active: boolean;
     is_featured: boolean;
     is_perishable: boolean;
+    images?: GalleryImage[];
 }
 
 const ProductForm: React.FC = () => {
@@ -134,6 +135,7 @@ const ProductForm: React.FC = () => {
                 }));
             setGallery(loaded);
             setOriginalImages(loaded);
+            form.setFieldsValue({ images: loaded });
         }
     }, [product, form]);
 
@@ -171,6 +173,17 @@ const ProductForm: React.FC = () => {
 
     const saveMutation = useMutation({
         mutationFn: async (values: ProductFormValues) => {
+            if (!gallery || gallery.length === 0) {
+                message.error('Please upload at least one product image (thumbnail).');
+                throw new Error('Please upload at least one product image (thumbnail).');
+            }
+
+            const imagesPayload = gallery.map((img, i) => ({
+                image_url: img.image_url,
+                is_primary: img.is_primary,
+                sort_order: i,
+            }));
+
             const payload: ProductPayload = {
                 name: values.name.trim(),
                 // Blank translations are sent as null, not "", so the backend
@@ -192,6 +205,7 @@ const ProductForm: React.FC = () => {
                 is_active: values.is_active,
                 is_featured: values.is_featured,
                 is_perishable: values.is_perishable ?? false,
+                images: imagesPayload,
             };
 
             const saved = isEdit
@@ -475,11 +489,36 @@ const ProductForm: React.FC = () => {
                             </Form.Item>
                         </Card>
 
-                        <Card title="Images">
-                            <Form.Item noStyle>
+                        <Card
+                            title={
+                                <Space>
+                                    <span>Product Images</span>
+                                    <span style={{ color: '#ff4d4f', fontSize: 16 }}>*</span>
+                                </Space>
+                            }
+                        >
+                            <Form.Item
+                                name="images"
+                                rules={[
+                                    {
+                                        validator: async () => {
+                                            if (!gallery || gallery.length === 0) {
+                                                return Promise.reject(
+                                                    new Error('Please upload at least one product image (thumbnail).')
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    },
+                                ]}
+                            >
                                 <ImageGalleryUpload
                                     value={gallery}
-                                    onChange={setGallery}
+                                    onChange={(newGallery) => {
+                                        setGallery(newGallery);
+                                        form.setFieldValue('images', newGallery);
+                                        form.validateFields(['images']).catch(() => {});
+                                    }}
                                     maxImages={5}
                                     productId={isEdit ? id : undefined}
                                 />
