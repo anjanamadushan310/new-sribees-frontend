@@ -291,82 +291,104 @@ const CouponList: React.FC = () => {
             executeSubmit(payload);
         }
     };
-
     const columns: ColumnsType<Coupon> = [
         {
             title: 'Code',
             dataIndex: 'code',
             key: 'code',
+            width: 170,
             render: (code: string, c) => (
-                <Space size={4} wrap>
-                    <Tag color="geekblue">{code}</Tag>
-                    {c.is_public && <Tag color="purple">In app</Tag>}
-                    {/* Coupons are branch-owned now. A branch admin sees the
-                        network-wide ones alongside their own but cannot edit
-                        them (the server 403s), so say which is which rather
-                        than letting them discover it by being refused. */}
-                    {c.is_network_wide ? (
-                        <Tag color="gold">All branches</Tag>
-                    ) : (
-                        <Tag color="blue">This branch</Tag>
-                    )}
-                </Space>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <Tag color="geekblue" style={{ fontWeight: 600, marginInlineEnd: 0 }}>
+                        {code}
+                    </Tag>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {c.is_public && (
+                            <Tag color="purple" style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                In app
+                            </Tag>
+                        )}
+                        {c.is_network_wide ? (
+                            <Tag color="gold" style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                All branches
+                            </Tag>
+                        ) : (
+                            <Tag color="blue" style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                This branch
+                            </Tag>
+                        )}
+                    </div>
+                </div>
             ),
         },
         {
             title: 'Type',
             dataIndex: 'discount_type',
             key: 'discount_type',
-            render: (t: DiscountType) => (t === 'percentage' ? 'Percentage' : 'Fixed'),
+            width: 100,
+            render: (t: DiscountType) => (
+                <span style={{ whiteSpace: 'nowrap' }}>
+                    {t === 'percentage' ? 'Percentage' : 'Fixed'}
+                </span>
+            ),
         },
         {
             title: 'Value',
             key: 'value',
-            render: (_, c) => <strong>{discountLabel(c)}</strong>,
+            width: 110,
+            render: (_, c) => <strong style={{ whiteSpace: 'nowrap' }}>{discountLabel(c)}</strong>,
         },
         {
             title: 'Min. Order',
             dataIndex: 'min_order_value',
             key: 'min_order_value',
-            render: (v: number) => (v > 0 ? formatLKR(v) : '—'),
+            width: 110,
+            render: (v: number) => (
+                <span style={{ whiteSpace: 'nowrap' }}>{v > 0 ? formatLKR(v) : '—'}</span>
+            ),
         },
         {
             title: 'Usage',
             key: 'usage',
+            width: 120,
             render: (_, c) => (
-                <span>
-                    {c.used_count} / {c.usage_limit ?? '∞'}
-                    <span style={{ color: '#999', fontSize: 12 }}>
-                        {' '}· {c.per_user_limit ?? '∞'}/customer
-                    </span>
-                </span>
+                <div style={{ whiteSpace: 'nowrap' }}>
+                    <div>
+                        {c.used_count} / {c.usage_limit ?? '∞'}
+                    </div>
+                    <div style={{ color: '#999', fontSize: 11 }}>
+                        {c.per_user_limit ?? '∞'}/customer
+                    </div>
+                </div>
             ),
         },
         {
             title: (
                 <Tooltip title="Discount given away, against the campaign's budget. Usage limits cap how MANY redemptions; this caps what they COST.">
-                    <span>
+                    <span style={{ whiteSpace: 'nowrap' }}>
                         <WalletOutlined /> Budget Spend
                     </span>
                 </Tooltip>
             ),
             key: 'budget',
-            width: 170,
+            width: 160,
             render: (_, c) => {
                 if (c.budget_cap == null) {
                     return (
                         <Tooltip title="No cap — this campaign can give away an unlimited amount of discount.">
-                            <span style={{ color: '#94a3b8', fontSize: 12 }}>No budget cap</span>
+                            <span style={{ color: '#94a3b8', fontSize: 12, whiteSpace: 'nowrap' }}>
+                                No budget cap
+                            </span>
                         </Tooltip>
                     );
                 }
                 const pct = c.budget_used_percent ?? 0;
                 return (
-                    <div style={{ minWidth: 150 }}>
+                    <div style={{ minWidth: 140 }}>
                         <div
                             style={{
                                 display: 'flex',
-                                justifyContent: 'space-between',
+                                justify-content: 'space-between',
                                 fontSize: 11.5,
                                 marginBottom: 2,
                             }}
@@ -390,16 +412,16 @@ const CouponList: React.FC = () => {
         {
             title: (
                 <Tooltip title="Gross sales placed with this code. The other half of the budget figure: Rs 30,000 of discount that pulled in Rs 612,000 of sales is a campaign worth repeating.">
-                    <span>
-                        <RiseOutlined /> Revenue Generated
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                        <RiseOutlined /> Revenue
                     </span>
                 </Tooltip>
             ),
             key: 'revenue',
-            width: 150,
+            width: 140,
             render: (_, c) =>
                 c.orders_count > 0 ? (
-                    <div>
+                    <div style={{ whiteSpace: 'nowrap' }}>
                         <div style={{ fontWeight: 600, color: '#16a34a' }}>
                             {formatLKR(c.revenue_generated)}
                         </div>
@@ -415,22 +437,27 @@ const CouponList: React.FC = () => {
         {
             title: 'Validity',
             key: 'validity',
+            width: 180,
             render: (_, c) => (
-                <span style={{ fontSize: 12 }}>
-                    {dayjs(c.valid_from).format('MMM DD, YYYY')} →{' '}
-                    {dayjs(c.valid_until).format('MMM DD, YYYY')}
-                </span>
+                <div style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+                    <div>{dayjs(c.valid_from).format('MMM DD, YYYY')}</div>
+                    <div style={{ color: '#94a3b8', fontSize: 11 }}>
+                        to {dayjs(c.valid_until).format('MMM DD, YYYY')}
+                    </div>
+                </div>
             ),
         },
         {
             title: 'Status',
             key: 'status',
-            width: 140,
+            width: 110,
             render: (_, c) => {
                 const meta = STATUS_META[c.status] ?? STATUS_META.inactive;
                 return (
                     <Tooltip title={meta.hint}>
-                        <Tag color={meta.color}>{meta.label}</Tag>
+                        <Tag color={meta.color} style={{ marginInlineEnd: 0, whiteSpace: 'nowrap' }}>
+                            {meta.label}
+                        </Tag>
                     </Tooltip>
                 );
             },
@@ -438,12 +465,8 @@ const CouponList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 240,
+            width: 190,
             render: (_, c) => {
-                // Gated on the SERVER's status so the button agrees with what
-                // the backend would actually do. Deactivating something already
-                // expired or budget-depleted is a no-op that just looks like it
-                // worked.
                 const canDeactivate = c.status === 'active' || c.status === 'scheduled';
 
                 const getDeactivateReason = () => {
@@ -454,8 +477,13 @@ const CouponList: React.FC = () => {
                 };
 
                 return (
-                    <Space>
-                        <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(c)}>
+                    <Space size={2} style={{ whiteSpace: 'nowrap' }}>
+                        <Button
+                            size="small"
+                            type="link"
+                            icon={<EditOutlined />}
+                            onClick={() => openEdit(c)}
+                        >
                             Edit
                         </Button>
                         {canDeactivate ? (
@@ -465,13 +493,13 @@ const CouponList: React.FC = () => {
                                 okButtonProps={{ danger: true }}
                                 onConfirm={() => deactivateMutation.mutate(c.coupon_id)}
                             >
-                                <Button type="link" danger icon={<StopOutlined />}>
+                                <Button size="small" type="link" danger icon={<StopOutlined />}>
                                     Deactivate
                                 </Button>
                             </Popconfirm>
                         ) : c.is_active ? (
                             <Tooltip title={getDeactivateReason()}>
-                                <Button type="link" danger disabled icon={<StopOutlined />}>
+                                <Button size="small" type="link" danger disabled icon={<StopOutlined />}>
                                     Deactivate
                                 </Button>
                             </Tooltip>
@@ -483,7 +511,7 @@ const CouponList: React.FC = () => {
                             okButtonProps={{ danger: true }}
                             onConfirm={() => deleteMutation.mutate(c.coupon_id)}
                         >
-                            <Button type="link" danger icon={<DeleteOutlined />}>
+                            <Button size="small" type="link" danger icon={<DeleteOutlined />}>
                                 Delete
                             </Button>
                         </Popconfirm>
@@ -544,6 +572,7 @@ const CouponList: React.FC = () => {
                     dataSource={data?.coupons ?? []}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load coupons.' : 'No coupons yet.' }}
+                    scroll={{ x: 'max-content' }}
                     pagination={{
                         current: page,
                         pageSize,
