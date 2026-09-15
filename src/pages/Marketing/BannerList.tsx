@@ -297,21 +297,22 @@ const BannerList: React.FC = () => {
         {
             title: 'Title',
             key: 'title',
+            width: 260,
             render: (_, record) => (
-                <Space direction="vertical" size={0}>
-                    <Text strong>{record.title}</Text>
+                <div style={{ minWidth: 220, maxWidth: 350 }}>
+                    <Text strong style={{ display: 'block' }}>{record.title}</Text>
                     {record.subtitle && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
+                        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
                             {record.subtitle}
                         </Text>
                     )}
-                </Space>
+                </div>
             ),
         },
         {
             title: 'Scope',
             key: 'scope',
-            width: 150,
+            width: 130,
             render: (_, record) =>
                 record.is_platform_wide ? (
                     <Tooltip title="Shown in every branch. Managed by a Super Admin.">
@@ -324,7 +325,7 @@ const BannerList: React.FC = () => {
         {
             title: 'Destination',
             key: 'destination',
-            width: 200,
+            width: 170,
             render: (_, record) => {
                 if (!record.link_type) {
                     return (
@@ -356,7 +357,7 @@ const BannerList: React.FC = () => {
                 </Tooltip>
             ),
             key: 'performance',
-            width: 165,
+            width: 160,
             render: (_, record) => (
                 <div>
                     {record.ctr != null ? (
@@ -392,7 +393,7 @@ const BannerList: React.FC = () => {
         {
             title: 'Validity',
             key: 'validity',
-            width: 180,
+            width: 160,
             render: (_, record) =>
                 record.is_always_active ? (
                     <Text type="secondary" style={{ fontSize: 12 }}>
@@ -423,7 +424,7 @@ const BannerList: React.FC = () => {
         {
             title: 'Status',
             key: 'status',
-            width: 120,
+            width: 100,
             render: (_, record) => {
                 // Server-derived, so "Expired" (its own end time passed) is
                 // distinguishable from "Inactive" (a person switched it off).
@@ -439,7 +440,7 @@ const BannerList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 170,
+            width: 130,
             render: (_, record) => {
                 const allowed = canModify(record);
                 return (
@@ -525,6 +526,7 @@ const BannerList: React.FC = () => {
                     dataSource={banners}
                     loading={isLoading}
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     locale={{
                         emptyText: isError
                             ? 'Failed to load banners.'
