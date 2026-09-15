@@ -23,6 +23,7 @@ import {
     Tabs,
     Tooltip,
     Alert,
+    InputNumber,
 } from 'antd';
 import { ArrowLeftOutlined, ThunderboltOutlined, StarOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -44,7 +45,7 @@ const slugify = (text: string): string =>
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-    interface ProductFormValues {
+interface ProductFormValues {
     name: string;
     name_si?: string;
     name_ta?: string;
@@ -59,6 +60,8 @@ const slugify = (text: string): string =>
     short_description_si?: string;
     short_description_ta?: string;
     search_keywords?: string;
+    weight?: number | null;
+    weight_unit?: string;
     is_active: boolean;
     is_featured: boolean;
     is_perishable: boolean;
@@ -120,6 +123,8 @@ const ProductForm: React.FC = () => {
                 short_description_si: product.short_description_si ?? undefined,
                 short_description_ta: product.short_description_ta ?? undefined,
                 search_keywords: product.search_keywords ?? undefined,
+                weight: product.weight !== null && product.weight !== undefined ? Number(product.weight) : undefined,
+                weight_unit: product.weight_unit || 'kg',
                 is_active: product.is_active,
                 is_featured: product.is_featured,
                 is_perishable: product.is_perishable ?? false,
@@ -202,6 +207,11 @@ const ProductForm: React.FC = () => {
                 short_description_si: values.short_description_si?.trim() || null,
                 short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
+                weight:
+                    values.weight !== undefined && values.weight !== null && !isNaN(Number(values.weight))
+                        ? Number(values.weight)
+                        : null,
+                weight_unit: values.weight_unit || 'kg',
                 is_active: values.is_active,
                 is_featured: values.is_featured,
                 is_perishable: values.is_perishable ?? false,
@@ -324,7 +334,7 @@ const ProductForm: React.FC = () => {
                 layout="vertical"
                 disabled={readOnly}
                 onFinish={(values) => saveMutation.mutate(values)}
-                initialValues={{ is_active: true, is_featured: false }}
+                initialValues={{ is_active: true, is_featured: false, weight_unit: 'kg' }}
             >
                 <Row gutter={16}>
                     <Col xs={24} lg={16}>
@@ -358,7 +368,7 @@ const ProductForm: React.FC = () => {
                                                     <Input
                                                         placeholder="e.g. Organic Whole Milk 1L"
                                                         onChange={(e) => {
-                                                            if (!slugTouched) {
+                                                             if (!slugTouched) {
                                                                 form.setFieldValue(
                                                                     'slug',
                                                                     slugify(e.target.value)
@@ -527,6 +537,46 @@ const ProductForm: React.FC = () => {
                     </Col>
 
                     <Col xs={24} lg={8}>
+                        <Card title="Weight & Measurement" style={{ marginBottom: 16 }}>
+                            <Row gutter={12}>
+                                <Col xs={14} sm={14}>
+                                    <Form.Item
+                                        label="Weight / Size"
+                                        name="weight"
+                                        tooltip="Used to calculate courier delivery charges and display product sizing"
+                                    >
+                                        <InputNumber
+                                            style={{ width: '100%' }}
+                                            placeholder="e.g. 500 or 1.5"
+                                            min={0}
+                                            step={0.01}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col xs={10} sm={10}>
+                                    <Form.Item
+                                        label="Unit"
+                                        name="weight_unit"
+                                        rules={[{ required: true, message: 'Select unit' }]}
+                                    >
+                                        <Select
+                                            options={[
+                                                { label: 'g (Grams)', value: 'g' },
+                                                { label: 'kg (Kilograms)', value: 'kg' },
+                                                { label: 'ml (Milliliters)', value: 'ml' },
+                                                { label: 'l (Liters)', value: 'l' },
+                                                { label: 'pcs (Pieces)', value: 'pcs' },
+                                                { label: 'pack (Packs)', value: 'pack' },
+                                            ]}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: -8 }}>
+                                💡 1kg ට අඩු භාණ්ඩ සඳහා <strong>Grams (g)</strong> ද (උදා: 250g, 500g), 1kg හෝ ඊට වැඩි භාණ්ඩ සඳහා <strong>Kilograms (kg)</strong> ද (උදා: 1kg, 2.5kg) තෝරන්න.
+                            </Typography.Text>
+                        </Card>
+
                         <Card title="Organization" style={{ marginBottom: 16 }}>
                             <Form.Item
                                 label="Category"

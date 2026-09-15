@@ -76,6 +76,8 @@ export interface AdminProduct {
     global_price?: number | null;
     compare_at_price?: number | null;
     stock_quantity: number;
+    weight?: number | null;
+    weight_unit?: string | null;
     is_active: boolean;
     is_featured: boolean;
     /** Short shelf life — the stock Quick Sale exists to clear before it spoils. */
@@ -129,6 +131,8 @@ export interface ProductPayload {
     // Must be a child of category_id — the backend rejects a mismatched pair.
     subcategory_id?: string | null;
     low_stock_threshold?: number;
+    weight?: number | null;
+    weight_unit?: string | null;
     is_active?: boolean;
     is_featured?: boolean;
     is_perishable?: boolean;

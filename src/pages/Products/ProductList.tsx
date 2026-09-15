@@ -225,6 +225,22 @@ const ProductList: React.FC = () => {
                     <span style={{ color: '#bbb' }}>Uncategorized</span>
                 ),
         },
+        {
+            title: 'Weight / Size',
+            key: 'weight',
+            width: 130,
+            render: (_, record: AdminProduct) => {
+                if (record.weight !== null && record.weight !== undefined) {
+                    const unit = record.weight_unit || 'kg';
+                    return (
+                        <Tag color="cyan" style={{ fontWeight: 500 }}>
+                            {record.weight} {unit}
+                        </Tag>
+                    );
+                }
+                return <span style={{ color: '#bbb' }}>—</span>;
+            },
+        },
         ...(isBranchScoped
             ? ([
                   {
