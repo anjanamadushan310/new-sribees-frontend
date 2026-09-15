@@ -527,6 +527,7 @@ const BannerList: React.FC = () => {
                     loading={isLoading}
                     pagination={false}
                     scroll={{ x: 'max-content' }}
+                    sticky
                     locale={{
                         emptyText: isError
                             ? 'Failed to load banners.'

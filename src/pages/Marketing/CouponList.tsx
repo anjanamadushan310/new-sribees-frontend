@@ -573,6 +573,7 @@ const CouponList: React.FC = () => {
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load coupons.' : 'No coupons yet.' }}
                     scroll={{ x: 'max-content' }}
+                    sticky
                     pagination={{
                         current: page,
                         pageSize,

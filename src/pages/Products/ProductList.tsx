@@ -495,6 +495,7 @@ const ProductList: React.FC = () => {
                         emptyText: isError ? 'Failed to load products.' : 'No products found.',
                     }}
                     scroll={{ x: 'max-content' }}
+                    sticky
                     pagination={{
                         current: page,
                         pageSize,

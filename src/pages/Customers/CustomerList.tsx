@@ -468,7 +468,8 @@ const CustomerList: React.FC = () => {
                     dataSource={data?.customers ?? []}
                     loading={isLoading}
                     locale={{ emptyText: isError ? 'Failed to load customers.' : 'No customers found.' }}
-                    scroll={{ x: 900 }}
+                    scroll={{ x: 'max-content' }}
+                    sticky
                     pagination={{
                         current: page,
                         pageSize,
