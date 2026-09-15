@@ -207,7 +207,25 @@ const AdminLayout: React.FC = () => {
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            <Sider trigger={null} collapsible collapsed={collapsed}>
+            <Sider
+                trigger={null}
+                collapsible
+                collapsed={collapsed}
+                width={220}
+                className="admin-sidebar-scroll"
+                style={{
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    height: '100vh',
+                    position: 'sticky',
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    zIndex: 100,
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#334155 #001529',
+                }}
+            >
                 <div
                     style={{
                         height: 64,
@@ -217,6 +235,11 @@ const AdminLayout: React.FC = () => {
                         color: 'white',
                         fontSize: collapsed ? 16 : 20,
                         fontWeight: 'bold',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10,
+                        background: '#001529',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                     }}
                 >
                     {collapsed ? 'SB' : 'SRIBEESonline'}
@@ -227,9 +250,10 @@ const AdminLayout: React.FC = () => {
                     selectedKeys={[location.pathname]}
                     items={menuItems}
                     onClick={handleMenuClick}
+                    style={{ borderRight: 0, paddingBottom: 24 }}
                 />
             </Sider>
-            <Layout>
+            <Layout style={{ minWidth: 0 }}>
                 <Header
                     style={{
                         padding: '0 24px',
@@ -237,6 +261,10 @@ const AdminLayout: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 99,
+                        boxShadow: '0 1px 4px rgba(0, 21, 41, 0.08)',
                     }}
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
