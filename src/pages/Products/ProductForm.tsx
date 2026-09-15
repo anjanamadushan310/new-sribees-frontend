@@ -183,6 +183,21 @@ const ProductForm: React.FC = () => {
                 throw new Error('Please upload at least one product image (thumbnail).');
             }
 
+            if (
+                values.weight === undefined ||
+                values.weight === null ||
+                isNaN(Number(values.weight)) ||
+                Number(values.weight) <= 0
+            ) {
+                message.error('Please enter a valid product weight greater than 0.');
+                throw new Error('Please enter a valid product weight greater than 0.');
+            }
+
+            if (!values.weight_unit || !values.weight_unit.trim()) {
+                message.error('Please select a measurement unit.');
+                throw new Error('Please select a measurement unit.');
+            }
+
             const imagesPayload = gallery.map((img, i) => ({
                 image_url: img.image_url,
                 is_primary: img.is_primary,
@@ -207,10 +222,7 @@ const ProductForm: React.FC = () => {
                 short_description_si: values.short_description_si?.trim() || null,
                 short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
-                weight:
-                    values.weight !== undefined && values.weight !== null && !isNaN(Number(values.weight))
-                        ? Number(values.weight)
-                        : null,
+                weight: Number(values.weight),
                 weight_unit: values.weight_unit || 'kg',
                 is_active: values.is_active,
                 is_featured: values.is_featured,
@@ -537,19 +549,36 @@ const ProductForm: React.FC = () => {
                     </Col>
 
                     <Col xs={24} lg={8}>
-                        <Card title="Weight & Measurement" style={{ marginBottom: 16 }}>
+                        <Card
+                            title={
+                                <Space>
+                                    <span>Weight & Measurement</span>
+                                    <span style={{ color: '#ff4d4f', fontSize: 16 }}>*</span>
+                                </Space>
+                            }
+                            style={{ marginBottom: 16 }}
+                        >
                             <Row gutter={12}>
                                 <Col xs={14} sm={14}>
                                     <Form.Item
                                         label="Weight / Size"
                                         name="weight"
                                         tooltip="Used to calculate courier delivery charges and display product sizing"
+                                        rules={[
+                                            { required: true, message: 'Please enter product weight' },
+                                            {
+                                                type: 'number',
+                                                min: 0.001,
+                                                message: 'Weight must be greater than 0',
+                                            },
+                                        ]}
                                     >
                                         <InputNumber
                                             style={{ width: '100%' }}
                                             placeholder="e.g. 500 or 1.5"
-                                            min={0}
+                                            min={0.001}
                                             step={0.01}
+                                            precision={3}
                                         />
                                     </Form.Item>
                                 </Col>
