@@ -1,23 +1,18 @@
 /**
- * Settings → Courier — the SribeesExpress account plumbing.
+ * Settings -> Courier -- the SribeesExpress account plumbing.
  *
- * Four things have to be true before a real parcel can be collected, and none
- * of them belong on a checkout path:
+ * Every branch is its own SribeesExpress client with its own API key. Four
+ * things have to be true before a real parcel can be collected:
  *
- * 1. **Coverage synced.** Our post office directory was hand-seeded and two of
- *    its three names do not match SribeesExpress's spelling. Their matching is
- *    exact, so a mismatch reaches the customer as "not serviceable".
- * 2. **Pickup locations registered.** Unregistered branches book against the
- *    account's default address, which for a multi-branch merchant means the
- *    rider drives to the wrong shop.
- * 3. **Webhook registered.** Its secret is shown once and is what every
- *    inbound status update is verified against.
- * 4. **The sweep runs.** Their webhooks are not retried, so the poll is the
- *    real source of truth.
- *
- * Steps 1–3 are one-time-ish Super Admin actions, which is why this is a
- * checklist rather than a dashboard. Step 4 belongs to an external cron; the
- * button here is for ops after an outage.
+ * 1. **Postal cities synced.** Customer addresses are priced by SribeesExpress
+ *    postal city id; a name we cannot match reaches the customer as
+ *    "not serviceable".
+ * 2. **Outlets registered.** Each branch's outlet postal city is the origin
+ *    every cart quote is priced from, and where the rider collects.
+ * 3. **Webhook registered per account.** The secret is stored encrypted by the
+ *    backend and never shown.
+ * 4. **The sweep runs.** Their webhooks are not retried, so the poll across
+ *    every branch account is the real source of truth.
  */
 import React, { useState } from 'react';
 import {
@@ -28,6 +23,7 @@ import {
     Descriptions,
     Empty,
     Input,
+    Select,
     Space,
     Statistic,
     Table,
@@ -46,8 +42,9 @@ import { courierApi } from '../../api/courier.api';
 import type {
     CoverageOrphan,
     CoverageSyncResponse,
-    PickupLocationSyncResponse,
-    PickupLocationSyncResult,
+    CoverageSkipped,
+    OutletSyncResponse,
+    OutletSyncResult,
     Remittance,
     WebhookRegistration,
 } from '../../api/courier.api';
@@ -60,6 +57,7 @@ const ACTION_COLORS: Record<string, string> = {
     created: 'green',
     updated: 'blue',
     recovered: 'gold',
+    own_account: 'cyan',
     skipped: 'default',
     failed: 'red',
 };
@@ -90,8 +88,12 @@ const CourierSettings: React.FC = () => {
     const { isSuperAdmin } = usePermissions();
 
     const [coverage, setCoverage] = useState<CoverageSyncResponse | null>(null);
-    const [pickup, setPickup] = useState<PickupLocationSyncResponse | null>(null);
+    const [pickup, setPickup] = useState<OutletSyncResponse | null>(null);
     const [webhook, setWebhook] = useState<WebhookRegistration | null>(null);
+    const [webhookBranchId, setWebhookBranchId] = useState<string | undefined>(undefined);
+    // Every branch can be its own SribeesExpress account, so 'what are we owed'
+    // has no single answer — it is asked per account.
+    const [codBranchId, setCodBranchId] = useState<string | undefined>(undefined);
     // Defaulted from the API base this dashboard already talks to: the
     // endpoint is ours, its path is fixed, and hand-typing it is how a
     // registration ends up pointing at nothing.
@@ -107,65 +109,76 @@ const CourierSettings: React.FC = () => {
     });
 
     const coverageMut = useMutation({
-        mutationFn: () => courierApi.syncCoverage(),
+        mutationFn: () => courierApi.syncPostalCities(),
         onSuccess: (res) => {
             setCoverage(res);
             message.success(
-                `Coverage synced — ${res.fetched} post offices across ${res.districts_covered.length} district(s).`,
+                `Postal cities synced — ${res.fetched} across ${res.districts_covered.length} district(s), ${res.addresses_matched} address(es) matched.`,
             );
         },
         onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Coverage sync failed.'),
+            message.error(err.response?.data?.detail || 'Postal city sync failed.'),
     });
 
     const pickupMut = useMutation({
-        mutationFn: () => courierApi.syncPickupLocations(),
+        mutationFn: () => courierApi.syncOutlets(),
         onSuccess: (res) => {
             setPickup(res);
             if (res.failed > 0) {
                 message.warning(`${res.synced} branch(es) registered, ${res.failed} failed.`);
             } else {
-                message.success(`${res.synced} branch(es) registered with SribeesExpress.`);
+                message.success(`${res.synced} branch(es) registered as SribeesExpress outlets.`);
             }
         },
         onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Pickup location sync failed.'),
+            message.error(err.response?.data?.detail || 'Outlet sync failed.'),
     });
 
     const sweepMut = useMutation({
         mutationFn: () => courierApi.runSweep(),
         onSuccess: (res) =>
             message.success(
-                `Sweep done — ${res.seen} shipment(s) read, ${res.applied} order(s) updated.`,
+                `Sweep done — ${res.accounts} account(s), ${res.seen} shipment(s) read, ${res.applied} order(s) updated.`,
             ),
         onError: (err: any) => message.error(err.response?.data?.detail || 'Sweep failed.'),
     });
 
     const webhookMut = useMutation({
-        mutationFn: (url: string) => courierApi.registerWebhook(url, 'SRIBEES Online admin'),
+        mutationFn: (url: string) => courierApi.registerWebhook(url, 'SRIBEES Online admin', webhookBranchId),
         onSuccess: (res) => {
             setWebhook(res);
-            message.success('Webhook registered. Copy the secret now — it is never shown again.');
+            message.success(
+                res.secret_stored
+                    ? 'Webhook registered and its secret stored.'
+                    : 'Webhook registered, but no secret was returned to store.',
+            );
         },
         onError: (err: any) =>
             message.error(err.response?.data?.detail || 'Webhook registration failed.'),
     });
 
+    const { data: credentials } = useQuery({
+        queryKey: ['admin', 'courier', 'credentials'],
+        queryFn: () => courierApi.getCredentials(),
+        enabled: isSuperAdmin,
+        retry: false,
+    });
+
     // Reads are allowed one role wider than the writes, so they load for a
     // Branch Manager too — they are the ones chasing an overdue payout.
     const { data: codBalance, isLoading: codLoading, refetch: refetchCod, error: codError } = useQuery({
-        queryKey: ['admin', 'courier', 'cod-balance'],
-        queryFn: () => courierApi.getCodBalance(),
+        queryKey: ['admin', 'courier', 'cod-balance', codBranchId ?? 'account'],
+        queryFn: () => courierApi.getCodBalance(codBranchId),
         retry: false,
     });
 
     const { data: remittances, isLoading: remLoading, error: remError } = useQuery({
-        queryKey: ['admin', 'courier', 'remittances'],
-        queryFn: () => courierApi.listRemittances(20, 0),
+        queryKey: ['admin', 'courier', 'remittances', codBranchId ?? 'account'],
+        queryFn: () => courierApi.listRemittances(20, 0, codBranchId),
         retry: false,
     });
 
-    const pickupColumns: ColumnsType<PickupLocationSyncResult> = [
+    const pickupColumns: ColumnsType<OutletSyncResult> = [
         { title: 'Branch', dataIndex: 'branch_name', key: 'branch_name' },
         { title: 'Code', dataIndex: 'branch_code', key: 'branch_code', width: 90 },
         {
@@ -176,9 +189,9 @@ const CourierSettings: React.FC = () => {
             render: (a: string) => <Tag color={ACTION_COLORS[a] ?? 'default'}>{a}</Tag>,
         },
         {
-            title: 'Pickup ID',
-            dataIndex: 'pickup_location_id',
-            key: 'pickup_location_id',
+            title: 'Outlet ID',
+            dataIndex: 'outlet_id',
+            key: 'outlet_id',
             width: 100,
             render: (v: number | null) => v ?? <Text type="secondary">—</Text>,
         },
@@ -191,7 +204,7 @@ const CourierSettings: React.FC = () => {
     ];
 
     const orphanColumns: ColumnsType<CoverageOrphan> = [
-        { title: 'Post Office', dataIndex: 'post_office', key: 'post_office' },
+        { title: 'Postal City', dataIndex: 'postal_city', key: 'postal_city' },
         { title: 'District', dataIndex: 'district', key: 'district' },
         {
             title: 'Saved addresses',
@@ -201,6 +214,12 @@ const CourierSettings: React.FC = () => {
             render: (n: number) =>
                 n > 0 ? <Tag color="red">{n} customer(s) affected</Tag> : <Text type="secondary">none</Text>,
         },
+    ];
+
+    const skippedColumns: ColumnsType<CoverageSkipped> = [
+        { title: 'Postal City', dataIndex: 'postal_city', key: 'postal_city' },
+        { title: 'SribeesExpress district', dataIndex: 'district', key: 'district' },
+        { title: 'Our directory has it under', dataIndex: 'held_by_district', key: 'held_by_district' },
     ];
 
     /** Columns derived from whatever the payout rows actually contain. */
@@ -228,7 +247,7 @@ const CourierSettings: React.FC = () => {
                     type="info"
                     showIcon
                     message="Read-only"
-                    description="Registering pickup locations, syncing coverage and rotating the webhook secret configure the whole SribeesExpress account, so they are Super Admin actions. You can still see what SribeesExpress owes us below."
+                    description="Registering outlets, syncing postal cities and rotating webhook secrets configure the SribeesExpress accounts, so they are Super Admin actions. You can still see what SribeesExpress owes us below."
                 />
             )}
 
@@ -243,7 +262,7 @@ const CourierSettings: React.FC = () => {
                         title={
                             <Space>
                                 <EnvironmentOutlined />
-                                <span>1. Post office coverage</span>
+                                <span>1. Postal cities</span>
                             </Space>
                         }
                         extra={
@@ -253,17 +272,16 @@ const CourierSettings: React.FC = () => {
                                 loading={coverageMut.isPending}
                                 onClick={() => coverageMut.mutate()}
                             >
-                                Sync Coverage
+                                Sync Postal Cities
                             </Button>
                         }
                     >
                         <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                            Replaces our hand-typed post office list with SribeesExpress's own, in
-                            their spelling. Their matching is exact — our seeded{' '}
-                            <Text code>Mathugama</Text> does not match their{' '}
-                            <Text code>Matugama</Text>, and the customer sees "not serviceable".
-                            Run this before the first live order, and again whenever they configure
-                            a new district.
+                            Pulls SribeesExpress's postal city list and links our directory and
+                            every saved customer address to their postal city ids. Cart delivery
+                            charges are priced between the branch outlet's postal city and the
+                            customer's, so an unmatched address cannot be quoted. Run this before
+                            the first live order, and again whenever they add coverage.
                         </Paragraph>
 
                         {coverage && (
@@ -272,6 +290,7 @@ const CourierSettings: React.FC = () => {
                                     <Statistic title="Fetched" value={coverage.fetched} />
                                     <Statistic title="Added" value={coverage.created} />
                                     <Statistic title="Updated" value={coverage.updated} />
+                                    <Statistic title="Addresses matched" value={coverage.addresses_matched} />
                                     <Statistic title="Re-enabled" value={coverage.reactivated} />
                                     <Statistic
                                         title="Disabled"
@@ -303,7 +322,7 @@ const CourierSettings: React.FC = () => {
                                         type="warning"
                                         showIcon
                                         style={{ marginBottom: 12 }}
-                                        message="Post offices switched off that customers still use"
+                                        message="Postal cities switched off that customers still use"
                                         description="SribeesExpress does not deliver to these. Any saved address naming one will be refused at checkout until the customer picks a different address — worth reaching out rather than waiting for the complaint."
                                     />
                                 )}
@@ -311,22 +330,40 @@ const CourierSettings: React.FC = () => {
                                     <Table
                                         columns={orphanColumns}
                                         dataSource={coverage.orphaned}
-                                        rowKey={(r) => `${r.district}:${r.post_office}`}
+                                        rowKey={(r) => `${r.district}:${r.postal_city}`}
                                         size="small"
                                         pagination={false}
                                     />
+                                )}
+                                {coverage.skipped.length > 0 && (
+                                    <>
+                                        <Alert
+                                            type="info"
+                                            showIcon
+                                            style={{ margin: '12px 0' }}
+                                            message="Skipped — same name, different district"
+                                            description="These were not linked because our directory holds the name under another district. Fix the district in Delivery Zones and sync again."
+                                        />
+                                        <Table
+                                            columns={skippedColumns}
+                                            dataSource={coverage.skipped}
+                                            rowKey={(r) => `${r.district}:${r.postal_city}`}
+                                            size="small"
+                                            pagination={false}
+                                        />
+                                    </>
                                 )}
                             </>
                         )}
                     </Card>
 
-                    {/* 2. Pickup locations */}
+                    {/* 2. Outlets */}
                     <Card
                         size="small"
                         title={
                             <Space>
                                 <ShopOutlined />
-                                <span>2. Branch pickup locations</span>
+                                <span>2. Branch outlets</span>
                             </Space>
                         }
                         extra={
@@ -336,16 +373,17 @@ const CourierSettings: React.FC = () => {
                                 loading={pickupMut.isPending}
                                 onClick={() => pickupMut.mutate()}
                             >
-                                Register Branches
+                                Register Outlets
                             </Button>
                         }
                     >
                         <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                            Tells SribeesExpress where a rider collects for each branch. A branch
-                            that is not registered still books successfully — the rider is just
-                            sent to the account's default address instead, so the parcel is never
-                            collected and nothing in the booking says why. Re-run after adding a
-                            branch or changing its address.
+                            A branch with its own API key is its own SribeesExpress client: quotes
+                            are priced from, and riders collect at, the postal city of the address
+                            it registered with, so it needs no outlet (<Text code>own_account</Text>).
+                            Branches that share the account key are registered as outlets so each
+                            is priced and collected from its own postal city. Re-run after adding
+                            a branch, changing its address or giving it a new API key.
                         </Paragraph>
 
                         {pickup && (
@@ -362,11 +400,24 @@ const CourierSettings: React.FC = () => {
                     {/* 3. Webhook */}
                     <Card size="small" title="3. Status webhook">
                         <Paragraph type="secondary">
-                            SribeesExpress signs every status push with a secret that is shown{' '}
-                            <b>exactly once</b>, at registration. Registering again mints a new
-                            secret and immediately invalidates the old one, so do it only when the
-                            URL changes or the secret is lost.
+                            SribeesExpress signs every status push with a per-account secret. The
+                            backend stores it encrypted the moment it is minted — it is never shown
+                            here. Register once per branch account; registering the same URL again
+                            rotates that account's secret.
                         </Paragraph>
+                        <Select
+                            allowClear
+                            placeholder="Account default"
+                            style={{ width: '100%', maxWidth: 640, marginBottom: 8 }}
+                            value={webhookBranchId}
+                            onChange={(v) => setWebhookBranchId(v)}
+                            options={(credentials?.branches ?? []).map((b) => ({
+                                value: b.branch_id,
+                                label: `${b.branch_name} (${b.branch_code}) · ${b.key_source} key${
+                                    b.webhook_secret_stored ? ' · secret stored' : ''
+                                }`,
+                            }))}
+                        />
                         <Space.Compact style={{ width: '100%', maxWidth: 640 }}>
                             <Input
                                 value={webhookUrl}
@@ -387,26 +438,31 @@ const CourierSettings: React.FC = () => {
                                 disabled={!webhookUrl.trim().startsWith('https://')}
                                 onClick={() => webhookMut.mutate(webhookUrl.trim())}
                             >
-                                Register &amp; Mint Secret
+                                Register Webhook
                             </Button>
                         </Space.Compact>
 
                         {webhook && (
                             <Alert
-                                type="success"
+                                type={webhook.secret_stored ? 'success' : 'warning'}
                                 showIcon
                                 style={{ marginTop: 12 }}
-                                message="Registered — copy the secret now"
+                                message={
+                                    webhook.secret_stored
+                                        ? 'Registered — secret stored encrypted'
+                                        : 'Registered, but no secret was stored'
+                                }
                                 description={
-                                    <>
-                                        <Paragraph style={{ marginBottom: 8 }}>
-                                            Put this in <Text code>COURIER_WEBHOOK_SECRET</Text> and
-                                            redeploy the backend <b>before the next status change</b>,
-                                            or every inbound push will fail signature verification.
-                                            It cannot be read back.
-                                        </Paragraph>
-                                        <RawFields value={webhook} />
-                                    </>
+                                    <Descriptions column={1} size="small">
+                                        <Descriptions.Item label="Endpoint">
+                                            {webhook.endpoint_id ?? '—'}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="URL">{webhook.url}</Descriptions.Item>
+                                        <Descriptions.Item label="Environment">
+                                            {webhook.environment}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="Key">{webhook.key_source}</Descriptions.Item>
+                                    </Descriptions>
                                 }
                             />
                         )}
@@ -429,7 +485,7 @@ const CourierSettings: React.FC = () => {
                         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
                             SribeesExpress does not retry a webhook that fails to reach us, so a
                             missed push is invisible — the order simply stops moving. This sweep
-                            re-reads everything that changed since the last run and is what an
+                            re-reads everything that changed since the last run in every branch account and is what an
                             external cron should call every 10–15 minutes. The button is for after
                             an outage.
                         </Paragraph>
@@ -442,17 +498,35 @@ const CourierSettings: React.FC = () => {
                 size="small"
                 title="Cash on delivery held by SribeesExpress"
                 extra={
-                    <Button size="small" icon={<ReloadOutlined />} onClick={() => refetchCod()}>
-                        Refresh
-                    </Button>
+                    <Space>
+                        {isSuperAdmin && (
+                            <Select
+                                allowClear
+                                size="small"
+                                style={{ minWidth: 220 }}
+                                placeholder="Account default"
+                                value={codBranchId}
+                                onChange={(v) => setCodBranchId(v)}
+                                options={(credentials?.branches ?? []).map((b) => ({
+                                    value: b.branch_id,
+                                    label: `${b.branch_name} (${b.branch_code})`,
+                                }))}
+                            />
+                        )}
+                        <Button size="small" icon={<ReloadOutlined />} onClick={() => refetchCod()}>
+                            Refresh
+                        </Button>
+                    </Space>
                 }
                 loading={codLoading}
             >
                 <Paragraph type="secondary">
-                    Cash collected from our customers that has not been paid out to us yet. Their
-                    payout runs are triggered by their ops team rather than a scheduler, so this
-                    sitting still for days is normal — it is a growing gap with no matching payout
-                    that is worth raising.
+                    Cash collected from our customers that has not been paid out to us yet, for
+                    the SribeesExpress account serving the branch above (leave it empty for the
+                    account key). A branch with its own key has its own balance and its own payout
+                    runs. Those runs are triggered by their ops team rather than a scheduler, so
+                    this sitting still for days is normal — it is a growing gap with no matching
+                    payout that is worth raising.
                 </Paragraph>
                 {codError ? (
                     <Alert

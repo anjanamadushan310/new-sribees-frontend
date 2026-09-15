@@ -1,7 +1,10 @@
 /**
  * Platform Settings (Module 7.6) — Super Admin only.
- * Data-driven configuration that removes hardcoded values (delivery fee, tax
- * rate, splash video URL). TanStack Query against /api/v1/admin/settings.
+ * Data-driven configuration that removes hardcoded values (tax rate, splash
+ * video URL). TanStack Query against /api/v1/admin/settings.
+ *
+ * The delivery charge is deliberately not here: SribeesExpress quotes it per
+ * parcel, from the branch to the customer's postal city.
  */
 import React, { useEffect } from 'react';
 import {
@@ -38,7 +41,6 @@ const PlatformSettings: React.FC = () => {
     useEffect(() => {
         if (data) {
             form.setFieldsValue({
-                flat_delivery_fee: data.flat_delivery_fee,
                 order_tax_rate_percent: data.order_tax_rate_percent,
                 splash_video_url: data.splash_video_url ?? undefined,
             });
@@ -58,7 +60,6 @@ const PlatformSettings: React.FC = () => {
     const handleSave = async () => {
         const values = await form.validateFields();
         saveMutation.mutate({
-            flat_delivery_fee: values.flat_delivery_fee,
             order_tax_rate_percent: values.order_tax_rate_percent,
             splash_video_url: values.splash_video_url?.trim() || null,
         });
@@ -99,19 +100,13 @@ const PlatformSettings: React.FC = () => {
                         }
                         style={{ marginBottom: 16 }}
                     >
-                        <Form.Item
-                            label="Flat Delivery Fee"
-                            name="flat_delivery_fee"
-                            rules={[{ required: true, message: 'Enter a delivery fee' }]}
-                            extra="Applied to every non-empty cart at checkout."
-                        >
-                            <InputNumber
-                                min={0}
-                                step={10}
-                                style={{ width: 240 }}
-                                addonBefore="Rs"
-                            />
-                        </Form.Item>
+                        <Alert
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                            message="Delivery charges come from SribeesExpress"
+                            description="Each cart's delivery charge is quoted by SribeesExpress, from the branch that fulfils it to the customer's postal city, by weight. It is not set here. Rates are managed on the SribeesExpress side; an area they do not deliver to cannot be checked out."
+                        />
 
                         <Form.Item
                             label="Order Tax Rate"

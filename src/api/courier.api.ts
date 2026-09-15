@@ -14,33 +14,40 @@
  */
 import apiClient from './client';
 
-/** One branch's outcome from the pickup-location registration sweep. */
-export interface PickupLocationSyncResult {
+/** One branch's outcome from the outlet registration sweep. */
+export interface OutletSyncResult {
     branch_code: string;
     branch_name: string;
-    pickup_location_id: number | null;
+    /** The SribeesExpress outlet whose postal city is the pickup origin for this branch. */
+    outlet_id: number | null;
     /**
-     * created | updated | recovered | skipped | failed.
-     * `recovered` means SribeesExpress already held a location under this
-     * branch's name and we re-linked its id — creating a duplicate is refused
-     * by design, so this is the repair path, not an error.
+     * created | updated | recovered | own_account | skipped | failed.
+     * `own_account`: the branch books with its own key, so it is collected at
+     * the address its SribeesExpress client registered with and needs no outlet.
      */
     action: string;
     detail: string | null;
 }
 
-export interface PickupLocationSyncResponse {
+export interface OutletSyncResponse {
     synced: number;
     failed: number;
-    results: PickupLocationSyncResult[];
+    results: OutletSyncResult[];
 }
 
-/** A directory row the coverage sync switched off that something still names. */
+/** A directory row the postal city sync switched off that something still names. */
 export interface CoverageOrphan {
-    post_office: string;
+    postal_city: string;
     district: string;
     /** Saved customer addresses still pointing at it — each one a checkout that will now be refused. */
     addresses: number;
+}
+
+/** A postal city SribeesExpress reported under a district other than ours. */
+export interface CoverageSkipped {
+    postal_city: string;
+    district: string;
+    held_by_district: string;
 }
 
 export interface CoverageSyncResponse {
@@ -49,21 +56,31 @@ export interface CoverageSyncResponse {
     updated: number;
     reactivated: number;
     deactivated: number;
+    /** Saved addresses re-linked to a SribeesExpress postal city id. */
+    addresses_matched: number;
     /** Districts SribeesExpress reported on — only these are reconciled. */
     districts_covered: string[];
     orphaned: CoverageOrphan[];
+    skipped: CoverageSkipped[];
 }
 
 export interface CourierSweepResponse {
     seen: number;
     applied: number;
+    /** Distinct SribeesExpress accounts (branch keys) swept. */
+    accounts: number;
 }
 
-/** Shown exactly once, at registration. Never readable again — only rotatable. */
+/**
+ * The secret SribeesExpress mints is stored encrypted server-side and never
+ * returned — registration only reports that it was stored.
+ */
 export interface WebhookRegistration {
-    secret?: string;
-    url?: string;
-    [key: string]: unknown;
+    endpoint_id: number | null;
+    url: string;
+    environment: 'test' | 'live';
+    key_source: 'branch' | 'account';
+    secret_stored: boolean;
 }
 
 /** One environment's account-wide setup, described without its secret. */
@@ -86,6 +103,7 @@ export interface CourierEnvironmentConfig {
     /** A key IS stored but will not decrypt — the master key changed. Re-enter it. */
     api_key_unreadable: boolean;
     usable: boolean;
+    webhook_secret_stored: boolean;
 }
 
 /** One branch's own credentials and which environment it books in. */
@@ -105,6 +123,8 @@ export interface CourierBranchKeyStatus {
     key_source: 'branch' | 'account';
     set_at: string | null;
     set_by: string | null;
+    outlet_id: number | null;
+    webhook_secret_stored: boolean;
 }
 
 export interface CourierCredentials {
@@ -131,7 +151,7 @@ export interface CourierKeyTestResult {
     environment: 'test' | 'live' | null;
     key_source: 'branch' | 'account' | null;
     detail: string;
-    post_offices: number | null;
+    postal_cities: number | null;
 }
 
 export type CodBalance = Record<string, unknown>;
@@ -193,8 +213,8 @@ export const courierApi = {
 
     /**
      * Give one branch its own SribeesExpress account for an environment.
-     * After setting one, re-run the pickup-location sync: the branch's pickup
-     * address exists in the old account, not the new one.
+     * After setting one, re-run the outlet sync: the branch's outlet
+     * exists in the old account, not the new one.
      */
     setBranchKey: async (
         branchId: string,
@@ -231,33 +251,29 @@ export const courierApi = {
     },
 
     /**
-     * Rebuild post_office_directory from GET /ecommerce/coverage.
-     * Run this before the first live order: the directory was hand-seeded and
-     * two of its three names do not match SribeesExpress's spelling, which
-     * reaches the customer as "not serviceable".
+     * Rebuild the postal city directory from SribeesExpress's GET /postal-cities
+     * and re-link saved addresses to their postal city ids. Their matching is
+     * by id, so an unmatched name reaches the customer as "not serviceable".
      */
-    syncCoverage: async (): Promise<CoverageSyncResponse> => {
-        const res = await apiClient.post<CoverageSyncResponse>('/admin/courier/coverage/sync');
+    syncPostalCities: async (): Promise<CoverageSyncResponse> => {
+        const res = await apiClient.post<CoverageSyncResponse>('/admin/courier/postal-cities/sync');
         return res.data;
     },
 
     /**
-     * Register every active branch as a pickup location, or update the one
-     * already registered. Safe to re-run — an existing registration is
-     * PATCHed, never re-created, so ids stay stable and booked shipments keep
-     * resolving.
+     * Register branches that share the account key as SribeesExpress outlets,
+     * so each is priced and collected from its own postal city. Branches with
+     * their own key are reported as `own_account` and left alone.
      */
-    syncPickupLocations: async (): Promise<PickupLocationSyncResponse> => {
-        const res = await apiClient.post<PickupLocationSyncResponse>(
-            '/admin/courier/pickup-locations/sync',
-        );
+    syncOutlets: async (): Promise<OutletSyncResponse> => {
+        const res = await apiClient.post<OutletSyncResponse>('/admin/courier/outlets/sync');
         return res.data;
     },
 
     /**
-     * Run the shipment reconciliation sweep now. SribeesExpress does not retry
-     * webhooks, so this poll is the real source of truth; an external cron
-     * calls it on a schedule and ops calls it by hand after an outage.
+     * Run the shipment reconciliation sweep now, across every branch account.
+     * SribeesExpress does not retry webhooks, so this poll is the real source
+     * of truth; an external cron calls it on a schedule.
      */
     runSweep: async (): Promise<CourierSweepResponse> => {
         const res = await apiClient.post<CourierSweepResponse>('/admin/courier/sync');
@@ -265,32 +281,37 @@ export const courierApi = {
     },
 
     /**
-     * Register our webhook URL. The secret in the response is shown ONCE —
-     * it goes into COURIER_WEBHOOK_SECRET and the backend is redeployed, or
-     * every inbound status update fails signature verification.
+     * Register our webhook URL with the account serving `branchId` (or the
+     * account default). The minted secret is stored encrypted by the backend
+     * and never shown; registering the same URL again rotates it.
      */
-    registerWebhook: async (url: string, description = ''): Promise<WebhookRegistration> => {
-        const res = await apiClient.post<{ success: boolean; data: WebhookRegistration }>(
-            '/admin/courier/webhook-endpoint',
-            null,
-            { params: { url, description } },
-        );
-        return res.data.data;
+    registerWebhook: async (
+        url: string,
+        description = '',
+        branchId?: string,
+    ): Promise<WebhookRegistration> => {
+        const res = await apiClient.post<WebhookRegistration>('/admin/courier/webhook-endpoint', {
+            url,
+            description,
+            branch_id: branchId ?? null,
+        });
+        return res.data;
     },
 
     /** Cash SribeesExpress has collected from our customers and not yet paid out. */
-    getCodBalance: async (): Promise<CodBalance> => {
+    getCodBalance: async (branchId?: string): Promise<CodBalance> => {
         const res = await apiClient.get<{ success: boolean; data: CodBalance }>(
             '/admin/courier/cod-balance',
+            { params: branchId ? { branch_id: branchId } : {} },
         );
         return res.data.data;
     },
 
     /** COD payout history. Read-only — their ops generates and settles the runs. */
-    listRemittances: async (limit = 50, offset = 0): Promise<Remittance[]> => {
+    listRemittances: async (limit = 50, offset = 0, branchId?: string): Promise<Remittance[]> => {
         const res = await apiClient.get<{ success: boolean; data: Remittance[] }>(
             '/admin/courier/remittances',
-            { params: { limit, offset } },
+            { params: { limit, offset, ...(branchId ? { branch_id: branchId } : {}) } },
         );
         return res.data.data ?? [];
     },

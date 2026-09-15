@@ -11,7 +11,7 @@ export interface Branch {
     name: string;
     code: string;
     address: string;
-    post_office: string;
+    postal_city: string;
     district: string;
     province: string;
     phone?: string;
@@ -44,8 +44,6 @@ export interface BranchSettings {
     auto_reorder_enabled: boolean;
     delivery_radius_km: number;
     min_order_amount: number;
-    delivery_fee: number;
-    free_delivery_threshold: number;
 }
 
 // Branch Stats (Dashboard)

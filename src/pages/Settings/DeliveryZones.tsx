@@ -1,7 +1,7 @@
 /**
- * Delivery Zones — master Post Office directory management (Super Admin only).
+ * Delivery Zones — master Postal City directory management (Super Admin only).
  *
- * Add / edit / delete Post Offices, each mapped to a District and Province.
+ * Add / edit / delete Postal Cities, each mapped to a District and Province.
  * This is the source-of-truth the Branch form reads from when picking coverage
  * areas. Backed by /api/v1/admin/locations.
  */
@@ -30,7 +30,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { locationsApi } from '../../api/locations.api';
-import type { PostOffice, PostOfficePayload } from '../../api/locations.api';
+import type { PostalCity, PostalCityPayload } from '../../api/locations.api';
 import { SL_PROVINCES, districtsForProvince } from '../../data/slLocations';
 
 const { Text } = Typography;
@@ -38,7 +38,7 @@ const { Text } = Typography;
 const LOCATIONS_KEY = ['admin', 'locations', 'all'];
 
 interface ZoneFormValues {
-    post_office: string;
+    postal_city: string;
     province: string;
     district: string;
     is_active?: boolean;
@@ -53,7 +53,7 @@ const DeliveryZones: React.FC = () => {
     const [form] = Form.useForm<ZoneFormValues>();
 
     const [modalOpen, setModalOpen] = useState(false);
-    const [editing, setEditing] = useState<PostOffice | null>(null);
+    const [editing, setEditing] = useState<PostalCity | null>(null);
     const [search, setSearch] = useState('');
 
     const provinceValue = Form.useWatch('province', form);
@@ -66,18 +66,18 @@ const DeliveryZones: React.FC = () => {
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin', 'locations'] });
 
     const createMutation = useMutation({
-        mutationFn: (payload: PostOfficePayload) => locationsApi.create(payload),
+        mutationFn: (payload: PostalCityPayload) => locationsApi.create(payload),
         onSuccess: () => {
             message.success('Post office added.');
             closeModal();
             invalidate();
         },
         onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to add post office.'),
+            message.error(err.response?.data?.detail || 'Failed to add postal city.'),
     });
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, payload }: { id: string; payload: Partial<PostOfficePayload> }) =>
+        mutationFn: ({ id, payload }: { id: string; payload: Partial<PostalCityPayload> }) =>
             locationsApi.update(id, payload),
         onSuccess: () => {
             message.success('Post office updated.');
@@ -85,7 +85,7 @@ const DeliveryZones: React.FC = () => {
             invalidate();
         },
         onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to update post office.'),
+            message.error(err.response?.data?.detail || 'Failed to update postal city.'),
     });
 
     const deleteMutation = useMutation({
@@ -95,7 +95,7 @@ const DeliveryZones: React.FC = () => {
             invalidate();
         },
         onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to remove post office.'),
+            message.error(err.response?.data?.detail || 'Failed to remove postal city.'),
     });
 
     const openCreate = () => {
@@ -105,10 +105,10 @@ const DeliveryZones: React.FC = () => {
         setModalOpen(true);
     };
 
-    const openEdit = (zone: PostOffice) => {
+    const openEdit = (zone: PostalCity) => {
         setEditing(zone);
         form.setFieldsValue({
-            post_office: zone.post_office,
+            postal_city: zone.postal_city,
             province: zone.province,
             district: zone.district,
             is_active: zone.is_active,
@@ -128,8 +128,8 @@ const DeliveryZones: React.FC = () => {
 
     const handleSubmit = async () => {
         const values = await form.validateFields();
-        const payload: PostOfficePayload = {
-            post_office: values.post_office.trim(),
+        const payload: PostalCityPayload = {
+            postal_city: values.postal_city.trim(),
             province: values.province.trim(),
             district: values.district.trim(),
             is_active: values.is_active ?? true,
@@ -145,7 +145,7 @@ const DeliveryZones: React.FC = () => {
         () =>
             zones.filter(
                 (z) =>
-                    z.post_office.toLowerCase().includes(search.toLowerCase()) ||
+                    z.postal_city.toLowerCase().includes(search.toLowerCase()) ||
                     z.district.toLowerCase().includes(search.toLowerCase()) ||
                     z.province.toLowerCase().includes(search.toLowerCase())
             ),
@@ -161,13 +161,13 @@ const DeliveryZones: React.FC = () => {
         editing?.district,
     ]).map((d) => ({ label: d, value: d }));
 
-    const columns: ColumnsType<PostOffice> = [
+    const columns: ColumnsType<PostalCity> = [
         {
-            title: 'Post Office',
-            dataIndex: 'post_office',
-            key: 'post_office',
+            title: 'Postal City',
+            dataIndex: 'postal_city',
+            key: 'postal_city',
             render: (v: string) => <Text strong>{v}</Text>,
-            sorter: (a, b) => a.post_office.localeCompare(b.post_office),
+            sorter: (a, b) => a.postal_city.localeCompare(b.postal_city),
         },
         {
             title: 'District',
@@ -202,7 +202,7 @@ const DeliveryZones: React.FC = () => {
                         Edit
                     </Button>
                     <Popconfirm
-                        title="Remove post office"
+                        title="Remove postal city"
                         description="Branches covering it will lose this area from their mapping."
                         okText="Remove"
                         okButtonProps={{ danger: true }}
@@ -237,16 +237,16 @@ const DeliveryZones: React.FC = () => {
                         </Space>
                     </Text>
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                        Master list of Post Offices. The Branch form picks coverage areas from here.
+                        Master list of Postal Cities. The Branch form picks coverage areas from here.
                     </Text>
                 </Space>
                 <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                    Add Post Office
+                    Add Postal City
                 </Button>
             </div>
 
             <Input
-                placeholder="Search by post office, district or province"
+                placeholder="Search by postal city, district or province"
                 allowClear
                 prefix={<SearchOutlined />}
                 style={{ width: 340, marginBottom: 16 }}
@@ -259,12 +259,12 @@ const DeliveryZones: React.FC = () => {
                 columns={columns}
                 dataSource={filtered}
                 loading={isLoading}
-                locale={{ emptyText: isError ? 'Failed to load post offices.' : 'No post offices yet.' }}
-                pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `Total ${t} post offices` }}
+                locale={{ emptyText: isError ? 'Failed to load postal cities.' : 'No postal cities yet.' }}
+                pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `Total ${t} postal cities` }}
             />
 
             <Modal
-                title={editing ? 'Edit Post Office' : 'New Post Office'}
+                title={editing ? 'Edit Postal City' : 'New Postal City'}
                 open={modalOpen}
                 onOk={handleSubmit}
                 onCancel={closeModal}
@@ -274,8 +274,8 @@ const DeliveryZones: React.FC = () => {
             >
                 <Form form={form} layout="vertical" initialValues={{ is_active: true }}>
                     <Form.Item
-                        label="Post Office"
-                        name="post_office"
+                        label="Postal City"
+                        name="postal_city"
                         rules={[{ required: true, message: 'Post office name is required' }]}
                     >
                         <Input placeholder="e.g. Welipenna" />

@@ -2,7 +2,7 @@
  * Sri Lanka administrative geography — canonical 9 Provinces and 25 Districts.
  *
  * Source-of-truth for the Province → District cascading dropdowns in the Branch
- * form and the Delivery Zones settings tab. Post Offices are NOT hardcoded here;
+ * form and the Delivery Zones settings tab. Postal Cities are NOT hardcoded here;
  * they come from the master directory API (/admin/locations), filtered by the
  * selected district.
  *

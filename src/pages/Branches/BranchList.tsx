@@ -5,14 +5,14 @@
  *
  * Province → District are dependent dropdowns describing where the branch
  * physically IS. They do NOT constrain what it DELIVERS to: "Coverage Areas" is
- * a multi-select over the entire national Post Office directory
+ * a multi-select over the entire national Postal City directory
  * (/admin/locations), because a branch near a district border routinely serves
- * post offices on the other side of it. The selected district only decides
- * ordering — its post offices are grouped at the top, with every other district
+ * postal cities on the other side of it. The selected district only decides
+ * ordering — its postal cities are grouped at the top, with every other district
  * grouped beneath.
  *
- * Selected post offices are sent as `coverage_post_offices: string[]` and the
- * backend syncs PostOfficeBranchMapping.
+ * Selected postal cities are sent as `coverage_postal_cities: string[]` and the
+ * backend syncs PostalCityBranchMapping.
  */
 import React, { useState } from 'react';
 import {
@@ -55,7 +55,7 @@ interface BranchFormValues {
     address?: string;
     province: string;
     district?: string;
-    coverage_post_offices?: string[];
+    coverage_postal_cities?: string[];
     phone?: string;
     is_active?: boolean;
 }
@@ -81,11 +81,11 @@ const BranchList: React.FC = () => {
         queryFn: branchesApi.list,
     });
 
-    // The ENTIRE national Post Office directory — deliberately not filtered by the
+    // The ENTIRE national Postal City directory — deliberately not filtered by the
     // branch's district. A branch near a district border routinely delivers across
     // it, so coverage is a logistics decision, not a consequence of the branch's
     // own address. The district only decides how the list is *ordered* below.
-    const { data: postOffices = [], isFetching: poLoading } = useQuery({
+    const { data: postalCities = [], isFetching: poLoading } = useQuery({
         queryKey: ['admin', 'locations', 'all'],
         queryFn: () => locationsApi.list({ active_only: true }),
         enabled: modalOpen,
@@ -142,7 +142,7 @@ const BranchList: React.FC = () => {
             address: branch.address ?? '',
             province: branch.province,
             district: branch.district ?? undefined,
-            coverage_post_offices: branch.coverage_post_offices ?? [],
+            coverage_postal_cities: branch.coverage_postal_cities ?? [],
             phone: branch.phone ?? '',
             is_active: branch.is_active,
         });
@@ -156,7 +156,7 @@ const BranchList: React.FC = () => {
     };
 
     // Province still gates District — a district only exists inside its province.
-    // Coverage is deliberately NOT cleared: post offices are no longer scoped to
+    // Coverage is deliberately NOT cleared: postal cities are no longer scoped to
     // the branch's district, so a cross-border selection must survive an edit to
     // the branch's own address. Wiping it here is what forced admins back into
     // single-district coverage.
@@ -172,7 +172,7 @@ const BranchList: React.FC = () => {
             address: values.address?.trim() || null,
             province: values.province.trim(),
             district: values.district?.trim() || null,
-            coverage_post_offices: values.coverage_post_offices ?? [],
+            coverage_postal_cities: values.coverage_postal_cities ?? [],
             phone: values.phone?.trim() || null,
         };
         if (editing) {
@@ -205,21 +205,21 @@ const BranchList: React.FC = () => {
     // Coverage options, grouped so the common case is one click away without
     // hiding the rest of the country:
     //   1. the branch's own district (the 90% case) pinned to the top, then
-    //   2. "Other Districts" — every remaining post office, for border deliveries.
+    //   2. "Other Districts" — every remaining postal city, for border deliveries.
     //
     // Out-of-district entries carry their district in the label ("Panadura ·
     // Kalutara") so an admin can tell them apart and can search by district name.
-    // The *value* stays the bare post-office name, so the `coverage_post_offices:
+    // The *value* stays the bare postal-city name, so the `coverage_postal_cities:
     // string[]` payload is byte-for-byte unchanged.
-    const postOfficeOptions = React.useMemo(() => {
-        if (postOffices.length === 0) return [];
+    const postalCityOptions = React.useMemo(() => {
+        if (postalCities.length === 0) return [];
 
         const inDistrict = districtValue
-            ? postOffices.filter((po) => po.district === districtValue)
+            ? postalCities.filter((po) => po.district === districtValue)
             : [];
         const others = districtValue
-            ? postOffices.filter((po) => po.district !== districtValue)
-            : postOffices;
+            ? postalCities.filter((po) => po.district !== districtValue)
+            : postalCities;
 
         const groups: {
             label: string;
@@ -230,8 +230,8 @@ const BranchList: React.FC = () => {
             groups.push({
                 label: districtValue as string,
                 options: inDistrict.map((po) => ({
-                    label: po.post_office,
-                    value: po.post_office,
+                    label: po.postal_city,
+                    value: po.postal_city,
                 })),
             });
         }
@@ -240,16 +240,16 @@ const BranchList: React.FC = () => {
             groups.push({
                 // With no district chosen there is nothing to contrast against,
                 // so the whole directory is simply one list.
-                label: districtValue ? 'Other Districts' : 'All Post Offices',
+                label: districtValue ? 'Other Districts' : 'All Postal Cities',
                 options: others.map((po) => ({
-                    label: `${po.post_office} · ${po.district}`,
-                    value: po.post_office,
+                    label: `${po.postal_city} · ${po.district}`,
+                    value: po.postal_city,
                 })),
             });
         }
 
         return groups;
-    }, [postOffices, districtValue]);
+    }, [postalCities, districtValue]);
 
     const columns: ColumnsType<Branch> = [
         {
@@ -286,7 +286,7 @@ const BranchList: React.FC = () => {
             title: 'Coverage',
             key: 'coverage',
             render: (_, record) => {
-                const pos = record.coverage_post_offices ?? [];
+                const pos = record.coverage_postal_cities ?? [];
                 if (pos.length === 0) return <Text type="secondary">—</Text>;
                 const shown = pos.slice(0, 2);
                 return (
@@ -436,7 +436,7 @@ const BranchList: React.FC = () => {
                     <Form.Item
                         label="City / District"
                         name="district"
-                        extra="Where the branch physically sits. It does not limit coverage — it just floats this district's post offices to the top of the list below."
+                        extra="Where the branch physically sits. It does not limit coverage — it just floats this district's postal cities to the top of the list below."
                     >
                         <Select
                             placeholder={provinceValue ? 'Select district' : 'Select a province first'}
@@ -451,18 +451,18 @@ const BranchList: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item
-                        label="Coverage Areas (Post Offices)"
-                        name="coverage_post_offices"
+                        label="Coverage Areas (Postal Cities)"
+                        name="coverage_postal_cities"
                         extra={
                             districtValue
                                 ? `Post offices this branch delivers to. ${districtValue} is listed first, but you can select from any district — border branches often deliver across one. Manage the master list in Settings → Delivery Zones.`
-                                : 'Post offices this branch delivers to, from anywhere in the country. Pick a district above to float its post offices to the top.'
+                                : 'Post offices this branch delivers to, from anywhere in the country. Pick a district above to float its postal cities to the top.'
                         }
                     >
                         <Select
                             mode="multiple"
-                            placeholder="Search and select post offices"
-                            options={postOfficeOptions}
+                            placeholder="Search and select postal cities"
+                            options={postalCityOptions}
                             // Never gated on district: coverage is independent of
                             // the branch's own address.
                             loading={poLoading}
@@ -470,14 +470,14 @@ const BranchList: React.FC = () => {
                             showSearch
                             // Searches the label of every option in BOTH groups —
                             // antd matches within groups, so an out-of-district
-                            // post office is reachable by typing its name (or its
+                            // postal city is reachable by typing its name (or its
                             // district, which is part of the label).
                             optionFilterProp="label"
                             maxTagCount="responsive"
                             notFoundContent={
                                 poLoading
                                     ? 'Loading…'
-                                    : 'No post offices in the directory yet — add them in Settings → Delivery Zones.'
+                                    : 'No postal cities in the directory yet — add them in Settings → Delivery Zones.'
                             }
                         />
                     </Form.Item>

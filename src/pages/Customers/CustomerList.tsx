@@ -624,7 +624,7 @@ const CustomerList: React.FC = () => {
                                                 </div>
                                                 <Text>{addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ''}</Text>
                                                 <br />
-                                                <Text type="secondary">{addr.post_office}, {addr.district}, {addr.province} (Postal Code: {addr.postal_code})</Text>
+                                                <Text type="secondary">{addr.postal_city}, {addr.district}, {addr.province} (Postal Code: {addr.postal_code})</Text>
                                             </div>
                                         </List.Item>
                                     )}

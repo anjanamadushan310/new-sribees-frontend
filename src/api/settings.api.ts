@@ -3,11 +3,14 @@
  * Wraps checkout pricing + mobile-app configuration.
  *
  * Note: order_tax_rate_percent is a percentage (15 = 15%).
+ *
+ * There is no delivery fee here. The delivery charge is SribeesExpress's quote
+ * for each parcel, priced from the fulfilling branch to the customer's postal
+ * city; the backend refuses a `flat_delivery_fee` field outright.
  */
 import apiClient from './client';
 
 export interface PlatformSettings {
-    flat_delivery_fee: number;
     order_tax_rate_percent: number;
     splash_video_url: string | null;
 }

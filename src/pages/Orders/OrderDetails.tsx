@@ -70,7 +70,8 @@ export const statusTag = (status: OrderStatus, showPrefix: boolean = false) => {
 };
 
 const NOTIFY_ON: OrderStatus[] = [
-    'handed_to_courier', 'shipped', 'out_for_delivery', 'delivered', 'delivery_failed',
+    'ready_for_pickup', 'handed_to_courier', 'shipped', 'out_for_delivery', 'delivered',
+    'delivery_failed',
 ];
 
 interface OrderDetailsProps {
@@ -205,6 +206,16 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     Change <b>{order.order_number}</b> from {statusLabel(order.status)} to{' '}
                     <b>{statusLabel(target)}</b>?
                     {NOTIFY_ON.includes(target) && ' The customer will be notified.'}
+                    {target === 'ready_for_pickup' && (
+                        <>
+                            {' '}
+                            This books the parcel with SribeesExpress at the delivery charge
+                            agreed at checkout
+                            {order.courier?.payment_method === 'cod'
+                                ? `, and the rider collects ${formatLKR(order.courier.cod_amount)} on delivery.`
+                                : '; it is prepaid, so there is nothing to collect.'}
+                        </>
+                    )}
                 </span>
             ),
             okText: 'Update',
@@ -408,7 +419,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                             {order.delivery_address.address_line2
                                 ? `, ${order.delivery_address.address_line2}`
                                 : ''}
-                            , {order.delivery_address.post_office}, {order.delivery_address.district},{' '}
+                            , {order.delivery_address.postal_city}, {order.delivery_address.district},{' '}
                             {order.delivery_address.province} {order.delivery_address.postal_code}
                         </Text>
                     ) : (

@@ -1,15 +1,15 @@
 /**
- * Admin Post Office Directory API (/api/v1/admin/locations) — Super Admin only.
+ * Admin Postal City Directory API (/api/v1/admin/locations) — Super Admin only.
  *
- * The master "Delivery Zones" catalog: every Post Office tagged with its
+ * The master "Delivery Zones" catalog: every Postal City tagged with its
  * District and Province. Powers the Branch form's coverage picker and the
  * Delivery Zones settings tab. Wire format is snake_case.
  */
 import apiClient from './client';
 
-export interface PostOffice {
+export interface PostalCity {
     id: string;
-    post_office: string;
+    postal_city: string;
     district: string;
     province: string;
     is_active: boolean;
@@ -17,8 +17,8 @@ export interface PostOffice {
     updated_at?: string | null;
 }
 
-export interface PostOfficePayload {
-    post_office: string;
+export interface PostalCityPayload {
+    postal_city: string;
     district: string;
     province: string;
     is_active?: boolean;
@@ -32,28 +32,28 @@ export interface LocationFilter {
 
 interface ListWire {
     success: boolean;
-    data: { post_offices: PostOffice[] };
+    data: { postal_cities: PostalCity[] };
     total: number;
 }
 
 interface MutationWire {
     success: boolean;
-    data: PostOffice;
+    data: PostalCity;
     message: string;
 }
 
 export const locationsApi = {
-    list: async (filter: LocationFilter = {}): Promise<PostOffice[]> => {
+    list: async (filter: LocationFilter = {}): Promise<PostalCity[]> => {
         const res = await apiClient.get<ListWire>('/admin/locations', { params: filter });
-        return res.data.data.post_offices;
+        return res.data.data.postal_cities;
     },
 
-    create: async (payload: PostOfficePayload): Promise<PostOffice> => {
+    create: async (payload: PostalCityPayload): Promise<PostalCity> => {
         const res = await apiClient.post<MutationWire>('/admin/locations', payload);
         return res.data.data;
     },
 
-    update: async (id: string, payload: Partial<PostOfficePayload>): Promise<PostOffice> => {
+    update: async (id: string, payload: Partial<PostalCityPayload>): Promise<PostalCity> => {
         const res = await apiClient.put<MutationWire>(`/admin/locations/${id}`, payload);
         return res.data.data;
     },

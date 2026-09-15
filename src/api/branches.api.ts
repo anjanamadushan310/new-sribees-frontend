@@ -29,14 +29,14 @@ export interface Branch {
     address?: string | null;
     district?: string | null;
     province: string;
-    post_office?: string | null;
+    postal_city?: string | null;
     phone?: string | null;
     manager_id?: string | null;
     is_active: boolean;
     /** Daily dispatch rounds, ordered by dispatch_time. Empty = not set up. */
     delivery_runs: DeliveryRun[];
-    /** Post Offices this branch serves (synced to PostOfficeBranchMapping). */
-    coverage_post_offices: string[];
+    /** Postal Cities this branch serves (synced to PostalCityBranchMapping). */
+    coverage_postal_cities: string[];
     created_at?: string | null;
     updated_at?: string | null;
 }
@@ -49,8 +49,8 @@ export interface BranchPayload {
     province: string;
     phone?: string | null;
     is_active?: boolean;
-    /** Full replacement set of Post Offices this branch serves. */
-    coverage_post_offices?: string[];
+    /** Full replacement set of Postal Cities this branch serves. */
+    coverage_postal_cities?: string[];
 }
 
 interface BranchListWire {
