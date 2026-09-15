@@ -579,6 +579,34 @@ const ProductForm: React.FC = () => {
                                             min={0.001}
                                             step={0.01}
                                             precision={3}
+                                            parser={(val) => (val ? (val.replace(/[^0-9.]/g, '') as any) : '')}
+                                            onKeyDown={(e) => {
+                                                if (
+                                                    [
+                                                        'Backspace',
+                                                        'Delete',
+                                                        'Tab',
+                                                        'Escape',
+                                                        'Enter',
+                                                        'ArrowLeft',
+                                                        'ArrowRight',
+                                                        'ArrowUp',
+                                                        'ArrowDown',
+                                                        'Home',
+                                                        'End',
+                                                    ].includes(e.key) ||
+                                                    e.ctrlKey ||
+                                                    e.metaKey
+                                                ) {
+                                                    return;
+                                                }
+                                                if (e.key === '.' && !(e.currentTarget as HTMLInputElement).value.includes('.')) {
+                                                    return;
+                                                }
+                                                if (!/^[0-9]$/.test(e.key)) {
+                                                    e.preventDefault();
+                                                }
+                                            }}
                                         />
                                     </Form.Item>
                                 </Col>
