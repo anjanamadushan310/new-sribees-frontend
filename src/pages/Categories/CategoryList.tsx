@@ -414,7 +414,7 @@ const CategoryList: React.FC = () => {
                     showIcon
                     style={{ marginBottom: 16 }}
                     message="Branch Categories View"
-                    description="Showing categories currently active and visible in your branch. To manage category visibility, go to Settings → My Branch."
+                    description="Showing categories with visibility status for your branch. To activate or deactivate categories for your branch, go to Settings → My Branch."
                 />
             )}
 
