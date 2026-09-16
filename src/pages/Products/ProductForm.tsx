@@ -33,7 +33,6 @@ import type { ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
-import { usePermissions } from '../../hooks/usePermissions';
 import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
 
@@ -83,7 +82,6 @@ const ProductForm: React.FC = () => {
     const isBranchScoped = !!user && !isSuperAdmin && user.role !== AdminRole.CUSTOMER_SUPPORT;
     const isReadOnlyUser = !!user && user.role === AdminRole.CUSTOMER_SUPPORT;
 
-    const { canUpdate, canCreate } = usePermissions();
     const catalogDisabled = !isSuperAdmin;
     const readOnly = isReadOnlyUser || (!isSuperAdmin && !isBranchScoped);
 
