@@ -35,6 +35,8 @@ import type { Category, CategoryPayload } from '../../api/categories.api';
 import CategoryImageUpload from '../../components/categories/CategoryImageUpload';
 import { usePermissions } from '../../hooks/usePermissions';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
+import { useAuthStore } from '../../store/authStore';
+import { AdminRole } from '../../types/admin.types';
 
 const { Title, Text } = Typography;
 
@@ -63,6 +65,12 @@ const CategoryList: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<CategoryPayload>();
+    const user = useAuthStore((state) => state.user);
+    const isBranchScoped =
+        !!user &&
+        user.role !== AdminRole.SUPER_ADMIN &&
+        user.role !== AdminRole.CUSTOMER_SUPPORT;
+
     // Support staff get a read-only Categories screen (B5).
     const { canCreate, canUpdate, canDelete } = usePermissions();
     const canWrite = canCreate('categories') || canUpdate('categories');
@@ -400,6 +408,16 @@ const CategoryList: React.FC = () => {
                 )}
             </div>
 
+            {isBranchScoped && (
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Branch Categories View"
+                    description="Showing categories currently active and visible in your branch. To manage category visibility, go to Settings → My Branch."
+                />
+            )}
+
             <Card>
                 <div style={{ marginBottom: 16 }}>
                     <DebouncedSearchInput
@@ -419,6 +437,7 @@ const CategoryList: React.FC = () => {
                         emptyText: isError ? 'Failed to load categories.' : 'No categories yet.',
                     }}
                     expandable={{ defaultExpandAllRows: true }}
+                    sticky
                     scroll={{ x: 'max-content' }}
                     pagination={{
                         pageSize: 10,

@@ -105,6 +105,7 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
         { resource: 'dashboard', action: 'read' },
         { resource: 'products', action: 'read' },
         { resource: 'products', action: 'update' },
+        { resource: 'categories', action: 'read' },
         { resource: 'orders', action: 'read' },
         { resource: 'orders', action: 'update' },
         { resource: 'customers', action: 'read' },
