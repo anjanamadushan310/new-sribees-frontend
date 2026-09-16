@@ -620,10 +620,6 @@ const ProductForm: React.FC = () => {
                                             options={[
                                                 { label: 'g (Grams)', value: 'g' },
                                                 { label: 'kg (Kilograms)', value: 'kg' },
-                                                { label: 'ml (Milliliters)', value: 'ml' },
-                                                { label: 'l (Liters)', value: 'l' },
-                                                { label: 'pcs (Pieces)', value: 'pcs' },
-                                                { label: 'pack (Packs)', value: 'pack' },
                                             ]}
                                         />
                                     </Form.Item>
