@@ -34,6 +34,8 @@ import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useAuthStore } from '../../store/authStore';
+import { AdminRole } from '../../types/admin.types';
 
 const { TextArea } = Input;
 const { Title } = Typography;
@@ -76,10 +78,14 @@ const ProductForm: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<ProductFormValues>();
-    // Support staff (products:read, no products:update) reach the edit route
-    // only to inspect a product — render the whole form read-only (B5).
+    const user = useAuthStore((state) => state.user);
+    const isSuperAdmin = user?.role === AdminRole.SUPER_ADMIN;
+    const isBranchScoped = !!user && !isSuperAdmin && user.role !== AdminRole.CUSTOMER_SUPPORT;
+    const isReadOnlyUser = !!user && user.role === AdminRole.CUSTOMER_SUPPORT;
+
     const { canUpdate, canCreate } = usePermissions();
-    const readOnly = isEdit ? !canUpdate('products') : !canCreate('products');
+    const catalogDisabled = !isSuperAdmin;
+    const readOnly = isReadOnlyUser || (!isSuperAdmin && !isBranchScoped);
 
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
     // Snapshot of server-side images at load time, to diff removals on save.
@@ -238,13 +244,19 @@ const ProductForm: React.FC = () => {
                 ? await productsApi.update(id!, payload)
                 : await productsApi.create(payload);
 
-            if (isEdit) {
+            if (isEdit && isSuperAdmin) {
                 await syncImages(saved.product_id);
             }
             return saved;
         },
         onSuccess: () => {
-            message.success(isEdit ? 'Product updated.' : 'Product created.');
+            message.success(
+                isBranchScoped
+                    ? 'Branch visibility updated.'
+                    : isEdit
+                    ? 'Product updated.'
+                    : 'Product created.'
+            );
             queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
             if (isEdit) {
                 queryClient.invalidateQueries({ queryKey: ['admin', 'product', id] });
@@ -326,10 +338,24 @@ const ProductForm: React.FC = () => {
             </Button>
 
             <Title level={3}>
-                {readOnly ? 'Product Details' : isEdit ? 'Edit Product' : 'New Product'}
+                {isBranchScoped
+                    ? 'Product Details & Branch Visibility'
+                    : readOnly
+                    ? 'Product Details'
+                    : isEdit
+                    ? 'Edit Product'
+                    : 'New Product'}
             </Title>
 
-            {readOnly ? (
+            {isBranchScoped ? (
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Branch Product View"
+                    description="Global catalog details (name, descriptions, images, weight, category, SKU, base price) are managed by Super Admin and are view-only. You can manage whether this product is Active (Visible) or Inactive (Hidden) for your branch below."
+                />
+            ) : readOnly ? (
                 <Alert
                     type="info"
                     showIcon
@@ -350,7 +376,6 @@ const ProductForm: React.FC = () => {
             <Form
                 form={form}
                 layout="vertical"
-                disabled={readOnly}
                 onFinish={(values) => saveMutation.mutate(values)}
                 initialValues={{ is_active: true, is_featured: false, weight_unit: 'kg' }}
             >
@@ -384,6 +409,7 @@ const ProductForm: React.FC = () => {
                                                     rules={[{ required: true, message: 'Name is required' }]}
                                                 >
                                                     <Input
+                                                        disabled={catalogDisabled}
                                                         placeholder="e.g. Organic Whole Milk 1L"
                                                         onChange={(e) => {
                                                              if (!slugTouched) {
@@ -401,12 +427,13 @@ const ProductForm: React.FC = () => {
                                                     rules={[{ max: 500, message: 'Max 500 characters' }]}
                                                 >
                                                     <TextArea
+                                                        disabled={catalogDisabled}
                                                         rows={2}
                                                         placeholder="One-line summary shown in listings"
                                                     />
                                                 </Form.Item>
                                                 <Form.Item label="Description" name="description">
-                                                    <TextArea rows={5} placeholder="Full product description" />
+                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="Full product description" />
                                                 </Form.Item>
                                             </>
                                         ),
@@ -421,7 +448,7 @@ const ProductForm: React.FC = () => {
                                                     name="name_si"
                                                     rules={[{ max: 255, message: 'Max 255 characters' }]}
                                                 >
-                                                    <Input placeholder="උදා. නැවුම් කිරි (ලීටර් 1)" />
+                                                    <Input disabled={catalogDisabled} placeholder="උදා. නැවුම් කිරි (ලීටර් 1)" />
                                                 </Form.Item>
                                                 <Form.Item
                                                     label="Short Description (Sinhala)"
@@ -429,6 +456,7 @@ const ProductForm: React.FC = () => {
                                                     rules={[{ max: 500, message: 'Max 500 characters' }]}
                                                 >
                                                     <TextArea
+                                                        disabled={catalogDisabled}
                                                         rows={2}
                                                         placeholder="ලැයිස්තුවේ පෙන්වන එක් පේළියක සාරාංශය"
                                                     />
@@ -437,7 +465,7 @@ const ProductForm: React.FC = () => {
                                                     label="Description (Sinhala)"
                                                     name="description_si"
                                                 >
-                                                    <TextArea rows={5} placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය" />
+                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය" />
                                                 </Form.Item>
                                             </>
                                         ),
@@ -452,7 +480,7 @@ const ProductForm: React.FC = () => {
                                                     name="name_ta"
                                                     rules={[{ max: 255, message: 'Max 255 characters' }]}
                                                 >
-                                                    <Input placeholder="எ.கா. புதிய பால் (1 லி)" />
+                                                    <Input disabled={catalogDisabled} placeholder="எ.கா. புதிய பால் (1 லி)" />
                                                 </Form.Item>
                                                 <Form.Item
                                                     label="Short Description (Tamil)"
@@ -460,6 +488,7 @@ const ProductForm: React.FC = () => {
                                                     rules={[{ max: 500, message: 'Max 500 characters' }]}
                                                 >
                                                     <TextArea
+                                                        disabled={catalogDisabled}
                                                         rows={2}
                                                         placeholder="பட்டியலில் காட்டப்படும் ஒரு வரி சுருக்கம்"
                                                     />
@@ -468,7 +497,7 @@ const ProductForm: React.FC = () => {
                                                     label="Description (Tamil)"
                                                     name="description_ta"
                                                 >
-                                                    <TextArea rows={5} placeholder="முழு தயாரிப்பு விவரம்" />
+                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="முழு தயாரிப்பு விவரம்" />
                                                 </Form.Item>
                                             </>
                                         ),
@@ -488,6 +517,7 @@ const ProductForm: React.FC = () => {
                                 ]}
                             >
                                 <Input
+                                    disabled={catalogDisabled}
                                     placeholder="organic-whole-milk-1l"
                                     onChange={() => setSlugTouched(true)}
                                 />
@@ -499,6 +529,7 @@ const ProductForm: React.FC = () => {
                                         Search Keywords
                                         <Button
                                             size="small"
+                                            disabled={catalogDisabled}
                                             icon={<ThunderboltOutlined />}
                                             loading={suggestKeywordsMutation.isPending}
                                             onClick={() => suggestKeywordsMutation.mutate()}
@@ -511,6 +542,7 @@ const ProductForm: React.FC = () => {
                                 extra="Sinhala/Tamil/Singlish/Tamilish alternate names, common misspellings — helps customers find this product however they search. Never shown to customers."
                             >
                                 <TextArea
+                                    disabled={catalogDisabled}
                                     rows={2}
                                     placeholder="e.g. kesel, කෙසෙල්, வாழைப்பழம், ambul kesel"
                                 />
@@ -549,6 +581,7 @@ const ProductForm: React.FC = () => {
                                     }}
                                     maxImages={5}
                                     maxFileSizeMB={1}
+                                    disabled={catalogDisabled}
                                     productId={isEdit ? id : undefined}
                                 />
                             </Form.Item>
@@ -581,6 +614,7 @@ const ProductForm: React.FC = () => {
                                         ]}
                                     >
                                         <InputNumber
+                                            disabled={catalogDisabled}
                                             style={{ width: '100%' }}
                                             placeholder="e.g. 500 or 1.5"
                                             min={0.001}
@@ -624,6 +658,7 @@ const ProductForm: React.FC = () => {
                                         rules={[{ required: true, message: 'Select unit' }]}
                                     >
                                         <Select
+                                            disabled={catalogDisabled}
                                             options={[
                                                 { label: 'g (Grams)', value: 'g' },
                                                 { label: 'kg (Kilograms)', value: 'kg' },
@@ -645,6 +680,7 @@ const ProductForm: React.FC = () => {
                                 extra="Default base price. Branch managers will see this as the default price when adding the product to their branch."
                             >
                                 <InputNumber
+                                    disabled={catalogDisabled}
                                     min={0}
                                     step={0.01}
                                     precision={2}
@@ -662,6 +698,7 @@ const ProductForm: React.FC = () => {
                                 rules={[{ required: true, message: 'Category is required' }]}
                             >
                                 <Select
+                                    disabled={catalogDisabled}
                                     placeholder="Select a category"
                                     allowClear
                                     showSearch
@@ -689,6 +726,7 @@ const ProductForm: React.FC = () => {
                                 }
                             >
                                 <Select
+                                    disabled={catalogDisabled || !selectedCategoryId || subcategories.length === 0}
                                     placeholder={
                                         selectedCategoryId
                                             ? 'Select a sub-category'
@@ -697,7 +735,6 @@ const ProductForm: React.FC = () => {
                                     allowClear
                                     showSearch
                                     optionFilterProp="label"
-                                    disabled={!selectedCategoryId || subcategories.length === 0}
                                     options={subcategories.map((c) => ({
                                         label: c.name,
                                         value: c.category_id,
@@ -711,12 +748,14 @@ const ProductForm: React.FC = () => {
                                 rules={[{ required: true, whitespace: true, message: 'SKU is required' }]}
                             >
                                 <Input
+                                    disabled={catalogDisabled}
                                     placeholder="e.g. MILK-ORG-1L"
                                     suffix={
                                         <Tooltip title="Generate Unique SKU automatically based on Name and Category">
                                             <Button
                                                 type="text"
                                                 size="small"
+                                                disabled={catalogDisabled}
                                                 icon={<StarOutlined style={{ color: '#faad14', fontSize: 16 }} />}
                                                 loading={suggestSkuMutation.isPending}
                                                 onClick={() => suggestSkuMutation.mutate()}
@@ -727,12 +766,25 @@ const ProductForm: React.FC = () => {
                                 />
                             </Form.Item>
 
-                            <Form.Item label="Active" name="is_active" valuePropName="checked">
-                                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                            <Form.Item
+                                label={isBranchScoped ? 'Visible in this Branch' : 'Active'}
+                                name="is_active"
+                                valuePropName="checked"
+                                extra={
+                                    isBranchScoped
+                                        ? "Turn on to show this product to customers in your branch's mobile app; turn off to hide it."
+                                        : undefined
+                                }
+                            >
+                                <Switch
+                                    disabled={readOnly}
+                                    checkedChildren={isBranchScoped ? 'Visible' : 'Active'}
+                                    unCheckedChildren={isBranchScoped ? 'Hidden' : 'Inactive'}
+                                />
                             </Form.Item>
 
                             <Form.Item label="Featured" name="is_featured" valuePropName="checked">
-                                <Switch />
+                                <Switch disabled={catalogDisabled} />
                             </Form.Item>
 
                             {/* A catalog-level fact (a carrot is perishable in every
@@ -746,7 +798,7 @@ const ProductForm: React.FC = () => {
                                 valuePropName="checked"
                                 tooltip="Short shelf life — prioritised for Quick Sale clearance"
                             >
-                                <Switch checkedChildren="Perishable" unCheckedChildren="Shelf-stable" />
+                                <Switch disabled={catalogDisabled} checkedChildren="Perishable" unCheckedChildren="Shelf-stable" />
                             </Form.Item>
                         </Card>
                     </Col>
@@ -759,7 +811,11 @@ const ProductForm: React.FC = () => {
                         size="large"
                         loading={saveMutation.isPending}
                     >
-                        {isEdit ? 'Update Product' : 'Create Product'}
+                        {isBranchScoped
+                            ? 'Update Branch Visibility'
+                            : isEdit
+                            ? 'Update Product'
+                            : 'Create Product'}
                     </Button>
                     <Button
                         size="large"

@@ -395,20 +395,29 @@ const ProductList: React.FC = () => {
                                 Add Deal
                             </Button>
                         ))}
-                    <Button
-                        type="link"
-                        icon={<EyeOutlined />}
-                        onClick={() => navigate(`/products/${record.product_id}/edit`)}
-                    >
-                        View
-                    </Button>
-                    {canEditProduct && (
+                    {isBranchScoped ? (
+                        <Button
+                            type="link"
+                            icon={<EyeOutlined />}
+                            onClick={() => navigate(`/products/${record.product_id}/edit`)}
+                        >
+                            View / Visibility
+                        </Button>
+                    ) : canEditProduct ? (
                         <Button
                             type="link"
                             icon={<EditOutlined />}
                             onClick={() => navigate(`/products/${record.product_id}/edit`)}
                         >
                             Edit
+                        </Button>
+                    ) : (
+                        <Button
+                            type="link"
+                            icon={<EyeOutlined />}
+                            onClick={() => navigate(`/products/${record.product_id}/edit`)}
+                        >
+                            View
                         </Button>
                     )}
                     {canDeleteProduct && (
