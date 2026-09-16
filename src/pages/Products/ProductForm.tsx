@@ -254,8 +254,8 @@ const ProductForm: React.FC = () => {
                 isBranchScoped
                     ? 'Branch visibility updated.'
                     : isEdit
-                    ? 'Product updated.'
-                    : 'Product created.'
+                        ? 'Product updated.'
+                        : 'Product created.'
             );
             queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
             if (isEdit) {
@@ -341,10 +341,10 @@ const ProductForm: React.FC = () => {
                 {isBranchScoped
                     ? 'Product Details & Branch Visibility'
                     : readOnly
-                    ? 'Product Details'
-                    : isEdit
-                    ? 'Edit Product'
-                    : 'New Product'}
+                        ? 'Product Details'
+                        : isEdit
+                            ? 'Edit Product'
+                            : 'New Product'}
             </Title>
 
             {isBranchScoped ? (
@@ -412,7 +412,7 @@ const ProductForm: React.FC = () => {
                                                         disabled={catalogDisabled}
                                                         placeholder="e.g. Organic Whole Milk 1L"
                                                         onChange={(e) => {
-                                                             if (!slugTouched) {
+                                                            if (!slugTouched) {
                                                                 form.setFieldValue(
                                                                     'slug',
                                                                     slugify(e.target.value)
@@ -577,7 +577,7 @@ const ProductForm: React.FC = () => {
                                     onChange={(newGallery) => {
                                         setGallery(newGallery);
                                         form.setFieldValue('images', newGallery);
-                                        form.validateFields(['images']).catch(() => {});
+                                        form.validateFields(['images']).catch(() => { });
                                     }}
                                     maxImages={5}
                                     maxFileSizeMB={1}
@@ -814,8 +814,8 @@ const ProductForm: React.FC = () => {
                         {isBranchScoped
                             ? 'Update Branch Visibility'
                             : isEdit
-                            ? 'Update Product'
-                            : 'Create Product'}
+                                ? 'Update Product'
+                                : 'Create Product'}
                     </Button>
                     <Button
                         size="large"
