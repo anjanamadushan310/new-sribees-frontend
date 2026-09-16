@@ -234,7 +234,9 @@ const ProductForm: React.FC = () => {
                 ? await productsApi.update(id!, payload)
                 : await productsApi.create(payload);
 
-            await syncImages(saved.product_id);
+            if (isEdit) {
+                await syncImages(saved.product_id);
+            }
             return saved;
         },
         onSuccess: () => {
@@ -542,6 +544,7 @@ const ProductForm: React.FC = () => {
                                         form.validateFields(['images']).catch(() => {});
                                     }}
                                     maxImages={5}
+                                    maxFileSizeMB={1}
                                     productId={isEdit ? id : undefined}
                                 />
                             </Form.Item>

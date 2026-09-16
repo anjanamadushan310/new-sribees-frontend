@@ -50,7 +50,7 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
     value = [],
     onChange,
     maxImages = 5,
-    maxFileSizeMB = 5,
+    maxFileSizeMB = 1,
     disabled = false,
     productId,
 }) => {
@@ -71,8 +71,11 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
             message.error('Only image files are allowed.');
             return false;
         }
-        if (file.size / 1024 / 1024 >= maxFileSizeMB) {
-            message.error(`Image must be smaller than ${maxFileSizeMB}MB.`);
+        if (file.size > maxFileSizeMB * 1024 * 1024) {
+            const actualMb = (file.size / 1024 / 1024).toFixed(1);
+            message.error(
+                `Image size (${actualMb}MB) exceeds the maximum limit of ${maxFileSizeMB}MB. Please upload an image under ${maxFileSizeMB}MB.`
+            );
             return false;
         }
         if (value.length >= maxImages) {
@@ -141,7 +144,7 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
                 <Space>
                     <Text strong>Product Images</Text>
                     <Text type="secondary">
-                        ({value.length}/{maxImages}) — the ★ image is the thumbnail
+                        ({value.length}/{maxImages}) — Max {maxFileSizeMB}MB per image. The ★ image is the thumbnail
                     </Text>
                 </Space>
             </div>
