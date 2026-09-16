@@ -548,6 +548,17 @@ const BranchInventory: React.FC = () => {
                             loading={loadingStockable}
                             filterOption={false}
                             onSearch={setAddSearch}
+                            onChange={(productId) => {
+                                const selected = (stockable?.products ?? []).find(
+                                    (p: StockableProduct) => p.product_id === productId
+                                );
+                                if (selected && selected.global_price !== undefined && selected.global_price !== null) {
+                                    addForm.setFieldValue(
+                                        'branch_price',
+                                        selected.global_price > 0 ? selected.global_price : undefined
+                                    );
+                                }
+                            }}
                             notFoundContent={
                                 loadingStockable
                                     ? 'Searching…'
@@ -567,7 +578,7 @@ const BranchInventory: React.FC = () => {
                             { required: true, message: 'Enter the price for this branch' },
                             { type: 'number', min: 0.01, message: 'Price must be greater than 0' },
                         ]}
-                        extra="The global catalog carries no price of its own — set what this branch sells it for."
+                        extra="Defaulted to the catalog Base Price. You can change it specifically for this branch."
                     >
                         <InputNumber
                             min={0.01}

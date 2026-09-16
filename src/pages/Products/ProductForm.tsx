@@ -51,6 +51,7 @@ interface ProductFormValues {
     name_ta?: string;
     slug: string;
     sku?: string;
+    price?: number | null;
     category_id?: string;
     subcategory_id?: string;
     description?: string;
@@ -108,12 +109,14 @@ const ProductForm: React.FC = () => {
     useEffect(() => {
         if (product) {
             setSlugTouched(true);
+            const globalPrice = product.global_price ?? product.price;
             form.setFieldsValue({
                 name: product.name,
                 name_si: product.name_si ?? undefined,
                 name_ta: product.name_ta ?? undefined,
                 slug: product.slug,
                 sku: product.sku ?? undefined,
+                price: globalPrice !== null && globalPrice !== undefined ? Number(globalPrice) : undefined,
                 category_id: product.category_id ?? undefined,
                 subcategory_id: product.subcategory_id ?? undefined,
                 description: product.description ?? undefined,
@@ -222,6 +225,7 @@ const ProductForm: React.FC = () => {
                 short_description_si: values.short_description_si?.trim() || null,
                 short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
+                price: values.price !== undefined && values.price !== null ? Number(values.price) : 0,
                 weight: Number(values.weight),
                 weight_unit: values.weight_unit || 'kg',
                 is_active: values.is_active,
@@ -338,8 +342,8 @@ const ProductForm: React.FC = () => {
                     type="info"
                     showIcon
                     style={{ marginBottom: 16 }}
-                    message="No price, stock or cashback here"
-                    description="This is the shared catalog entry only. Price, stock quantity and cashback % are set per branch by that branch's manager, from Inventory → Add Product to Branch."
+                    message="Global Catalog Product"
+                    description="Set the shared catalog details and default Base Price here. Branch stock quantities and branch-specific price overrides are managed per branch from Inventory."
                 />
             )}
 
@@ -631,6 +635,24 @@ const ProductForm: React.FC = () => {
                             <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: -8 }}>
                                 💡 1kg ට අඩු භාණ්ඩ සඳහා <strong>Grams (g)</strong> ද (උදා: 250g, 500g), 1kg හෝ ඊට වැඩි භාණ්ඩ සඳහා <strong>Kilograms (kg)</strong> ද (උදා: 1kg, 2.5kg) තෝරන්න.
                             </Typography.Text>
+                        </Card>
+
+                        <Card title="Pricing" style={{ marginBottom: 16 }}>
+                            <Form.Item
+                                label="Base Price (LKR)"
+                                name="price"
+                                tooltip="Global catalog base price. If left empty, defaults to 0.00. Branches can override this price with their own local price in Inventory."
+                                extra="Default base price. Branch managers will see this as the default price when adding the product to their branch."
+                            >
+                                <InputNumber
+                                    min={0}
+                                    step={0.01}
+                                    precision={2}
+                                    style={{ width: '100%' }}
+                                    prefix="LKR"
+                                    placeholder="0.00"
+                                />
+                            </Form.Item>
                         </Card>
 
                         <Card title="Organization" style={{ marginBottom: 16 }}>
