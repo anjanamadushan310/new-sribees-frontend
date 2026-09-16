@@ -60,10 +60,22 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
 
     const emit = (next: GalleryImage[]) => {
         // Guarantee exactly one primary whenever the list is non-empty.
-        if (next.length > 0 && !next.some((img) => img.is_primary)) {
-            next = next.map((img, i) => ({ ...img, is_primary: i === 0 }));
+        let hasFoundPrimary = false;
+        const normalized = next.map((img) => {
+            if (img.is_primary) {
+                if (!hasFoundPrimary) {
+                    hasFoundPrimary = true;
+                    return img;
+                }
+                return { ...img, is_primary: false };
+            }
+            return img;
+        });
+
+        if (normalized.length > 0 && !hasFoundPrimary) {
+            normalized[0] = { ...normalized[0], is_primary: true };
         }
-        onChange?.(next);
+        onChange?.(normalized);
     };
 
     const beforeUpload = (file: RcFile): boolean => {
@@ -89,6 +101,10 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
         setUploading(true);
         try {
             const url = await productsApi.uploadImage(file);
+            if (value.some((img) => img.image_url === url)) {
+                message.warning('This image is already added.');
+                return;
+            }
             const newImage: GalleryImage = {
                 uid: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                 image_url: url,

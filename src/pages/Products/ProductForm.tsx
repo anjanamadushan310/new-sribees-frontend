@@ -136,15 +136,23 @@ const ProductForm: React.FC = () => {
                 is_featured: product.is_featured,
                 is_perishable: product.is_perishable ?? false,
             });
-            const loaded: GalleryImage[] = product.images
+            let primaryAssigned = false;
+            const loaded: GalleryImage[] = (product.images || [])
                 .slice()
                 .sort((a, b) => a.sort_order - b.sort_order)
-                .map((img) => ({
-                    uid: img.image_id,
-                    image_id: img.image_id,
-                    image_url: img.image_url,
-                    is_primary: img.is_primary,
-                }));
+                .map((img) => {
+                    const isPrimary = img.is_primary && !primaryAssigned;
+                    if (isPrimary) primaryAssigned = true;
+                    return {
+                        uid: img.image_id,
+                        image_id: img.image_id,
+                        image_url: img.image_url,
+                        is_primary: isPrimary,
+                    };
+                });
+            if (loaded.length > 0 && !primaryAssigned) {
+                loaded[0].is_primary = true;
+            }
             setGallery(loaded);
             setOriginalImages(loaded);
             form.setFieldsValue({ images: loaded });
