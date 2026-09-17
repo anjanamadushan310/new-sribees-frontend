@@ -11,6 +11,7 @@ export interface Coupon {
     code: string;
     /** Owning branch; null = network-wide (Super Admin only). */
     branch_id?: string | null;
+    branch_name?: string | null;
     /** Convenience mirror of `branch_id === null`, sent by the server. */
     is_network_wide?: boolean;
     description: string | null;
@@ -65,6 +66,7 @@ export type CouponStatus = 'active' | 'scheduled' | 'expired' | 'inactive' | 'de
 
 export interface CouponPayload {
     code: string;
+    branch_id?: string | null;
     description?: string | null;
     discount_type: DiscountType;
     discount_value: number;
@@ -93,6 +95,7 @@ export interface CouponListParams {
     page?: number;
     limit?: number;
     search?: string;
+    branch_id?: string;
     is_active?: boolean;
     /** Filter tab. Derived server-side; see Coupon.status. */
     status?: CouponStatus;

@@ -36,6 +36,8 @@ import {
     ExclamationCircleOutlined,
     WalletOutlined,
     RiseOutlined,
+    GlobalOutlined,
+    ShopOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -43,6 +45,8 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { couponsApi } from '../../api/coupons.api';
 import type { Coupon, CouponPayload, CouponStatus, DiscountType } from '../../api/coupons.api';
 import { categoriesApi } from '../../api/categories.api';
+import { branchesApi } from '../../api/branches.api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -111,32 +115,45 @@ interface CouponFormValues {
     first_order_only?: boolean;
     eligibility: 'all' | 'categories';
     category_ids?: string[];
+    branch_scope: 'network' | 'branch';
+    branch_id?: string | null;
 }
 
 const CouponList: React.FC = () => {
     const { message } = App.useApp();
+    const { isSuperAdmin } = usePermissions();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<CouponFormValues>();
     const discountType = Form.useWatch('discount_type', form);
+    const branchScope = Form.useWatch('branch_scope', form);
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
+    const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
     const [statusTab, setStatusTab] = useState<CouponStatus | 'all'>('all');
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Coupon | null>(null);
     const eligibility = Form.useWatch('eligibility', form);
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: [COUPONS_KEY, { page, pageSize, search, statusTab }],
+        queryKey: [COUPONS_KEY, { page, pageSize, search, statusTab, selectedBranch }],
         queryFn: () =>
             couponsApi.list({
                 page,
                 limit: pageSize,
                 search: search || undefined,
                 status: statusTab === 'all' ? undefined : statusTab,
+                branch_id: selectedBranch || undefined,
             }),
         placeholderData: keepPreviousData,
+    });
+
+    // Branches for Super Admin filter and assignment
+    const branchesQuery = useQuery({
+        queryKey: ['admin', 'branches', 'list'],
+        queryFn: () => branchesApi.list(),
+        enabled: isSuperAdmin,
     });
 
     // For the catalog-eligibility picker. Only fetched while the modal is open.
@@ -207,6 +224,8 @@ const CouponList: React.FC = () => {
             auto_stop_on_budget: true,
             first_order_only: false,
             eligibility: 'all',
+            branch_scope: 'network',
+            branch_id: null,
         });
         setModalOpen(true);
     };
@@ -231,6 +250,8 @@ const CouponList: React.FC = () => {
             first_order_only: c.first_order_only,
             eligibility: c.category_ids.length ? 'categories' : 'all',
             category_ids: c.category_ids,
+            branch_scope: c.branch_id ? 'branch' : 'network',
+            branch_id: c.branch_id ?? undefined,
         });
         setModalOpen(true);
     };
@@ -255,6 +276,11 @@ const CouponList: React.FC = () => {
         const minOrder = values.min_order_value ?? 0;
         const payload: CouponPayload = {
             code: values.code.trim().toUpperCase(),
+            branch_id: isSuperAdmin
+                ? values.branch_scope === 'branch'
+                    ? (values.branch_id || null)
+                    : null
+                : undefined,
             description: values.description?.trim() || null,
             discount_type: values.discount_type,
             discount_value: values.discount_value,
@@ -309,12 +335,12 @@ const CouponList: React.FC = () => {
                             </Tag>
                         )}
                         {c.is_network_wide ? (
-                            <Tag color="gold" style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                            <Tag color="gold" icon={<GlobalOutlined />} style={{ marginInlineEnd: 0, fontSize: 11 }}>
                                 All branches
                             </Tag>
                         ) : (
-                            <Tag color="blue" style={{ marginInlineEnd: 0, fontSize: 11 }}>
-                                This branch
+                            <Tag color="blue" icon={<ShopOutlined />} style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                {c.branch_name || 'This branch'}
                             </Tag>
                         )}
                     </div>
@@ -553,17 +579,37 @@ const CouponList: React.FC = () => {
                     style={{ marginBottom: 16 }}
                 />
 
-                <div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
                     <Input.Search
                         placeholder="Search code or description…"
                         allowClear
                         enterButton={<SearchOutlined />}
-                        style={{ width: 320, marginBottom: 16 }}
+                        style={{ width: 280 }}
                         onSearch={(value) => {
                             setPage(1);
                             setSearch(value);
                         }}
                     />
+                    {isSuperAdmin && (
+                        <Select
+                            allowClear
+                            placeholder="Filter by Branch"
+                            style={{ width: 230 }}
+                            value={selectedBranch}
+                            onChange={(val) => {
+                                setPage(1);
+                                setSelectedBranch(val);
+                            }}
+                            options={[
+                                { label: '🌐 All Branches & Network-wide', value: '' },
+                                { label: '⚡ Network-wide only', value: 'network' },
+                                ...(branchesQuery.data ?? []).map((b) => ({
+                                    label: `🏢 ${b.name}`,
+                                    value: b.branch_id,
+                                })),
+                            ]}
+                        />
+                    )}
                 </div>
 
                 <Table
@@ -774,6 +820,38 @@ const CouponList: React.FC = () => {
                             SCOPE &amp; ELIGIBILITY
                         </span>
                     </Divider>
+
+                    {isSuperAdmin && !editing && (
+                        <>
+                            <Form.Item label="Branch Scope" name="branch_scope">
+                                <Radio.Group
+                                    options={[
+                                        { label: 'All Branches (Network-wide)', value: 'network' },
+                                        { label: 'Specific Branch', value: 'branch' },
+                                    ]}
+                                    optionType="button"
+                                />
+                            </Form.Item>
+
+                            {branchScope === 'branch' && (
+                                <Form.Item
+                                    label="Target Branch"
+                                    name="branch_id"
+                                    rules={[{ required: true, message: 'Select a branch' }]}
+                                    extra="This coupon will only be usable on orders fulfilled by this specific branch."
+                                >
+                                    <Select
+                                        placeholder="Choose branch"
+                                        loading={branchesQuery.isLoading}
+                                        options={(branchesQuery.data ?? []).map((b) => ({
+                                            label: b.name,
+                                            value: b.branch_id,
+                                        }))}
+                                    />
+                                </Form.Item>
+                            )}
+                        </>
+                    )}
 
                     <Form.Item
                         name="first_order_only"

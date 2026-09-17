@@ -137,7 +137,10 @@ export const usePermissions = () => {
         const isStaff = role === AdminRole.STAFF;
 
         // Branch access
-        const requiresBranchIsolation = role === AdminRole.BRANCH_MANAGER;
+        const requiresBranchIsolation =
+            role === AdminRole.BRANCH_MANAGER ||
+            role === AdminRole.MARKETING_MANAGER ||
+            role === AdminRole.INVENTORY_MANAGER;
         const canAccessAllBranches = !requiresBranchIsolation;
         const canAccessBranch = (targetBranchId: string) => {
             if (canAccessAllBranches) return true;
