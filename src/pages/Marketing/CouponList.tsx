@@ -217,10 +217,7 @@ const CouponList: React.FC = () => {
             min_order_value: 0,
             per_user_limit: 1,
             is_public: false,
-            // Defaults that protect the branch. A new campaign excludes
-            // clearance stock and stops itself at its budget unless someone
-            // deliberately says otherwise.
-            exclude_quick_sale: true,
+            exclude_quick_sale: false,
             auto_stop_on_budget: true,
             first_order_only: false,
             eligibility: 'all',
@@ -246,7 +243,7 @@ const CouponList: React.FC = () => {
             is_active: c.is_active,
             budget_cap: c.budget_cap ?? undefined,
             auto_stop_on_budget: c.auto_stop_on_budget,
-            exclude_quick_sale: c.exclude_quick_sale,
+            exclude_quick_sale: false,
             first_order_only: c.first_order_only,
             eligibility: c.category_ids.length ? 'categories' : 'all',
             category_ids: c.category_ids,
@@ -296,7 +293,7 @@ const CouponList: React.FC = () => {
             is_active: values.is_active ?? true,
             budget_cap: values.budget_cap ?? null,
             auto_stop_on_budget: values.auto_stop_on_budget ?? true,
-            exclude_quick_sale: values.exclude_quick_sale ?? true,
+            exclude_quick_sale: false,
             first_order_only: values.first_order_only ?? false,
             // Always sent, including as an empty array: that is the only way to
             // widen a coupon back to the whole catalog once it was narrowed.
@@ -769,25 +766,12 @@ const CouponList: React.FC = () => {
                     </Form.Item>
 
                     {/* ============ Financial protection ============
-                        The two controls that stop a promotion becoming a loss.
-                        Usage limits cap how many redemptions; these cap what
-                        they cost, and what they are allowed to be spent on. */}
+                        The control that stops a promotion becoming a loss. */}
                     <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
                             FINANCIAL PROTECTION
                         </span>
                     </Divider>
-
-                    <Form.Item
-                        name="exclude_quick_sale"
-                        valuePropName="checked"
-                        extra="Clearance items are already sold at or below cost. With this on, they count toward neither the discount nor the minimum order value."
-                    >
-                        <Switch
-                            checkedChildren="Excluding Quick Sale"
-                            unCheckedChildren="Quick Sale included"
-                        />
-                    </Form.Item>
 
                     <Form.Item
                         label="Total campaign budget"
