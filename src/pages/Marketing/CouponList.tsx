@@ -434,7 +434,7 @@ const CouponList: React.FC = () => {
         },
         {
             title: (
-                <Tooltip title="Gross sales placed with this code. The other half of the budget figure: Rs 30,000 of discount that pulled in Rs 612,000 of sales is a campaign worth repeating.">
+                <Tooltip title="Net merchandise sales (subtotal minus coupon discount, excluding delivery fees) placed with this code.">
                     <span style={{ whiteSpace: 'nowrap' }}>
                         <RiseOutlined /> Revenue
                     </span>
