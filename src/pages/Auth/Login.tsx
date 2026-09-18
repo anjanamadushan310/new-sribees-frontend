@@ -15,7 +15,11 @@ const Login: React.FC = () => {
     const onFinish = async (values: { email: string; password: string }) => {
         setLoading(true);
         try {
-            const result = await authApi.login(values);
+            const cleanValues = {
+                email: values.email?.trim().toLowerCase(),
+                password: values.password,
+            };
+            const result = await authApi.login(cleanValues);
             login(result.user, result.tokens);
             message.success(result.message || 'Login successful!');
             navigate('/');
@@ -59,9 +63,14 @@ const Login: React.FC = () => {
                 >
                     <Form.Item
                         name="email"
+                        normalize={(value) => (value ? value.trim() : value)}
                         rules={[
                             { required: true, message: 'Please input your email!' },
-                            { type: 'email', message: 'Please enter a valid email!' },
+                            {
+                                type: 'email',
+                                message: 'Please enter a valid email!',
+                                transform: (value: string) => value?.trim(),
+                            },
                         ]}
                     >
                         <Input
