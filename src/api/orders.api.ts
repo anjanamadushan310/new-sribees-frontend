@@ -266,6 +266,34 @@ export interface OrderDetail {
     refund_amount: number | null;
     return_resolution: ReturnResolution | null;
     return_resolution_note: string | null;
+
+    /**
+     * The reverse pickup, once a `reverse_pickup` resolution has been
+     * approved. `return_handover_code` is the code counter staff read to the
+     * SribeesExpress rider when the goods arrive back — it closes the return
+     * leg, and it is deliberately absent from the customer-facing payload.
+     *
+     * SribeesExpress stores only a hash of it, so what is here is the only
+     * copy. If it is lost, a new one has to be issued (`regenerateReturnCode`)
+     * — nobody can look the old one up.
+     */
+    return_waybill_number: string | null;
+    return_handover_code: string | null;
+    return_booking_status: 'not_required' | 'pending' | 'booked' | 'failed' | null;
+    return_booking_error: string | null;
+    return_fee: number | null;
+    return_tracking_status: string | null;
+    return_approved_at: string | null;
+    return_collected_at: string | null;
+    return_received_at: string | null;
+
+    /**
+     * How long ago this order was delivered. The customer-facing window is 12
+     * hours and the API refuses a later request, so a claim showing more than
+     * that only exists because support raised it by hand — a legitimate thing
+     * to do, and one a manager should be able to see they are doing.
+     */
+    hours_since_delivery: number | null;
     customer: OrderCustomer | null;
     delivery_address: OrderDeliveryAddress | null;
     items: OrderItem[];
@@ -483,6 +511,27 @@ export const ordersApi = {
     },
 
     /** Customer Support appends a proof/context note to an open return claim (B4). */
+    /**
+     * Issue a fresh handover code for this order's reverse pickup, killing the
+     * old one. The answer to "we lost the code", and the only one — see
+     * `return_handover_code`.
+     */
+    regenerateReturnCode: async (orderId: string): Promise<OrderDetail> => {
+        const res = await apiClient.post(`/admin/orders/${orderId}/return/regenerate-code`);
+        return res.data.data;
+    },
+
+    /**
+     * Book the reverse pickup again after a courier outage. Approval does not
+     * fail when SribeesExpress is unreachable — the manager's decision stands
+     * and the claim is left with `return_booking_status: 'failed'`. Safe to
+     * press repeatedly: the booking is idempotent on the order number.
+     */
+    retryReturnBooking: async (orderId: string): Promise<OrderDetail> => {
+        const res = await apiClient.post(`/admin/orders/${orderId}/return/retry-booking`);
+        return res.data.data;
+    },
+
     addReturnNote: async (id: string, note: string): Promise<OrderDetail> => {
         const res = await apiClient.post<OrderDetailWire>(`/admin/orders/${id}/return/note`, { note });
         return res.data.data;

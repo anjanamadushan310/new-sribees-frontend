@@ -245,6 +245,44 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             message.error(err.response?.data?.detail || 'Failed to reject return.'),
     });
 
+    const regenerateCodeMutation = useMutation({
+        mutationFn: (id: string) => ordersApi.regenerateReturnCode(id),
+        onSuccess: (updated) => {
+            message.success(`New handover code: ${updated.return_handover_code}`);
+            invalidateOrder();
+        },
+        onError: (err: any) =>
+            message.error(err.response?.data?.detail || 'Failed to issue a new code.'),
+    });
+
+    const retryBookingMutation = useMutation({
+        mutationFn: (orderId: string) => ordersApi.retryReturnBooking(orderId),
+        onSuccess: (updated) => {
+            message.success(`Pickup booked — ${updated.return_waybill_number}`);
+            invalidateOrder();
+        },
+        onError: (err: any) =>
+            message.error(err.response?.data?.detail || 'SribeesExpress could not be reached.'),
+    });
+
+    /*
+      Confirmed, not one-tap: issuing a new code kills the one the branch may
+      already have written on the parcel, and a rider standing at the counter
+      reading a dead code is exactly the situation this button is meant to
+      rescue people from.
+    */
+    const confirmRegenerateCode = () => {
+        if (!order) return;
+        modal.confirm({
+            title: 'Generate a new handover code?',
+            content:
+                'The current code stops working immediately. Only do this if the branch cannot find it.',
+            okText: 'Generate',
+            okButtonProps: { danger: true },
+            onOk: () => regenerateCodeMutation.mutateAsync(order.order_id),
+        });
+    };
+
     const confirmApproveReturn = () => {
         if (!order) return;
         modal.confirm({
@@ -541,6 +579,23 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                         ? `${order.return_items.length} item(s)`
                                         : 'Full order'}
                                 </Descriptions.Item>
+                                {/*
+                                  The window is 12 hours and the API refuses a
+                                  later request, so a claim past it only exists
+                                  because support raised it by hand. That is a
+                                  legitimate thing to do and an illegitimate
+                                  thing to do invisibly — hence the tag.
+                                */}
+                                {order.hours_since_delivery != null && (
+                                    <Descriptions.Item label="Since delivery">
+                                        {order.hours_since_delivery}h
+                                        {order.hours_since_delivery > 12 && (
+                                            <Tag color="orange" style={{ marginLeft: 8 }}>
+                                                outside the 12h window
+                                            </Tag>
+                                        )}
+                                    </Descriptions.Item>
+                                )}
                             </Descriptions>
                             {/* Support captures proofs; only BM/SA decides (B4 §2). */}
                             <div style={{ marginTop: 12 }}>
@@ -608,6 +663,124 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                     showIcon
                                     message="A Branch Manager or Super Admin reviews and decides this claim."
                                 />
+                            )}
+                        </>
+                    )}
+
+                    {order.status === 'return_approved' && (
+                        <>
+                            <Divider titlePlacement="start">Reverse Pickup</Divider>
+                            {order.return_booking_status === 'failed' ? (
+                                /*
+                                  Approval does not fail when SribeesExpress is
+                                  unreachable — the manager's decision stands and
+                                  the parcel simply has not been dispatched yet.
+                                  This is where that shows up, with the button
+                                  that clears it, rather than as a claim that
+                                  silently never moves.
+                                */
+                                <Alert
+                                    type="error"
+                                    showIcon
+                                    message="The pickup could not be booked with SribeesExpress"
+                                    description={
+                                        <>
+                                            <div style={{ marginBottom: 8 }}>
+                                                {order.return_booking_error ||
+                                                    'SribeesExpress could not be reached.'}
+                                            </div>
+                                            <Button
+                                                size="small"
+                                                loading={retryBookingMutation.isPending}
+                                                onClick={() => retryBookingMutation.mutate(order.order_id)}
+                                            >
+                                                Try booking again
+                                            </Button>
+                                        </>
+                                    }
+                                />
+                            ) : (
+                                <>
+                                    <Descriptions column={1} size="small" bordered>
+                                        <Descriptions.Item label="Return waybill">
+                                            {order.return_waybill_number || '—'}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="Status">
+                                            {order.return_tracking_status || 'Awaiting a rider'}
+                                        </Descriptions.Item>
+                                        {order.return_fee != null && (
+                                            <Descriptions.Item label="Return fee">
+                                                {formatLKR(order.return_fee)}
+                                            </Descriptions.Item>
+                                        )}
+                                    </Descriptions>
+
+                                    {/*
+                                      The one thing on this screen that a member
+                                      of staff physically reads aloud. Given its
+                                      own box, at a size that survives a phone
+                                      held at arm's length across a counter.
+                                    */}
+                                    <div
+                                        style={{
+                                            marginTop: 12,
+                                            padding: 12,
+                                            background: '#fffbe6',
+                                            border: '1px solid #ffe58f',
+                                            borderRadius: 8,
+                                        }}
+                                    >
+                                        <Text strong style={{ fontSize: 13 }}>
+                                            Handover code
+                                        </Text>
+                                        <div
+                                            style={{
+                                                fontSize: 28,
+                                                fontWeight: 800,
+                                                letterSpacing: 6,
+                                                margin: '4px 0 6px',
+                                            }}
+                                        >
+                                            {order.return_handover_code || '——————'}
+                                        </div>
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                            Read this to the rider when they bring the goods back.
+                                            It is what closes the return.
+                                        </Text>
+                                        <div style={{ marginTop: 10 }}>
+                                            <Space>
+                                                <Button
+                                                    size="small"
+                                                    disabled={!order.return_handover_code}
+                                                    onClick={() => {
+                                                        navigator.clipboard
+                                                            ?.writeText(order.return_handover_code!)
+                                                            .then(() => message.success('Code copied.'))
+                                                            .catch(() => message.error('Could not copy.'));
+                                                    }}
+                                                >
+                                                    Copy
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    danger
+                                                    loading={regenerateCodeMutation.isPending}
+                                                    onClick={confirmRegenerateCode}
+                                                >
+                                                    Generate a new code
+                                                </Button>
+                                            </Space>
+                                        </div>
+                                    </div>
+
+                                    <Alert
+                                        style={{ marginTop: 12 }}
+                                        type="info"
+                                        showIcon
+                                        message="The customer is refunded when the goods are back with us"
+                                        description="Their wallet is credited automatically once the rider hands the parcel over and the code above is entered — not on approval."
+                                    />
+                                </>
                             )}
                         </>
                     )}
