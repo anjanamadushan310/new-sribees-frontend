@@ -101,11 +101,13 @@ const CustomerList: React.FC = () => {
             });
             
             const exportData = result.customers;
-            const headers = ['Name', 'Email', 'Phone', 'Joined Date', 'Status'];
+            const headers = ['Name', 'NIC', 'Email', 'Phone', 'Second Phone', 'Joined Date', 'Status'];
             const rows = exportData.map(c => [
                 c.full_name || 'Unnamed',
+                c.nic || '',
                 c.email || '',
                 c.phone || '',
+                c.alternate_phone || '',
                 c.created_at ? slt(c.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
                 c.is_active ? 'Active' : 'Inactive'
             ]);
@@ -167,7 +169,7 @@ const CustomerList: React.FC = () => {
     });
 
     const editMutation = useMutation({
-        mutationFn: ({ id, values }: { id: string; values: { full_name: string; email?: string | null; phone?: string | null } }) =>
+        mutationFn: ({ id, values }: { id: string; values: { full_name: string; email?: string | null; phone?: string | null; nic?: string | null; alternate_phone?: string | null } }) =>
             customersApi.update(id, values),
         onSuccess: () => {
             message.success('Customer profile updated successfully.');
@@ -294,10 +296,23 @@ const CustomerList: React.FC = () => {
             sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
         },
         {
+            title: 'NIC',
+            dataIndex: 'nic',
+            key: 'nic',
+            render: (nic: string | null) => nic || <span style={{ color: '#bbb' }}>—</span>,
+        },
+        {
             title: 'Phone',
             dataIndex: 'phone',
             key: 'phone',
-            render: (phone: string | null) => phone || <span style={{ color: '#bbb' }}>—</span>,
+            render: (phone: string | null, record) => (
+                <>
+                    {phone || <span style={{ color: '#bbb' }}>—</span>}
+                    {record.alternate_phone ? (
+                        <div style={{ color: '#888', fontSize: 12 }}>{record.alternate_phone}</div>
+                    ) : null}
+                </>
+            ),
         },
         {
             title: 'Joined',
@@ -362,7 +377,9 @@ const CustomerList: React.FC = () => {
                                 form.setFieldsValue({
                                     full_name: record.full_name,
                                     email: record.email,
-                                    phone: record.phone
+                                    phone: record.phone,
+                                    nic: record.nic,
+                                    alternate_phone: record.alternate_phone
                                 });
                                 setEditModalVisible(true);
                             }
@@ -451,7 +468,7 @@ const CustomerList: React.FC = () => {
 
                 <div style={{ marginBottom: 16 }}>
                     <DebouncedSearchInput
-                        placeholder="Search name, phone, email…"
+                        placeholder="Search name, NIC, phone, email…"
                         value={search}
                         onChange={(v) => {
                             setPage(1);
@@ -593,7 +610,9 @@ const CustomerList: React.FC = () => {
 
                             <Descriptions bordered column={1} size="small">
                                 <Descriptions.Item label="Email">{profile.email || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
+                                <Descriptions.Item label="NIC">{profile.nic || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
                                 <Descriptions.Item label="Phone">{profile.phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
+                                <Descriptions.Item label="Second Phone">{profile.alternate_phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
                                 <Descriptions.Item label="Status">
                                     {profile.is_blocked ? (
                                         <Space direction="vertical" size={2}>
@@ -694,6 +713,25 @@ const CustomerList: React.FC = () => {
                         label="Phone Number"
                     >
                         <Input placeholder="+94771234567" />
+                    </Form.Item>
+                    {/* The customer cannot change their own NIC, so this form
+                        is the only way a mistyped one ever gets corrected. */}
+                    <Form.Item
+                        name="nic"
+                        label="NIC Number"
+                        extra="The customer cannot edit this themselves."
+                        rules={[{
+                            pattern: /^(\d{9}[VXvx]|\d{12})$/,
+                            message: '9 digits and V/X, or 12 digits',
+                        }]}
+                    >
+                        <Input placeholder="199512345678" />
+                    </Form.Item>
+                    <Form.Item
+                        name="alternate_phone"
+                        label="Second Phone Number"
+                    >
+                        <Input placeholder="+94719876543" />
                     </Form.Item>
                 </Form>
             </Modal>

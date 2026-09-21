@@ -40,6 +40,10 @@ export interface Customer extends CustomerPurchaseStats {
     email: string;
     full_name: string | null;
     phone: string | null;
+    /** The NIC the customer is identified by. Write-once for them; support
+     *  can correct it from the edit form below. */
+    nic: string | null;
+    alternate_phone: string | null;
     role: string;
     is_active: boolean;
     is_blocked?: boolean;
@@ -76,6 +80,8 @@ export interface CustomerProfile {
     email: string | null;
     full_name: string | null;
     phone: string | null;
+    nic: string | null;
+    alternate_phone: string | null;
     is_active: boolean;
     is_blocked: boolean;
     blocked_reason: string | null;
