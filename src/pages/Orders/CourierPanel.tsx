@@ -25,12 +25,12 @@
 import React, { useState } from 'react';
 import { Alert, App, Button, Descriptions, Space, Tag, Typography } from 'antd';
 import { PrinterOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ordersApi } from '../../api/orders.api';
 import type { OrderCourier, OrderDetail } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import ShippingLabel from './ShippingLabel';
+import { slt } from '../../utils/datetime';
 
 const { Text } = Typography;
 
@@ -234,7 +234,7 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                             {!booked && courier.quote_expires_at && (
                                 <Text type="secondary" style={{ fontSize: 12 }}>
                                     Price held until{' '}
-                                    {dayjs(courier.quote_expires_at).format('MMM DD, HH:mm')}
+                                    {slt(courier.quote_expires_at).format('MMM DD, HH:mm')}
                                 </Text>
                             )}
                         </Space>
@@ -261,7 +261,7 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                                 {trackingTag(courier.tracking_status)}
                                 {courier.tracking_updated_at && (
                                     <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {dayjs(courier.tracking_updated_at).format('MMM DD, HH:mm')}
+                                        {slt(courier.tracking_updated_at).format('MMM DD, HH:mm')}
                                     </Text>
                                 )}
                             </Space>

@@ -27,6 +27,7 @@ import { apiErrorMessage } from '../../utils/analytics';
 import OrderDetails from '../Orders/OrderDetails';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { slt } from '../../utils/datetime';
 
 dayjs.extend(relativeTime);
 
@@ -150,7 +151,7 @@ const StaffDashboard: React.FC = () => {
                     Welcome, {user?.full_name?.split(' ')[0] || 'Staff'}! 👋
                 </Title>
                 <Text type="secondary">
-                    All Branches • {dayjs().format('dddd, MMMM D')}
+                    All Branches • {slt().format('dddd, MMMM D')}
                 </Text>
             </div>
 
@@ -233,7 +234,7 @@ const StaffDashboard: React.FC = () => {
                                                     </Tag>
                                                 )}
                                                 <Text type="secondary">
-                                                    {order.created_at ? dayjs(order.created_at).fromNow() : '—'} ·{' '}
+                                                    {order.created_at ? slt(order.created_at).fromNow() : '—'} ·{' '}
                                                     {order.item_count} items
                                                 </Text>
                                                 <Text strong style={{ color: '#16a34a', fontSize: '18px' }}>

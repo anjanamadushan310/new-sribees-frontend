@@ -22,7 +22,6 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 
 import { analyticsApi } from '../../api/analytics.api';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -35,6 +34,7 @@ import {
 import { apiErrorMessage, mergeSeries } from '../../utils/analytics';
 import { formatLKR, formatNumber, formatPercent } from '../../utils/format';
 import { PRIMARY, SERIES, STATUS } from '../../utils/chartTheme';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 
@@ -131,8 +131,8 @@ const DashboardHome: React.FC = () => {
                     </Title>
                     {summary && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                            {dayjs(summary.range.start_date).format('MMM D, YYYY')} –{' '}
-                            {dayjs(summary.range.end_date).format('MMM D, YYYY')}
+                            {slt(summary.range.start_date).format('MMM D, YYYY')} –{' '}
+                            {slt(summary.range.end_date).format('MMM D, YYYY')}
                             {!summary.scope.is_super_admin && ' · your branch only'}
                         </Text>
                     )}

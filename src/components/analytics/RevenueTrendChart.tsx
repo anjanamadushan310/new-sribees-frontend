@@ -22,10 +22,10 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import dayjs from 'dayjs';
 import { compactLKR, formatLKR, formatNumber } from '../../utils/format';
 import { COMPARISON, PRIMARY, axisProps, gridProps } from '../../utils/chartTheme';
 import type { ChartTooltipProps, TrendRow } from '../../utils/analytics';
+import { slt } from '../../utils/datetime';
 
 const { Text } = Typography;
 
@@ -54,7 +54,7 @@ const TrendTooltip: React.FC<ChartTooltipProps<TrendRow> & { metric: Metric }> =
             }}
         >
             <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                {dayjs(row.date).format('ddd, MMM D YYYY')}
+                {slt(row.date).format('ddd, MMM D YYYY')}
             </div>
             <div>
                 <span style={{ color: PRIMARY }}>●</span> This period: {fmt(current)}
@@ -62,7 +62,7 @@ const TrendTooltip: React.FC<ChartTooltipProps<TrendRow> & { metric: Metric }> =
             </div>
             {prior !== undefined && (
                 <div>
-                    <span style={{ color: COMPARISON }}>●</span> {dayjs(row.prevDate).format('MMM D')}
+                    <span style={{ color: COMPARISON }}>●</span> {slt(row.prevDate).format('MMM D')}
                     : {fmt(prior)}
                 </div>
             )}
@@ -131,7 +131,7 @@ export const RevenueTrendChart: React.FC<Props> = ({
                     <CartesianGrid {...gridProps} />
                     <XAxis
                         dataKey="date"
-                        tickFormatter={(d) => dayjs(d).format('MMM D')}
+                        tickFormatter={(d) => slt(d).format('MMM D')}
                         interval="preserveStartEnd"
                         minTickGap={32}
                         {...axisProps}

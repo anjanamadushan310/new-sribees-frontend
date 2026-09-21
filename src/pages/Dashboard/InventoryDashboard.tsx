@@ -20,7 +20,7 @@ import { inventoryApi } from '../../api/inventory.api';
 import { categoriesApi } from '../../api/categories.api';
 import { useAuthStore } from '../../store/authStore';
 import { apiErrorMessage } from '../../utils/analytics';
-import dayjs from 'dayjs';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 
@@ -55,7 +55,7 @@ const InventoryDashboard: React.FC = () => {
                 </Title>
                 <Text type="secondary">
                     {user?.branch_name ? `${user.branch_name} • ` : ''}
-                    {dayjs().format('dddd, MMMM D, YYYY')}
+                    {slt().format('dddd, MMMM D, YYYY')}
                 </Text>
             </div>
 

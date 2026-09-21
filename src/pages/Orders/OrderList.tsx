@@ -22,17 +22,18 @@ import { transfersApi } from '../../api/transfers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import OrderDetails, { statusTag } from './OrderDetails';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const rangePresets: { label: string; value: [dayjs.Dayjs, dayjs.Dayjs] }[] = [
-    { label: 'Today', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
-    { label: 'Yesterday', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
-    { label: 'Last 7 Days', value: [dayjs().subtract(7, 'day').startOf('day'), dayjs().endOf('day')] },
-    { label: 'Last 30 Days', value: [dayjs().subtract(30, 'day').startOf('day'), dayjs().endOf('day')] },
-    { label: 'This Month', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
-    { label: 'Last Month', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+    { label: 'Today', value: [slt().startOf('day'), slt().endOf('day')] },
+    { label: 'Yesterday', value: [slt().subtract(1, 'day').startOf('day'), slt().subtract(1, 'day').endOf('day')] },
+    { label: 'Last 7 Days', value: [slt().subtract(7, 'day').startOf('day'), slt().endOf('day')] },
+    { label: 'Last 30 Days', value: [slt().subtract(30, 'day').startOf('day'), slt().endOf('day')] },
+    { label: 'This Month', value: [slt().startOf('month'), slt().endOf('month')] },
+    { label: 'Last Month', value: [slt().subtract(1, 'month').startOf('month'), slt().subtract(1, 'month').endOf('month')] },
 ];
 
 const formatLKR = (value: number): string =>
@@ -124,8 +125,8 @@ const OrderList: React.FC = () => {
             a.href = url;
             a.download =
                 kind === 'csv'
-                    ? `orders_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`
-                    : `dispatch_manifest_${dayjs().format('YYYYMMDD_HHmmss')}.pdf`;
+                    ? `orders_export_${slt().format('YYYYMMDD_HHmmss')}.csv`
+                    : `dispatch_manifest_${slt().format('YYYYMMDD_HHmmss')}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -174,7 +175,7 @@ const OrderList: React.FC = () => {
             title: 'Date',
             dataIndex: 'created_at',
             key: 'created_at',
-            render: (d: string | null) => (d ? dayjs(d).format('MMM DD, YYYY') : '—'),
+            render: (d: string | null) => (d ? slt(d).format('MMM DD, YYYY') : '—'),
         },
         { title: 'Items', dataIndex: 'item_count', key: 'item_count', width: 70, align: 'right' },
         {

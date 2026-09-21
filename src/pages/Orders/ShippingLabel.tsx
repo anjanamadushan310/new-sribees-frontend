@@ -17,10 +17,10 @@ import React from 'react';
 import { Alert, Button, Modal, Spin, Typography } from 'antd';
 import { PrinterOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import { ordersApi } from '../../api/orders.api';
 import type { CourierLabel } from '../../api/orders.api';
 import Code128 from '../../components/common/Code128';
+import { slt } from '../../utils/datetime';
 
 const { Text } = Typography;
 
@@ -126,7 +126,7 @@ const ShippingLabel: React.FC<ShippingLabelProps> = ({ orderId, open, onClose })
                         <div style={{ fontSize: 11, textAlign: 'right' }}>
                             {label.order_number}
                             <br />
-                            {label.booked_at ? dayjs(label.booked_at).format('DD MMM YYYY') : ''}
+                            {label.booked_at ? slt(label.booked_at).format('DD MMM YYYY') : ''}
                         </div>
                     </div>
 

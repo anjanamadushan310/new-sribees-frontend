@@ -42,11 +42,11 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { marketingApi } from '../../api/marketing.api';
 import type { DashboardNextDeliveryRun } from '../../api/marketing.api';
 import { useAuthStore } from '../../store/authStore';
 import { apiErrorMessage } from '../../utils/analytics';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 
@@ -115,7 +115,7 @@ const MarketingDashboard: React.FC = () => {
                 <Text type="secondary">
                     {data?.branch.branchName ?? user?.branch_name ?? ''}
                     {data?.branch.branchName || user?.branch_name ? ' • ' : ''}
-                    {dayjs().format('dddd, MMMM D, YYYY')}
+                    {slt().format('dddd, MMMM D, YYYY')}
                 </Text>
             </div>
 
@@ -216,7 +216,7 @@ const MarketingDashboard: React.FC = () => {
                     ) : nextRun ? (
                         <>
                             <div style={{ fontSize: 24, fontWeight: 600, color: COLORS.delivery, lineHeight: '32px' }}>
-                                {dayjs(nextRun.dispatchAt).format('hh:mm A')}
+                                {slt(nextRun.dispatchAt).format('hh:mm A')}
                             </div>
                             <Text
                                 style={{

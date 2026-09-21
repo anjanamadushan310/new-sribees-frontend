@@ -45,6 +45,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { useBranchStore } from '../../store/branchStore';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -74,8 +75,8 @@ const BranchAnalytics: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-        dayjs().subtract(30, 'day'),
-        dayjs(),
+        slt().subtract(30, 'day'),
+        slt(),
     ]);
 
     const branch = getBranchById(branchId || '');

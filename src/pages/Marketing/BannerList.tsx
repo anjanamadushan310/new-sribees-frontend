@@ -38,7 +38,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadChangeParam, UploadFile } from 'antd/es/upload';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import dayjs, { Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import type { BannerLinkType, BannerStatus } from '../../api/banners.api';
 import { categoriesApi } from '../../api/categories.api';
 import { marketingApi } from '../../api/marketing.api';
@@ -46,6 +46,7 @@ import { bannersApi } from '../../api/banners.api';
 import type { Banner, BannerPayload } from '../../api/banners.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 
@@ -172,7 +173,7 @@ const BannerList: React.FC = () => {
             always_active: banner.is_always_active,
             schedule:
                 banner.starts_at && banner.ends_at
-                    ? [dayjs(banner.starts_at), dayjs(banner.ends_at)]
+                    ? [slt(banner.starts_at), slt(banner.ends_at)]
                     : undefined,
         });
         setModalOpen(true);
@@ -403,12 +404,12 @@ const BannerList: React.FC = () => {
                     <div style={{ fontSize: 12 }}>
                         {record.ends_at && (
                             <div style={{ fontWeight: 500 }}>
-                                Ends: {dayjs(record.ends_at).format('MMM D, h:mm A')}
+                                Ends: {slt(record.ends_at).format('MMM D, h:mm A')}
                             </div>
                         )}
                         {record.starts_at && (
                             <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                                From: {dayjs(record.starts_at).format('MMM D, h:mm A')}
+                                From: {slt(record.starts_at).format('MMM D, h:mm A')}
                             </div>
                         )}
                     </div>

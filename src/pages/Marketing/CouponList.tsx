@@ -40,13 +40,14 @@ import {
     ShopOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs, { Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { couponsApi } from '../../api/coupons.api';
 import type { Coupon, CouponPayload, CouponStatus, DiscountType } from '../../api/coupons.api';
 import { categoriesApi } from '../../api/categories.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { slt } from '../../utils/datetime';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -239,7 +240,7 @@ const CouponList: React.FC = () => {
             usage_limit: c.usage_limit ?? undefined,
             per_user_limit: c.per_user_limit ?? undefined,
             is_public: c.is_public,
-            validity: [dayjs(c.valid_from), dayjs(c.valid_until)],
+            validity: [slt(c.valid_from), slt(c.valid_until)],
             is_active: c.is_active,
             budget_cap: c.budget_cap ?? undefined,
             auto_stop_on_budget: c.auto_stop_on_budget,
@@ -463,9 +464,9 @@ const CouponList: React.FC = () => {
             width: 180,
             render: (_, c) => (
                 <div style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
-                    <div>{dayjs(c.valid_from).format('MMM DD, YYYY')}</div>
+                    <div>{slt(c.valid_from).format('MMM DD, YYYY')}</div>
                     <div style={{ color: '#94a3b8', fontSize: 11 }}>
-                        to {dayjs(c.valid_until).format('MMM DD, YYYY')}
+                        to {slt(c.valid_until).format('MMM DD, YYYY')}
                     </div>
                 </div>
             ),

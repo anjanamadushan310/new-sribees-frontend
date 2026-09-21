@@ -13,7 +13,7 @@ import type { StaffDashboardStats } from '../../api/dashboard.api';
 import { KpiCard } from '../../components/analytics';
 import { formatLKR, formatNumber } from '../../utils/format';
 import { SERIES, PRIMARY } from '../../utils/chartTheme';
-import dayjs from 'dayjs';
+import { slt } from '../../utils/datetime';
 
 const { Text } = Typography;
 
@@ -78,7 +78,7 @@ const Dashboard: React.FC = () => {
             title: 'Date',
             dataIndex: 'created_at',
             key: 'created_at',
-            render: (date: string) => dayjs(date).format('MMM DD, YYYY'),
+            render: (date: string) => slt(date).format('MMM DD, YYYY'),
         },
     ];
 
@@ -179,9 +179,9 @@ const Dashboard: React.FC = () => {
                             <ResponsiveContainer width="100%" height={300}>
                                 <LineChart data={stats.revenueTrend}>
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tickFormatter={(d) => dayjs(d).format('MMM D')} />
+                                    <XAxis dataKey="date" tickFormatter={(d) => slt(d).format('MMM D')} />
                                     <YAxis />
-                                    <Tooltip labelFormatter={(d) => dayjs(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatLKR(v)} />
+                                    <Tooltip labelFormatter={(d) => slt(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatLKR(v)} />
                                     <Legend />
                                     <Line type="monotone" dataKey="revenue" name="Revenue" stroke={PRIMARY} strokeWidth={2} />
                                 </LineChart>
@@ -190,9 +190,9 @@ const Dashboard: React.FC = () => {
                             <ResponsiveContainer width="100%" height={300}>
                                 <LineChart data={stats.ordersTrend}>
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tickFormatter={(d) => dayjs(d).format('MMM D')} />
+                                    <XAxis dataKey="date" tickFormatter={(d) => slt(d).format('MMM D')} />
                                     <YAxis allowDecimals={false} />
-                                    <Tooltip labelFormatter={(d) => dayjs(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatNumber(v)} />
+                                    <Tooltip labelFormatter={(d) => slt(d as string).format('MMM D, YYYY')} formatter={(v?: number) => formatNumber(v)} />
                                     <Legend />
                                     <Line type="monotone" dataKey="orders" name="Orders" stroke={PRIMARY} strokeWidth={2} />
                                 </LineChart>

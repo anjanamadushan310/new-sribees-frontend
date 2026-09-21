@@ -37,7 +37,6 @@ import {
 } from 'antd';
 import { ApiOutlined, KeyOutlined, LinkOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { courierApi } from '../../api/courier.api';
 import type {
@@ -45,6 +44,7 @@ import type {
     CourierCredentials,
     CourierEnvironmentConfig,
 } from '../../api/courier.api';
+import { slt } from '../../utils/datetime';
 
 const { Text, Paragraph } = Typography;
 
@@ -284,7 +284,7 @@ const CourierKeysCard: React.FC = () => {
                         not recoverable; who changed it is. */}
                     {r.set_at && (
                         <Text type="secondary" style={{ fontSize: 11 }}>
-                            {dayjs(r.set_at).format('DD MMM YYYY')}
+                            {slt(r.set_at).format('DD MMM YYYY')}
                             {r.set_by ? ` · ${r.set_by}` : ''}
                         </Text>
                     )}

@@ -41,7 +41,6 @@ import {
     WhatsAppOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi, ORDER_STATUS_META } from '../../api/orders.api';
 import type {
@@ -54,6 +53,7 @@ import type {
 } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import CourierPanel from './CourierPanel';
+import { slt } from '../../utils/datetime';
 
 const { Text, Title } = Typography;
 
@@ -417,7 +417,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     <Descriptions column={1} size="small" bordered>
                         <Descriptions.Item label="Placed">
                             {order.created_at
-                                ? dayjs(order.created_at).format('MMM DD, YYYY HH:mm')
+                                ? slt(order.created_at).format('MMM DD, YYYY HH:mm')
                                 : '—'}
                         </Descriptions.Item>
                         <Descriptions.Item label="Payment Method">
@@ -425,7 +425,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                         </Descriptions.Item>
                         {order.delivery_slot_date && (
                             <Descriptions.Item label="Delivery Slot">
-                                {dayjs(order.delivery_slot_date).format('MMM DD, YYYY')}
+                                {slt(order.delivery_slot_date).format('MMM DD, YYYY')}
                                 {order.delivery_slot_time ? ` · ${order.delivery_slot_time}` : ''}
                             </Descriptions.Item>
                         )}
@@ -830,7 +830,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                                     )}
                                                     <Text type="secondary" style={{ fontSize: 12 }}>
                                                         <ClockCircleOutlined style={{ marginRight: 4 }} />
-                                                        {h.created_at ? dayjs(h.created_at).format('MMM DD, YYYY · hh:mm A') : '—'}
+                                                        {h.created_at ? slt(h.created_at).format('MMM DD, YYYY · hh:mm A') : '—'}
                                                     </Text>
                                                 </Space>
                                                 <div style={{ marginTop: 4 }}>
@@ -884,7 +884,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                     </Tag>
                                     <Text type="secondary" style={{ fontSize: 12 }}>
                                         {e.raised_by_name}
-                                        {e.created_at ? ` · ${dayjs(e.created_at).format('MMM DD, HH:mm')}` : ''}
+                                        {e.created_at ? ` · ${slt(e.created_at).format('MMM DD, HH:mm')}` : ''}
                                     </Text>
                                 </Space>
                                 <div style={{ marginTop: 4 }}>{e.message}</div>

@@ -53,6 +53,7 @@ import {
 } from '../../api/transfers.api';
 import type { StockTransfer, TransferStatus } from '../../api/transfers.api';
 import { apiErrorMessage } from '../../utils/analytics';
+import { slt } from '../../utils/datetime';
 
 dayjs.extend(relativeTime);
 
@@ -192,9 +193,9 @@ const StockTransfers: React.FC = () => {
             render: (_, record) => (
                 <Space direction="vertical" size={0}>
                     <Text>{record.requested_by_name}</Text>
-                    <Tooltip title={record.requested_at ? dayjs(record.requested_at).format('YYYY-MM-DD HH:mm') : ''}>
+                    <Tooltip title={record.requested_at ? slt(record.requested_at).format('YYYY-MM-DD HH:mm') : ''}>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                            <ClockCircleOutlined /> {record.requested_at ? dayjs(record.requested_at).fromNow() : '—'}
+                            <ClockCircleOutlined /> {record.requested_at ? slt(record.requested_at).fromNow() : '—'}
                         </Text>
                     </Tooltip>
                 </Space>

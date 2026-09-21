@@ -52,6 +52,7 @@ import type { TopWatchedProduct, WatchlistTrend } from '../../api/dashboard.api'
 import { useAuthStore } from '../../store/authStore';
 import { useBranchStore } from '../../store/branchStore';
 import { AdminRole } from '../../types/admin.types';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -71,8 +72,8 @@ const WatchlistAnalytics: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedBranch, setSelectedBranch] = useState<string>('all');
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-        dayjs().subtract(30, 'day'),
-        dayjs(),
+        slt().subtract(30, 'day'),
+        slt(),
     ]);
 
     // Data states
@@ -191,7 +192,7 @@ const WatchlistAnalytics: React.FC = () => {
             // Mock trend data - last 30 days
             const trendData: WatchlistTrend[] = [];
             for (let i = 29; i >= 0; i--) {
-                const date = dayjs().subtract(i, 'day').format('YYYY-MM-DD');
+                const date = slt().subtract(i, 'day').format('YYYY-MM-DD');
                 const newWatches = Math.floor(Math.random() * 30) + 10;
                 const removals = Math.floor(Math.random() * 10) + 2;
                 trendData.push({
@@ -414,11 +415,11 @@ const WatchlistAnalytics: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis 
                                     dataKey="date" 
-                                    tickFormatter={(value) => dayjs(value).format('MMM D')}
+                                    tickFormatter={(value) => slt(value).format('MMM D')}
                                 />
                                 <YAxis />
                                 <RechartsTooltip 
-                                    labelFormatter={(value) => dayjs(value).format('MMM D, YYYY')}
+                                    labelFormatter={(value) => slt(value).format('MMM D, YYYY')}
                                 />
                                 <Legend />
                                 <Area 

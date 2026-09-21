@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List, Segmented, Avatar, Tooltip, Statistic, Row, Col } from 'antd';
 import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import AssignPromoModal from './AssignPromoModal';
 import type { CustomerSegment } from '../../api/customers.api';
@@ -10,6 +9,7 @@ import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
+import { slt } from '../../utils/datetime';
 
 const { Title, Text } = Typography;
 
@@ -106,7 +106,7 @@ const CustomerList: React.FC = () => {
                 c.full_name || 'Unnamed',
                 c.email || '',
                 c.phone || '',
-                c.created_at ? dayjs(c.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
+                c.created_at ? slt(c.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
                 c.is_active ? 'Active' : 'Inactive'
             ]);
             
@@ -124,7 +124,7 @@ const CustomerList: React.FC = () => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.setAttribute('href', url);
-            link.setAttribute('download', `customers_export_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+            link.setAttribute('download', `customers_export_${slt().format('YYYYMMDD_HHmmss')}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -303,9 +303,9 @@ const CustomerList: React.FC = () => {
             title: 'Joined',
             dataIndex: 'created_at',
             key: 'created_at',
-            render: (d: string | null) => (d ? dayjs(d).format('MMM DD, YYYY') : '—'),
+            render: (d: string | null) => (d ? slt(d).format('MMM DD, YYYY') : '—'),
             sorter: (a, b) =>
-                dayjs(a.created_at ?? 0).valueOf() - dayjs(b.created_at ?? 0).valueOf(),
+                slt(a.created_at ?? 0).valueOf() - slt(b.created_at ?? 0).valueOf(),
         },
         {
             title: 'Status',
@@ -605,8 +605,8 @@ const CustomerList: React.FC = () => {
                                     )}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Email Verified">{profile.is_verified ? <Tag color="green">Yes</Tag> : <Tag color="orange">No</Tag>}</Descriptions.Item>
-                                <Descriptions.Item label="Joined Date">{profile.created_at ? dayjs(profile.created_at).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
-                                <Descriptions.Item label="Last Login">{profile.last_login ? dayjs(profile.last_login).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
+                                <Descriptions.Item label="Joined Date">{profile.created_at ? slt(profile.created_at).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
+                                <Descriptions.Item label="Last Login">{profile.last_login ? slt(profile.last_login).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
                             </Descriptions>
                         </div>
 
@@ -653,7 +653,7 @@ const CustomerList: React.FC = () => {
                                     { title: 'Order No', dataIndex: 'order_number', key: 'order_number' },
                                     { title: 'Amount', dataIndex: 'total_amount', key: 'total_amount', render: (val) => `Rs. ${val.toLocaleString()}` },
                                     { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'completed' ? 'green' : s === 'cancelled' ? 'red' : 'blue'}>{s.toUpperCase()}</Tag> },
-                                    { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (d) => dayjs(d).format('MMM DD, YYYY') }
+                                    { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (d) => slt(d).format('MMM DD, YYYY') }
                                 ]}
                             />
                         </div>
