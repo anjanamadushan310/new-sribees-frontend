@@ -8,6 +8,7 @@ import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { AdminRole } from '../types/admin.types';
+import { recordServerDate } from '../utils/server-clock';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -96,9 +97,16 @@ const refreshTokens = (): Promise<string> => {
 // Response interceptor - Refresh expired tokens, retry once, else logout
 apiClient.interceptors.response.use(
     (response) => {
+        // Every reply carries the server's own `Date`. Learning the offset here
+        // means no screen has to trust this machine's clock for a rule the
+        // server decides — what "today" covers, most of all.
+        recordServerDate(response.headers?.date as string | undefined);
         return response;
     },
     async (error: AxiosError<{ message?: string; detail?: string }>) => {
+        // A 4xx carries a Date header too, and an error is exactly when the
+        // clock is worth correcting.
+        recordServerDate(error.response?.headers?.date as string | undefined);
         const originalRequest = error.config as RetriableRequestConfig | undefined;
 
         if (

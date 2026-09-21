@@ -26,6 +26,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 
+import { serverNow } from './server-clock';
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 // `.fromNow()` is used on the dashboards; extending here as well as wherever
@@ -35,9 +37,16 @@ dayjs.extend(relativeTime);
 
 export const DISPLAY_TZ = 'Asia/Colombo';
 
-/** Sri Lanka time. Drop-in for `dayjs(...)` — see this module's docstring. */
+/**
+ * Sri Lanka time. Drop-in for `dayjs(...)` — see this module's docstring.
+ *
+ * `slt()` with no argument is **now according to the server**, not this
+ * machine. That matters wherever "now" decides something: `slt().startOf('day')`
+ * is what a report means by today, and a browser whose clock is a day out would
+ * otherwise pull the wrong day's figures and give no sign of it.
+ */
 export function slt(value?: dayjs.ConfigType): Dayjs {
-    return (value === undefined ? dayjs() : dayjs(value)).tz(DISPLAY_TZ);
+    return (value === undefined ? dayjs(serverNow()) : dayjs(value)).tz(DISPLAY_TZ);
 }
 
 /** Today in Sri Lanka as `YYYY-MM-DD`, for date filters and report ranges. */
