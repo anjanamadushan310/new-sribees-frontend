@@ -19,6 +19,7 @@ import {
     Divider,
     Drawer,
     Empty,
+    Image,
     Input,
     Modal,
     Radio,
@@ -562,7 +563,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                         Total: {formatLKR(order.pricing.total_amount)}
                     </Title>
 
-                    {order.status === 'return_requested' && (
+                    {/*
+                      Not just `return_requested`. The photos ARE the record of
+                      why this was approved or refused, and a dispute arrives
+                      after the decision, not before -- so the block stays
+                      visible once the claim has moved on. The decision
+                      controls below are still gated on the pending state.
+                    */}
+                    {(order.status === 'return_requested' ||
+                        order.return_requested_at != null) && (
                         <>
                             <Divider titlePlacement="start">Return Request</Divider>
                             <Descriptions column={1} size="small" bordered>
@@ -578,6 +587,41 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                     {order.return_items && order.return_items.length > 0
                                         ? `${order.return_items.length} item(s)`
                                         : 'Full order'}
+                                </Descriptions.Item>
+                                {/*
+                                  The evidence the claim is decided on. The app
+                                  now requires at least one photo, so an empty
+                                  row here means the return was raised by hand
+                                  (support, over the phone) -- worth saying out
+                                  loud rather than rendering nothing, because
+                                  "no photos" and "photos did not load" look
+                                  identical otherwise.
+                                */}
+                                <Descriptions.Item label="Photos">
+                                    {order.return_images && order.return_images.length > 0 ? (
+                                        <Image.PreviewGroup>
+                                            <Space wrap size={8}>
+                                                {order.return_images.map((url, i) => (
+                                                    <Image
+                                                        key={url}
+                                                        src={url}
+                                                        alt={`Return photo ${i + 1}`}
+                                                        width={88}
+                                                        height={88}
+                                                        style={{
+                                                            objectFit: 'cover',
+                                                            borderRadius: 6,
+                                                            border: '1px solid #f0f0f0',
+                                                        }}
+                                                    />
+                                                ))}
+                                            </Space>
+                                        </Image.PreviewGroup>
+                                    ) : (
+                                        <Text type="secondary">
+                                            No photos — raised without the app
+                                        </Text>
+                                    )}
                                 </Descriptions.Item>
                                 {/*
                                   The window is 12 hours and the API refuses a
@@ -598,6 +642,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                 )}
                             </Descriptions>
                             {/* Support captures proofs; only BM/SA decides (B4 §2). */}
+                            {order.status === 'return_requested' && (
                             <div style={{ marginTop: 12 }}>
                                 <Text strong style={{ fontSize: 13 }}>Add a proof / context note</Text>
                                 <Space.Compact style={{ display: 'flex', marginTop: 4 }}>
@@ -616,8 +661,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                     </Button>
                                 </Space.Compact>
                             </div>
+                            )}
 
-                            {canDecideReturn ? (
+                            {canDecideReturn && order.status === 'return_requested' ? (
                                 <div style={{ marginTop: 16 }}>
                                     <Text strong style={{ fontSize: 13 }}>Resolution</Text>
                                     <Radio.Group
