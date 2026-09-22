@@ -122,6 +122,7 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
     [AdminRole.MARKETING_MANAGER]: [
         { resource: 'dashboard', action: 'read' },
         { resource: 'products', action: 'read' },
+        { resource: 'categories', action: 'read' },
         { resource: 'customers', action: 'read' },
         // No 'analytics': /admin/analytics/* is server-side restricted to
         // super_admin and branch_manager. Granting it here only puts an
@@ -217,6 +218,7 @@ export const NAVIGATION_CONFIG: Partial<Record<AdminRole, string[]>> = {
     [AdminRole.MARKETING_MANAGER]: [
         'dashboard',
         'products',
+        'categories',
         'analytics',
         'watchlist',
         'customers',

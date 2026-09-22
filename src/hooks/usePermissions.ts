@@ -6,24 +6,53 @@
 import { useMemo } from 'react';
 import { useAuthStore } from '../store/authStore';
 import type { Resource, Action, PermissionGrant } from '../types/admin.types';
-import { AdminRole } from '../types/admin.types';
+import { AdminRole, ROLE_PERMISSIONS } from '../types/admin.types';
 
-// Backend-driven permission checks: `permissions` is the admin's effective,
-// already-resolved (resource, action) set (see authStore.ts `user.permissions`,
-// populated from AdminResponse on login/profile). No wildcard matching here —
-// wildcards were expanded into concrete rows server-side (see
-// fastapi_backend/app/core/permission_catalog.py), so this is a plain
-// membership check that works the same way for base-role and staff admins.
 function checkPermission(
     permissions: PermissionGrant[],
     resource: Resource | string,
     action: Action | string,
+    role?: AdminRole,
 ): boolean {
-    return permissions.some((p) => p.resource === resource && p.action === action);
+    if (role === AdminRole.SUPER_ADMIN) return true;
+
+    const hasUserPerm = permissions.some(
+        (p) =>
+            (p.resource === resource || p.resource === '*') &&
+            (p.action === action || p.action === '*')
+    );
+    if (hasUserPerm) return true;
+
+    if (role && ROLE_PERMISSIONS[role]) {
+        return ROLE_PERMISSIONS[role]!.some(
+            (p) =>
+                (p.resource === resource || p.resource === '*') &&
+                (p.action === action || p.action === '*')
+        );
+    }
+
+    return false;
 }
 
-function checkAnyPermission(permissions: PermissionGrant[], resource: Resource | string): boolean {
-    return permissions.some((p) => p.resource === resource);
+function checkAnyPermission(
+    permissions: PermissionGrant[],
+    resource: Resource | string,
+    role?: AdminRole,
+): boolean {
+    if (role === AdminRole.SUPER_ADMIN) return true;
+
+    const hasUserPerm = permissions.some(
+        (p) => p.resource === resource || p.resource === '*'
+    );
+    if (hasUserPerm) return true;
+
+    if (role && ROLE_PERMISSIONS[role]) {
+        return ROLE_PERMISSIONS[role]!.some(
+            (p) => p.resource === resource || p.resource === '*'
+        );
+    }
+
+    return false;
 }
 
 export type DashboardType = 'admin' | 'manager' | 'marketing' | 'support' | 'inventory';
@@ -92,11 +121,11 @@ export const usePermissions = () => {
         const permissions = user?.permissions ?? [];
 
         const hasPermission = (resource: string, action: string): boolean => {
-            return checkPermission(permissions, resource, action);
+            return checkPermission(permissions, resource, action, role);
         };
 
-        const can = (resource: Resource, action: Action) => checkPermission(permissions, resource, action);
-        const canAny = (resource: Resource) => checkAnyPermission(permissions, resource);
+        const can = (resource: Resource, action: Action) => checkPermission(permissions, resource, action, role);
+        const canAny = (resource: Resource) => checkAnyPermission(permissions, resource, role);
         const canCreate = (resource: string) => hasPermission(resource, 'create');
         const canRead = (resource: string) => hasPermission(resource, 'read');
         const canUpdate = (resource: string) => hasPermission(resource, 'update');
