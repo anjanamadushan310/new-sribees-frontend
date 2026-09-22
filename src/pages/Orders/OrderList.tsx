@@ -144,20 +144,44 @@ const OrderList: React.FC = () => {
             title: 'Order',
             dataIndex: 'order_number',
             key: 'order_number',
-            render: (num: string, record) => <a onClick={() => openDrawer(record.order_id)}>{num}</a>,
+            width: 175,
+            render: (num: string, record) => (
+                <a
+                    onClick={() => openDrawer(record.order_id)}
+                    style={{
+                        fontWeight: 600,
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontSize: 13,
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    {num}
+                </a>
+            ),
         },
         {
             title: 'Customer',
             key: 'customer',
+            width: 220,
             render: (_, record) => (
-                <Space direction="vertical" size={0}>
-                    <Text>{record.customer_name || '—'}</Text>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+                    <Text
+                        strong
+                        style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        title={record.customer_name || undefined}
+                    >
+                        {record.customer_name || '—'}
+                    </Text>
                     {record.customer_email && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
+                        <Text
+                            type="secondary"
+                            style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            title={record.customer_email}
+                        >
                             {record.customer_email}
                         </Text>
                     )}
-                </Space>
+                </div>
             ),
         },
         ...(showBranchColumn
@@ -166,8 +190,12 @@ const OrderList: React.FC = () => {
                       title: 'Branch',
                       dataIndex: 'branch_name',
                       key: 'branch_name',
-                      render: (name: string | null) =>
-                          name ? <span>{name}</span> : <Text type="secondary">Unassigned</Text>,
+                      width: 140,
+                      render: (name: string | null) => (
+                          <span style={{ whiteSpace: 'nowrap' }}>
+                              {name ? name : <Text type="secondary">Unassigned</Text>}
+                          </span>
+                      ),
                   } as ColumnsType<OrderListItem>[number],
               ]
             : []),
@@ -175,42 +203,57 @@ const OrderList: React.FC = () => {
             title: 'Date',
             dataIndex: 'created_at',
             key: 'created_at',
-            render: (d: string | null) => (d ? slt(d).format('MMM DD, YYYY') : '—'),
+            width: 120,
+            render: (d: string | null) => (
+                <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#434343' }}>
+                    {d ? slt(d).format('MMM DD, YYYY') : '—'}
+                </span>
+            ),
         },
-        { title: 'Items', dataIndex: 'item_count', key: 'item_count', width: 70, align: 'right' },
+        {
+            title: 'Items',
+            dataIndex: 'item_count',
+            key: 'item_count',
+            width: 75,
+            align: 'center',
+            render: (count: number) => <Tag style={{ margin: 0, fontWeight: 500 }}>{count}</Tag>,
+        },
         {
             title: 'Total',
             dataIndex: 'total_amount',
             key: 'total_amount',
+            width: 130,
             align: 'right',
-            render: (v: number) => <Text strong>{formatLKR(v)}</Text>,
+            render: (v: number) => (
+                <Text strong style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                    {formatLKR(v)}
+                </Text>
+            ),
         },
         {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            width: 150,
-            render: (s: OrderStatus) => statusTag(s),
+            width: 130,
+            align: 'center',
+            render: (s: OrderStatus) => <div style={{ whiteSpace: 'nowrap' }}>{statusTag(s)}</div>,
         },
         {
-            // The courier half of the row. A waybill means a rider has been
-            // asked to collect; `failed` means nobody has, and nothing retries
-            // it — that is the cell a Branch Manager is scanning this list for.
             title: 'Parcel',
             key: 'parcel',
-            width: 150,
+            width: 140,
             render: (_, record) => {
                 if (record.courier_booking_status === 'failed' && !record.courier_waybill) {
-                    return <Tag color="red">Not booked</Tag>;
+                    return <Tag color="red" style={{ margin: 0 }}>Not booked</Tag>;
                 }
                 if (!record.courier_waybill) {
                     return <Text type="secondary">—</Text>;
                 }
                 return (
-                    <Space direction="vertical" size={0}>
-                        <Text style={{ fontSize: 12 }}>{record.courier_waybill}</Text>
+                    <Space direction="vertical" size={0} style={{ whiteSpace: 'nowrap' }}>
+                        <Text style={{ fontSize: 12, fontFamily: 'monospace' }}>{record.courier_waybill}</Text>
                         {record.courier_tracking_status && (
-                            <Text type="secondary" style={{ fontSize: 11 }}>
+                            <Text type="secondary" style={{ fontSize: 11, textTransform: 'capitalize' }}>
                                 {record.courier_tracking_status.replace(/_/g, ' ')}
                             </Text>
                         )}
@@ -221,9 +264,10 @@ const OrderList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 100,
+            width: 90,
+            align: 'center',
             render: (_, record) => (
-                <Button type="link" icon={<EyeOutlined />} onClick={() => openDrawer(record.order_id)}>
+                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDrawer(record.order_id)}>
                     View
                 </Button>
             ),
@@ -359,10 +403,12 @@ const OrderList: React.FC = () => {
 
                 <Table
                     rowKey="order_id"
+                    size="middle"
                     rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) }}
                     columns={columns}
                     dataSource={data?.orders ?? []}
                     loading={isLoading}
+                    scroll={{ x: 'max-content' }}
                     locale={{ emptyText: isError ? 'Failed to load orders.' : 'No orders found.' }}
                     pagination={{
                         current: page,
