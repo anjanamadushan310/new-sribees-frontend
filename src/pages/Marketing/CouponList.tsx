@@ -741,7 +741,21 @@ const CouponList: React.FC = () => {
                         <Form.Item
                             label="Usage Limit (total)"
                             name="usage_limit"
-                            extra="Leave blank for unlimited"
+                            dependencies={['budget_cap']}
+                            rules={[
+                                ({ getFieldValue }) => ({
+                                    validator(_, value) {
+                                        const budgetCap = getFieldValue('budget_cap');
+                                        if ((value == null || value === '') && (budgetCap == null || budgetCap === '')) {
+                                            return Promise.reject(
+                                                new Error('Financial Protection: Enter either Usage Limit or Total Campaign Budget')
+                                            );
+                                        }
+                                        return Promise.resolve();
+                                    },
+                                }),
+                            ]}
+                            extra="Leave blank if Total Campaign Budget is set"
                             style={{ width: 200 }}
                         >
                             <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
@@ -777,7 +791,21 @@ const CouponList: React.FC = () => {
                     <Form.Item
                         label="Total campaign budget"
                         name="budget_cap"
-                        extra="The most discount this coupon may ever give away. Blank = uncapped, which means a usage limit is the only thing between you and an unbounded bill."
+                        dependencies={['usage_limit']}
+                        rules={[
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                    const usageLimit = getFieldValue('usage_limit');
+                                    if ((value == null || value === '') && (usageLimit == null || usageLimit === '')) {
+                                        return Promise.reject(
+                                            new Error('Financial Protection: Enter either Total Campaign Budget or Usage Limit')
+                                        );
+                                    }
+                                    return Promise.resolve();
+                                },
+                            }),
+                        ]}
+                        extra="The most discount this coupon may ever give away. Required if Usage Limit is left blank to prevent unbounded bills."
                     >
                         <InputNumber
                             min={1}
