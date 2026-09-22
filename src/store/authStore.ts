@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AdminRole } from '../types/admin.types';
+import { AdminRole, ROLE_PERMISSIONS } from '../types/admin.types';
 import type { Resource, Action, PermissionGrant } from '../types/admin.types';
 
 // User interface
@@ -110,10 +110,18 @@ export const useAuthStore = create<AuthState>()(
             hasPermission: (resource: Resource, action: Action) => {
                 const user = get().user;
                 if (!user) return false;
-                // Super Admin's effective set is the full delegatable catalog
-                // (seeded that way server-side), so a plain membership check
-                // already covers it — no wildcard case to special-case here.
-                return user.permissions.some((p) => p.resource === resource && p.action === action);
+                if (user.role === AdminRole.SUPER_ADMIN) return true;
+                const matchUser = (user.permissions ?? []).some(
+                    (p) => (p.resource === resource || p.resource === '*') && (p.action === action || p.action === '*')
+                );
+                if (matchUser) return true;
+                const rolePerms = ROLE_PERMISSIONS[user.role];
+                if (rolePerms) {
+                    return rolePerms.some(
+                        (p) => (p.resource === resource || p.resource === '*') && (p.action === action || p.action === '*')
+                    );
+                }
+                return false;
             },
 
             isSuperAdmin: () => {
