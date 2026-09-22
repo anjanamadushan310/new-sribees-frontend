@@ -144,11 +144,23 @@ const StaffDashboard: React.FC = () => {
         setDrawerOpen(true);
     };
 
+const greetingName = (() => {
+    if (!user?.full_name) return 'Staff';
+
+    const trimmed = user.full_name.trim();
+
+    if (/^customer\b/i.test(trimmed)) {
+        return trimmed;
+    }
+
+    return trimmed.split(' ')[0] || 'Staff';
+})();
+
     return (
         <div style={{ padding: '24px' }}>
             <div style={{ marginBottom: '24px' }}>
                 <Title level={2} style={{ margin: 0 }}>
-                    Welcome, {user?.full_name?.split(' ')[0] || 'Staff'}! 👋
+                    Welcome, {greetingName}! 👋
                 </Title>
                 <Text type="secondary">
                     All Branches • {slt().format('dddd, MMMM D')}

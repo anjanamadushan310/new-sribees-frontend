@@ -205,6 +205,41 @@ const AdminLayout: React.FC = () => {
         navigate('/login');
     };
 
+    const headerTitle = useMemo(() => {
+        if (location.pathname === '/products') return 'Products';
+        if (location.pathname === '/categories') return 'Categories';
+        if (location.pathname === '/inventory') return 'Inventory';
+        if (location.pathname === '/orders') return 'Orders';
+        if (location.pathname === '/customers') return 'Customers';
+        if (location.pathname === '/analytics') return 'Analytics';
+        if (location.pathname === '/coupons') return 'Coupons';
+        if (location.pathname === '/quick-sale') return 'Quick Sale';
+        if (location.pathname === '/banners') return 'Home Banners';
+        if (location.pathname === '/branches') return 'Branches';
+        if (location.pathname === '/users') return 'Admin Users';
+        if (location.pathname === '/staff') return 'My Staff';
+        if (location.pathname === '/partners') return 'Partners';
+        if (location.pathname.startsWith('/settings')) return 'Settings';
+
+        if (user?.role_name) {
+            const name = user.role_name.trim();
+            return name.toLowerCase().endsWith('dashboard') ? name : `${name} Dashboard`;
+        }
+        if (role === AdminRole.CUSTOMER_SUPPORT) {
+            return 'Customer Support Dashboard';
+        }
+        if (role === AdminRole.BRANCH_MANAGER) {
+            return 'Branch Manager Dashboard';
+        }
+        if (role === AdminRole.MARKETING_MANAGER) {
+            return 'Marketing Dashboard';
+        }
+        if (role === AdminRole.INVENTORY_MANAGER) {
+            return 'Inventory Dashboard';
+        }
+        return 'Admin Dashboard';
+    }, [location.pathname, user?.role_name, role]);
+
     return (
         <Layout style={{ minHeight: '100vh' }}>
             <Sider
@@ -273,7 +308,7 @@ const AdminLayout: React.FC = () => {
                             onClick: () => setCollapsed(!collapsed),
                             style: { fontSize: 18, cursor: 'pointer' },
                         })}
-                        <h2 style={{ margin: 0 }}>Admin Dashboard</h2>
+                        <h2 style={{ margin: 0 }}>{headerTitle}</h2>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                         {user?.branch_name && (
