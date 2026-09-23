@@ -5,6 +5,21 @@
 import apiClient from './client';
 
 export type DiscountType = 'percentage' | 'fixed';
+export type TargetCustomerType = 'all' | 'specific' | 'tier';
+export type CustomerTierOption = 'GOLD' | 'SILVER' | 'MEMBER' | 'INACTIVE';
+
+export interface WhitelistedCustomer {
+    user_id?: string;
+    name: string;
+    phone?: string;
+    email?: string;
+}
+
+export interface DispatchConfig {
+    enabled: boolean;
+    channels: ('sms' | 'email' | 'push')[];
+    template: string;
+}
 
 export interface Coupon {
     coupon_id: string;
@@ -41,10 +56,14 @@ export interface Coupon {
     /** Clearance lines count toward neither the discount nor the minimum order. */
     exclude_quick_sale: boolean;
 
-    // ---- Eligibility ------------------------------------------------------
+    // ---- Eligibility & Targeting ------------------------------------------
     first_order_only: boolean;
     /** Issued to one named customer via Assign Promo; nobody else can redeem. */
     target_user_id: string | null;
+    target_customer_type?: TargetCustomerType;
+    customer_tier?: CustomerTierOption | null;
+    whitelisted_customers?: WhitelistedCustomer[];
+    dispatch_config?: DispatchConfig;
     /** Empty = the whole catalog. */
     category_ids: string[];
     product_ids: string[];
@@ -83,6 +102,12 @@ export interface CouponPayload {
     auto_stop_on_budget?: boolean;
     exclude_quick_sale?: boolean;
     first_order_only?: boolean;
+
+    target_customer_type?: TargetCustomerType;
+    customer_tier?: CustomerTierOption | null;
+    whitelisted_customers?: WhitelistedCustomer[];
+    dispatch_config?: DispatchConfig;
+
     /**
      * Catalog eligibility. Omit to leave unchanged on an update; send an empty
      * array to clear a restriction and widen the coupon back to everything.
