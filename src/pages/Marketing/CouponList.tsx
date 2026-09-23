@@ -31,6 +31,8 @@ import {
     Checkbox,
     Alert,
     Upload,
+    Row,
+    Col,
 } from 'antd';
 import {
     PlusOutlined,
@@ -858,114 +860,125 @@ const CouponList: React.FC = () => {
                         <Input.TextArea rows={2} placeholder="Internal note or campaign title" />
                     </Form.Item>
 
-                    <Space style={{ display: 'flex' }} align="start">
-                        <Form.Item
-                            label="Discount Type"
-                            name="discount_type"
-                            rules={[{ required: true }]}
-                            style={{ width: 220 }}
-                        >
-                            <Select
-                                options={[
-                                    { label: 'Percentage (%)', value: 'percentage' },
-                                    { label: 'Fixed (LKR)', value: 'fixed' },
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Discount Type"
+                                name="discount_type"
+                                rules={[{ required: true, message: 'Please select discount type' }]}
+                            >
+                                <Select
+                                    options={[
+                                        { label: 'Percentage (%)', value: 'percentage' },
+                                        { label: 'Fixed (LKR)', value: 'fixed' },
+                                    ]}
+                                />
+                            </Form.Item>
+                        </Col>
+
+                        <Col span={12}>
+                            <Form.Item
+                                label="Discount Value"
+                                name="discount_value"
+                                rules={[
+                                    { required: true, message: 'Enter value' },
+                                    {
+                                        validator: (_, v) => {
+                                            if (v == null) return Promise.resolve();
+                                            if (v <= 0) return Promise.reject('Must be greater than 0');
+                                            if (discountType === 'percentage' && v > 100)
+                                                return Promise.reject('Max 100%');
+                                            return Promise.resolve();
+                                        },
+                                    },
                                 ]}
-                            />
-                        </Form.Item>
+                            >
+                                <InputNumber
+                                    min={0}
+                                    step={discountType === 'percentage' ? 1 : 10}
+                                    style={{ width: '100%' }}
+                                    placeholder={discountType === 'percentage' ? '10' : '500'}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
-                        <Form.Item
-                            label="Discount Value"
-                            name="discount_value"
-                            rules={[
-                                { required: true, message: 'Enter value' },
-                                {
-                                    validator: (_, v) => {
-                                        if (v == null) return Promise.resolve();
-                                        if (v <= 0) return Promise.reject('Must be greater than 0');
-                                        if (discountType === 'percentage' && v > 100)
-                                            return Promise.reject('Max 100%');
-                                        return Promise.resolve();
-                                    },
-                                },
-                            ]}
-                            style={{ width: 220 }}
-                        >
-                            <InputNumber
-                                min={0}
-                                step={discountType === 'percentage' ? 1 : 10}
-                                style={{ width: '100%' }}
-                                addonAfter={discountType === 'percentage' ? '%' : 'LKR'}
-                            />
-                        </Form.Item>
-                    </Space>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Min. Order Value"
+                                name="min_order_value"
+                                dependencies={['discount_type', 'discount_value']}
+                                rules={[
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            const type = getFieldValue('discount_type');
+                                            const discVal = getFieldValue('discount_value');
+                                            if (type === 'fixed' && value != null && discVal != null && value < discVal) {
+                                                return Promise.reject(
+                                                    new Error(`Min. Order must be at least LKR ${discVal} for fixed discounts`)
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    }),
+                                ]}
+                            >
+                                <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
+                            </Form.Item>
+                        </Col>
 
-                    <Space style={{ display: 'flex' }} align="start" wrap>
-                        <Form.Item
-                            label="Min. Order Value"
-                            name="min_order_value"
-                            dependencies={['discount_type', 'discount_value']}
-                            rules={[
-                                ({ getFieldValue }) => ({
-                                    validator(_, value) {
-                                        const type = getFieldValue('discount_type');
-                                        const discVal = getFieldValue('discount_value');
-                                        if (type === 'fixed' && value != null && discVal != null && value < discVal) {
-                                            return Promise.reject(
-                                                new Error(`Min. Order must be at least LKR ${discVal} for fixed discounts`)
-                                            );
-                                        }
-                                        return Promise.resolve();
-                                    },
-                                }),
-                            ]}
-                            style={{ width: 200 }}
-                        >
-                            <InputNumber min={0} style={{ width: '100%' }} addonBefore="LKR" />
-                        </Form.Item>
-
-                        {discountType === 'percentage' && (
+                        <Col span={12}>
                             <Form.Item
                                 label="Max Discount Amount"
                                 name="max_discount_amount"
                                 extra="Cap for percentage discount"
-                                style={{ width: 200 }}
                             >
-                                <InputNumber min={0} style={{ width: '100%' }} addonBefore="LKR" placeholder="Unlimited" />
+                                <InputNumber
+                                    min={0}
+                                    disabled={discountType === 'fixed'}
+                                    style={{ width: '100%' }}
+                                    placeholder="Unlimited"
+                                />
                             </Form.Item>
-                        )}
+                        </Col>
+                    </Row>
 
-                        <Form.Item
-                            label="Usage Limit (total)"
-                            name="usage_limit"
-                            dependencies={['budget_cap']}
-                            rules={[
-                                ({ getFieldValue }) => ({
-                                    validator(_, value) {
-                                        const budgetCap = getFieldValue('budget_cap');
-                                        if ((value == null || value === '') && (budgetCap == null || budgetCap === '')) {
-                                            return Promise.reject(
-                                                new Error('Financial Protection: Enter either Usage Limit or Total Campaign Budget')
-                                            );
-                                        }
-                                        return Promise.resolve();
-                                    },
-                                }),
-                            ]}
-                            extra="Blank = Unlimited"
-                            style={{ width: 200 }}
-                        >
-                            <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
-                        </Form.Item>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Usage Limit (total)"
+                                name="usage_limit"
+                                dependencies={['budget_cap']}
+                                rules={[
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            const budgetCap = getFieldValue('budget_cap');
+                                            if ((value == null || value === '') && (budgetCap == null || budgetCap === '')) {
+                                                return Promise.reject(
+                                                    new Error('Financial Protection: Enter either Usage Limit or Total Campaign Budget')
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    }),
+                                ]}
+                                extra="Leave blank for unlimited"
+                            >
+                                <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
+                            </Form.Item>
+                        </Col>
 
-                        <Form.Item
-                            label="Per-customer Limit"
-                            name="per_user_limit"
-                            extra="Blank = Unlimited"
-                            style={{ width: 200 }}
-                        >
-                            <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
-                        </Form.Item>
-                    </Space>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Per-customer Limit"
+                                name="per_user_limit"
+                                extra="Max uses per customer (blank = unlimited)"
+                            >
+                                <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
                     <Form.Item
                         label="Show in app (collectible offer)"
