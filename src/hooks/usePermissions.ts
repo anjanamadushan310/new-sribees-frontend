@@ -170,7 +170,8 @@ export const usePermissions = () => {
         const requiresBranchIsolation =
             role === AdminRole.BRANCH_MANAGER ||
             role === AdminRole.MARKETING_MANAGER ||
-            role === AdminRole.INVENTORY_MANAGER;
+            role === AdminRole.INVENTORY_MANAGER ||
+            (role === AdminRole.CUSTOMER_SUPPORT && Boolean(branchId));
         const canAccessAllBranches = !requiresBranchIsolation;
         const canAccessBranch = (targetBranchId: string) => {
             if (canAccessAllBranches) return true;

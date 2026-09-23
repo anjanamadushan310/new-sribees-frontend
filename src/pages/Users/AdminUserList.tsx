@@ -61,6 +61,24 @@ const AdminUserList: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<UserFormValues>();
+    const selectedRole = Form.useWatch('role', form);
+    const selectedBranchId = Form.useWatch('branch_id', form);
+
+    const getBranchExtraText = () => {
+        if (selectedRole === AdminRole.CUSTOMER_SUPPORT) {
+            if (!selectedBranchId) {
+                return '🌐 Global Support: Not pinned to a branch. Will have access to support tickets and orders across ALL branches.';
+            }
+            return '📍 Branch-Scoped Support: Pinned strictly to this branch. Will only access data for this branch.';
+        }
+        if (selectedRole === AdminRole.SUPER_ADMIN) {
+            return '🌐 Global Role: Super Admins manage the entire network across all branches (leave empty).';
+        }
+        if (selectedRole) {
+            return '⚠️ Required: Branch Managers and Operations Staff must be assigned to a specific branch.';
+        }
+        return 'Required for branch-scoped roles; leave empty for global roles.';
+    };
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<AdminUser | null>(null);
@@ -360,7 +378,7 @@ const AdminUserList: React.FC = () => {
                     <Form.Item
                         label="Branch Assignment"
                         name="branch_id"
-                        extra="Required for branch-scoped roles; leave empty for global roles."
+                        extra={getBranchExtraText()}
                     >
                         <Select
                             placeholder="Select a branch (optional)"

@@ -66,6 +66,8 @@ export const SupportTicketList: React.FC = () => {
     const queryClient = useQueryClient();
     const user = useAuthStore((state) => state.user);
     const isSuperAdmin = user?.role === AdminRole.SUPER_ADMIN;
+    const isGlobalSupport = user?.role === AdminRole.CUSTOMER_SUPPORT && !user?.branch_id;
+    const canFilterBranches = isSuperAdmin || isGlobalSupport;
 
     // Filters
     const [page, setPage] = useState(1);
@@ -96,11 +98,11 @@ export const SupportTicketList: React.FC = () => {
             }),
     });
 
-    // Query branches for super admin filter
+    // Query branches for branch filter (Super Admin and Global Customer Support)
     const { data: branches = [] } = useQuery<Branch[]>({
         queryKey: ['admin', 'branches'],
         queryFn: branchesApi.list,
-        enabled: isSuperAdmin,
+        enabled: canFilterBranches,
     });
 
     // Update ticket mutation
@@ -329,7 +331,7 @@ export const SupportTicketList: React.FC = () => {
                         />
                     </Col>
                     <Col xs={24} md={16} style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        {isSuperAdmin && (
+                        {canFilterBranches && (
                             <Select
                                 placeholder="Filter by Branch"
                                 allowClear
