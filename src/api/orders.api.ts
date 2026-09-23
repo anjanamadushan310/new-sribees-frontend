@@ -262,6 +262,8 @@ export interface OrderDetail {
     return_reason: string | null;
     return_comments: string | null;
     return_items: OrderReturnItem[] | null;
+    /** Photos the customer attached, already resolved to fetchable URLs. */
+    return_images: string[] | null;
     return_requested_at: string | null;
     refund_amount: number | null;
     return_resolution: ReturnResolution | null;
