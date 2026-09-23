@@ -5,6 +5,7 @@ import {
     DashboardOutlined,
     ShoppingOutlined,
     ShoppingCartOutlined,
+    StopOutlined,
     UserOutlined,
     LogoutOutlined,
     MenuFoldOutlined,
@@ -93,6 +94,11 @@ const AdminLayout: React.FC = () => {
             key: '/orders',
             icon: <ShoppingCartOutlined />,
             label: 'Orders',
+        },
+        {
+            key: '/orders/cancellations',
+            icon: <StopOutlined />,
+            label: 'Cancellations',
         },
         {
             key: '/customers',
@@ -209,6 +215,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname === '/products') return 'Products';
         if (location.pathname === '/categories') return 'Categories';
         if (location.pathname === '/inventory') return 'Inventory';
+        if (location.pathname === '/orders/cancellations') return 'Cancellations';
         if (location.pathname === '/orders') return 'Orders';
         if (location.pathname === '/customers') return 'Customers';
         if (location.pathname === '/analytics') return 'Analytics';
