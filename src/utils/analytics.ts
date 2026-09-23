@@ -68,6 +68,23 @@ export const apiErrorMessage = (error: unknown): string => {
     const e = error as AxiosLikeError | null | undefined;
     const detail = e?.response?.data?.detail;
     if (typeof detail === 'string' && detail) return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((item) => {
+                if (typeof item === 'string') return item;
+                if (item && typeof item === 'object') {
+                    const obj = item as Record<string, unknown>;
+                    return (obj.msg as string) || (obj.message as string) || JSON.stringify(item);
+                }
+                return String(item);
+            })
+            .join('; ');
+    }
+    if (detail && typeof detail === 'object') {
+        const obj = detail as Record<string, unknown>;
+        if (typeof obj.msg === 'string') return obj.msg;
+        if (typeof obj.message === 'string') return obj.message;
+    }
     if (e?.message) return e.message;
     return 'Please try again.';
 };

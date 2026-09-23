@@ -131,11 +131,23 @@ export interface FulfilmentContacts {
 }
 
 export type EscalationCategory =
+    | 'return_replacement'
+    | 'refund_request'
     | 'cancel_request'
     | 'address_correction'
     | 'hold_shipment'
+    | 'delivery_exception'
     | 'customer_complaint'
     | 'other';
+
+export type EscalationPriority = 'urgent' | 'medium' | 'low';
+
+export interface EscalationAffectedItem {
+    order_item_id: string;
+    product_name: string;
+    quantity: number;
+}
+
 export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
 
 /** Internal support → branch ticket (B4 Module B). */
@@ -143,6 +155,9 @@ export interface OrderEscalation {
     escalation_id: string;
     order_id: string;
     category: EscalationCategory;
+    priority?: EscalationPriority;
+    affected_items?: EscalationAffectedItem[];
+    images?: string[];
     message: string;
     status: EscalationStatus;
     resolution_note: string | null;
@@ -548,12 +563,24 @@ export const ordersApi = {
     },
     raiseEscalation: async (
         id: string,
-        category: EscalationCategory,
-        message: string,
+        payloadOrCategory:
+            | {
+                  category: EscalationCategory;
+                  priority?: EscalationPriority;
+                  message: string;
+                  affected_items?: EscalationAffectedItem[];
+                  images?: string[];
+              }
+            | EscalationCategory,
+        legacyMessage?: string,
     ): Promise<OrderEscalation> => {
+        const body =
+            typeof payloadOrCategory === 'object'
+                ? payloadOrCategory
+                : { category: payloadOrCategory, message: legacyMessage || '' };
         const res = await apiClient.post<{ success: boolean; data: OrderEscalation }>(
             `/admin/orders/${id}/escalations`,
-            { category, message },
+            body,
         );
         return res.data.data;
     },

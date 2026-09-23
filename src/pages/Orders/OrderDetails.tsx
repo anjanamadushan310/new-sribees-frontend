@@ -45,7 +45,6 @@ import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi, ORDER_STATUS_META } from '../../api/orders.api';
 import type {
-    EscalationCategory,
     FulfilmentContacts,
     OrderEscalation,
     OrderItem,
@@ -55,6 +54,7 @@ import type {
 import { usePermissions } from '../../hooks/usePermissions';
 import CourierPanel from './CourierPanel';
 import { slt } from '../../utils/datetime';
+import RaiseEscalationModal, { escCategoryLabel } from '../../components/orders/RaiseEscalationModal';
 
 const { Text, Title } = Typography;
 
@@ -81,14 +81,6 @@ interface OrderDetailsProps {
     onClose: () => void;
 }
 
-const ESC_CATEGORIES: { value: EscalationCategory; label: string }[] = [
-    { value: 'cancel_request', label: 'Urgent Cancellation' },
-    { value: 'address_correction', label: 'Address Correction' },
-    { value: 'hold_shipment', label: 'Hold Shipment' },
-    { value: 'customer_complaint', label: 'Customer Complaint' },
-    { value: 'other', label: 'Other' },
-];
-const escLabel = (c: string) => ESC_CATEGORIES.find((x) => x.value === c)?.label ?? c;
 const telHref = (p?: string | null) => (p ? `tel:${p.replace(/\s+/g, '')}` : undefined);
 const waHref = (p?: string | null) =>
     p ? `https://wa.me/${p.replace(/[^\d]/g, '')}` : undefined;
@@ -96,7 +88,7 @@ const waHref = (p?: string | null) =>
 const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
-    const { isSuperAdmin, isBranchManager, isSupport } = usePermissions();
+    const { isSuperAdmin, isBranchManager } = usePermissions();
     const canDecideReturn = isSuperAdmin || isBranchManager;
 
     const [overrideOpen, setOverrideOpen] = useState(false);
@@ -107,8 +99,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
     const [returnNote, setReturnNote] = useState('');
     const [proofNote, setProofNote] = useState('');
     const [escOpen, setEscOpen] = useState(false);
-    const [escCategory, setEscCategory] = useState<EscalationCategory>('cancel_request');
-    const [escMessage, setEscMessage] = useState('');
 
     const { data: order, isLoading } = useQuery({
         queryKey: ['admin', 'order', orderId],
@@ -130,8 +120,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         setReturnNote('');
         setProofNote('');
         setEscOpen(false);
-        setEscCategory('cancel_request');
-        setEscMessage('');
     }, [orderId]);
 
     const invalidateOrder = () => {
@@ -141,17 +129,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
 
     const escalations = order?.escalations ?? [];
     const contacts: FulfilmentContacts | undefined = order?.fulfilment_contacts;
-
-    const raiseEscMut = useMutation({
-        mutationFn: () => ordersApi.raiseEscalation(order!.order_id, escCategory, escMessage.trim()),
-        onSuccess: () => {
-            message.success('Escalation raised.');
-            setEscOpen(false);
-            setEscMessage('');
-            invalidateOrder();
-        },
-        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to raise escalation.'),
-    });
 
     const escUpdateMut = useMutation({
         mutationFn: ({ eid, status, note }: { eid: string; status: 'acknowledged' | 'resolved'; note?: string }) =>
@@ -389,31 +366,42 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                 </div>
             ) : (
                 <>
-                    <Space wrap style={{ marginBottom: 16 }}>
-                        {statusTag(order.status, true)}
-                        {(() => {
-                            const isCOD =
-                                order.payment_method === 'CASH_ON_DELIVERY' ||
-                                order.payment_method === 'cash_on_delivery';
-                            let color = 'orange';
-                            let text = order.payment_status?.toUpperCase() || 'PENDING';
-                            if (order.payment_status === 'paid') {
-                                color = 'green';
-                                text = 'Paid';
-                            } else if (order.payment_status === 'failed') {
-                                color = 'red';
-                                text = 'Failed';
-                            } else if (order.payment_status === 'refunded') {
-                                color = 'purple';
-                                text = 'Refunded';
-                            } else if (order.payment_status === 'pending' || !order.payment_status) {
-                                color = 'orange';
-                                text = isCOD ? 'Pending (COD)' : 'Pending';
-                            }
-                            return <Tag color={color}>💳 Payment: {text}</Tag>;
-                        })()}
-                        {order.branch_name && <Tag color="geekblue">📍 Branch: {order.branch_name}</Tag>}
-                    </Space>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                        <Space wrap>
+                            {statusTag(order.status, true)}
+                            {(() => {
+                                const isCOD =
+                                    order.payment_method === 'CASH_ON_DELIVERY' ||
+                                    order.payment_method === 'cash_on_delivery';
+                                let color = 'orange';
+                                let text = order.payment_status?.toUpperCase() || 'PENDING';
+                                if (order.payment_status === 'paid') {
+                                    color = 'green';
+                                    text = 'Paid';
+                                } else if (order.payment_status === 'failed') {
+                                    color = 'red';
+                                    text = 'Failed';
+                                } else if (order.payment_status === 'refunded') {
+                                    color = 'purple';
+                                    text = 'Refunded';
+                                } else if (order.payment_status === 'pending' || !order.payment_status) {
+                                    color = 'orange';
+                                    text = isCOD ? 'Pending (COD)' : 'Pending';
+                                }
+                                return <Tag color={color}>💳 Payment: {text}</Tag>;
+                            })()}
+                            {order.branch_name && <Tag color="geekblue">📍 Branch: {order.branch_name}</Tag>}
+                        </Space>
+                        <Button
+                            type="primary"
+                            danger
+                            icon={<FlagOutlined />}
+                            onClick={() => setEscOpen(true)}
+                            style={{ fontWeight: 600, borderRadius: 6 }}
+                        >
+                            🚩 Raise Escalation
+                        </Button>
+                    </div>
 
                     <Descriptions column={1} size="small" bordered>
                         <Descriptions.Item label="Placed">
@@ -909,88 +897,150 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                             )}
                         </Space>
                     </Divider>
-                    <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                    <Space direction="vertical" style={{ width: '100%' }} size={12}>
                         {escalations.length === 0 && (
                             <Text type="secondary">No escalations raised on this order.</Text>
                         )}
-                        {escalations.map((e: OrderEscalation) => (
-                            <div
-                                key={e.escalation_id}
-                                style={{
-                                    padding: 10,
-                                    borderRadius: 8,
-                                    border: '1px solid #f0f0f0',
-                                    background: e.status === 'resolved' ? '#fafafa' : '#fffef7',
-                                }}
-                            >
-                                <Space wrap size={6}>
-                                    <Tag color="geekblue">{escLabel(e.category)}</Tag>
-                                    <Tag color={e.status === 'open' ? 'red' : e.status === 'acknowledged' ? 'gold' : 'green'}>
-                                        {e.status}
-                                    </Tag>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {e.raised_by_name}
-                                        {e.created_at ? ` · ${slt(e.created_at).format('MMM DD, HH:mm')}` : ''}
-                                    </Text>
-                                </Space>
-                                <div style={{ marginTop: 4 }}>{e.message}</div>
-                                {e.resolution_note && (
-                                    <div style={{ marginTop: 4 }}>
-                                        <Text type="secondary" style={{ fontSize: 12 }}>
-                                            ↳ {e.handled_by_name}: {e.resolution_note}
+                        {escalations.map((e: OrderEscalation) => {
+                            const priorityColor =
+                                e.priority === 'urgent'
+                                    ? 'red'
+                                    : e.priority === 'low'
+                                    ? 'blue'
+                                    : 'orange';
+                            const priorityLabel =
+                                e.priority === 'urgent'
+                                    ? '🔴 Urgent'
+                                    : e.priority === 'low'
+                                    ? '🔵 Low'
+                                    : '🟠 Medium';
+
+                            return (
+                                <div
+                                    key={e.escalation_id}
+                                    style={{
+                                        padding: 12,
+                                        borderRadius: 8,
+                                        border: e.status === 'resolved' ? '1px solid #f0f0f0' : '1px solid #ffe58f',
+                                        background: e.status === 'resolved' ? '#fafafa' : '#ffffe6',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 6 }}>
+                                        <Space wrap size={6}>
+                                            <Tag color={priorityColor}>{priorityLabel}</Tag>
+                                            <Tag color="geekblue">{escCategoryLabel(e.category)}</Tag>
+                                            <Tag color={e.status === 'open' ? 'red' : e.status === 'acknowledged' ? 'gold' : 'green'}>
+                                                {e.status.toUpperCase()}
+                                            </Tag>
+                                        </Space>
+                                        <Text type="secondary" style={{ fontSize: 11 }}>
+                                            Raised by <b>{e.raised_by_name}</b>
+                                            {e.created_at ? ` · ${slt(e.created_at).format('MMM DD, HH:mm')}` : ''}
                                         </Text>
                                     </div>
-                                )}
-                                {canDecideReturn && e.status !== 'resolved' && (
-                                    <Space style={{ marginTop: 8 }}>
-                                        {e.status === 'open' && (
+
+                                    <div style={{ marginTop: 8, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                                        {e.message}
+                                    </div>
+
+                                    {e.affected_items && e.affected_items.length > 0 && (
+                                        <div style={{ marginTop: 8, background: '#ffffff', padding: '6px 10px', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                                            <Text type="secondary" style={{ fontSize: 11, fontWeight: 600 }}>Affected Items:</Text>
+                                            <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 12 }}>
+                                                {e.affected_items.map((ai, idx) => (
+                                                    <li key={idx}>
+                                                        {ai.product_name} <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>Qty: {ai.quantity}</Tag>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {e.images && e.images.length > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>Attached Evidence:</Text>
+                                            <Image.PreviewGroup>
+                                                <Space wrap size={8}>
+                                                    {e.images.map((imgUrl, imgIdx) => (
+                                                        <Image
+                                                            key={imgIdx}
+                                                            src={imgUrl}
+                                                            alt={`Evidence photo ${imgIdx + 1}`}
+                                                            width={60}
+                                                            height={60}
+                                                            style={{
+                                                                objectFit: 'cover',
+                                                                borderRadius: 6,
+                                                                border: '1px solid #d9d9d9',
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </Space>
+                                            </Image.PreviewGroup>
+                                        </div>
+                                    )}
+
+                                    {e.resolution_note && (
+                                        <div style={{ marginTop: 6, padding: '4px 8px', background: '#e6f7ff', borderRadius: 4 }}>
+                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                ↳ <b>{e.handled_by_name || 'Staff'}</b>: {e.resolution_note}
+                                            </Text>
+                                        </div>
+                                    )}
+
+                                    {canDecideReturn && e.status !== 'resolved' && (
+                                        <Space style={{ marginTop: 10 }}>
+                                            {e.status === 'open' && (
+                                                <Button
+                                                    size="small"
+                                                    loading={escUpdateMut.isPending}
+                                                    onClick={() =>
+                                                        escUpdateMut.mutate({ eid: e.escalation_id, status: 'acknowledged' })
+                                                    }
+                                                >
+                                                    Acknowledge
+                                                </Button>
+                                            )}
                                             <Button
                                                 size="small"
+                                                type="primary"
                                                 loading={escUpdateMut.isPending}
-                                                onClick={() =>
-                                                    escUpdateMut.mutate({ eid: e.escalation_id, status: 'acknowledged' })
-                                                }
+                                                onClick={() => {
+                                                    let note = '';
+                                                    modal.confirm({
+                                                        title: 'Resolve escalation',
+                                                        content: (
+                                                            <Input.TextArea
+                                                                rows={3}
+                                                                placeholder="Resolution note (optional)…"
+                                                                onChange={(ev) => (note = ev.target.value)}
+                                                            />
+                                                        ),
+                                                        okText: 'Resolve',
+                                                        onOk: () =>
+                                                            escUpdateMut.mutateAsync({
+                                                                eid: e.escalation_id,
+                                                                status: 'resolved',
+                                                                note: note.trim() || undefined,
+                                                            }),
+                                                    });
+                                                }}
                                             >
-                                                Acknowledge
+                                                Resolve
                                             </Button>
-                                        )}
-                                        <Button
-                                            size="small"
-                                            type="primary"
-                                            loading={escUpdateMut.isPending}
-                                            onClick={() => {
-                                                let note = '';
-                                                modal.confirm({
-                                                    title: 'Resolve escalation',
-                                                    content: (
-                                                        <Input.TextArea
-                                                            rows={3}
-                                                            placeholder="Resolution note (optional)…"
-                                                            onChange={(ev) => (note = ev.target.value)}
-                                                        />
-                                                    ),
-                                                    okText: 'Resolve',
-                                                    onOk: () =>
-                                                        escUpdateMut.mutateAsync({
-                                                            eid: e.escalation_id,
-                                                            status: 'resolved',
-                                                            note: note.trim() || undefined,
-                                                        }),
-                                                });
-                                            }}
-                                        >
-                                            Resolve
-                                        </Button>
-                                    </Space>
-                                )}
-                            </div>
-                        ))}
+                                        </Space>
+                                    )}
+                                </div>
+                            );
+                        })}
                         <Button
+                            type="primary"
+                            danger
                             icon={<FlagOutlined />}
                             onClick={() => setEscOpen(true)}
-                            style={{ alignSelf: 'flex-start' }}
+                            style={{ alignSelf: 'flex-start', fontWeight: 600, borderRadius: 6 }}
                         >
-                            Raise Escalation
+                             Raise Escalation
                         </Button>
                     </Space>
 
@@ -1104,48 +1154,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                         </Space>
                     </Modal>
 
-                    <Modal
-                        title="🚩 Raise Internal Escalation"
+                    {/* Integrated Raise Escalation Modal Popup */}
+                    <RaiseEscalationModal
                         open={escOpen}
-                        onCancel={() => setEscOpen(false)}
-                        okText="Raise Escalation"
-                        okButtonProps={{
-                            disabled: escMessage.trim().length < 5,
-                            loading: raiseEscMut.isPending,
-                        }}
-                        onOk={() => raiseEscMut.mutate()}
-                    >
-                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                            <div>
-                                <Text strong>Category</Text>
-                                <Select
-                                    style={{ width: '100%', marginTop: 4 }}
-                                    value={escCategory}
-                                    onChange={setEscCategory}
-                                    options={ESC_CATEGORIES}
-                                />
-                            </div>
-                            <div>
-                                <Text strong>What needs the branch's attention?</Text>
-                                <Input.TextArea
-                                    style={{ marginTop: 4 }}
-                                    rows={4}
-                                    maxLength={2000}
-                                    showCount
-                                    placeholder="e.g. Customer called to cancel — order is still Confirmed, please hold before packing."
-                                    value={escMessage}
-                                    onChange={(e) => setEscMessage(e.target.value)}
-                                />
-                            </div>
-                            {isSupport && (
-                                <Alert
-                                    type="info"
-                                    showIcon
-                                    message="The Branch Manager is notified and will acknowledge / resolve this ticket."
-                                />
-                            )}
-                        </Space>
-                    </Modal>
+                        onClose={() => setEscOpen(false)}
+                        order={order}
+                    />
                 </>
             )}
         </Drawer>
