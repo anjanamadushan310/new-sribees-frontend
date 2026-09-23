@@ -53,7 +53,8 @@ export type Resource =
     | 'transfers'
     | 'marketing'
     | 'banners'
-    | 'partners';
+    | 'partners'
+    | 'support';
 
 // Action types
 export type Action = 'create' | 'read' | 'update' | 'delete' | '*';
@@ -118,6 +119,8 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
         { resource: 'transfers', action: 'create' },
         { resource: 'transfers', action: 'read' },
         { resource: 'settings', action: 'read' },
+        { resource: 'support', action: 'read' },
+        { resource: 'support', action: 'update' },
     ],
     [AdminRole.MARKETING_MANAGER]: [
         { resource: 'dashboard', action: 'read' },
@@ -141,6 +144,8 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
         { resource: 'customers', action: 'update' },
         { resource: 'reviews', action: 'read' },
         { resource: 'reviews', action: 'update' },
+        { resource: 'support', action: 'read' },
+        { resource: 'support', action: 'update' },
     ],
     [AdminRole.INVENTORY_MANAGER]: [
         { resource: 'dashboard', action: 'read' },

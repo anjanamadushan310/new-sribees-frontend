@@ -149,6 +149,7 @@ export const usePermissions = () => {
             '/partners': { resource: 'partners', action: 'read' },
             '/settings': { resource: 'settings', action: 'read' },
             '/transfers': { resource: 'transfers', action: 'read' },
+            '/support-tickets': { resource: 'support', action: 'read' },
         };
 
         const canAccessRoute = (route: string): boolean => {

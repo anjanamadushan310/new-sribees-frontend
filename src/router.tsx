@@ -56,8 +56,9 @@ const PartnerList = lazy(() => import('./pages/Partners/PartnerList'));
 // Staff — any base-role admin manages their own delegated staff
 const StaffList = lazy(() => import('./pages/Staff/StaffList'));
 
-// Customers
+// Customers & Support
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
+const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList'));
 
 // Settings
 const Settings = lazy(() => import('./pages/Settings'));
@@ -284,6 +285,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'customers', action: 'read' }}>
                                     <CustomerList />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Customer Support Tickets */}
+                        <Route
+                            path="support-tickets"
+                            element={
+                                <RoleGuard requiredPermission={{ resource: 'support', action: 'read' }}>
+                                    <SupportTicketList />
                                 </RoleGuard>
                             }
                         />

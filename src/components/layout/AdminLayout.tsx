@@ -19,6 +19,7 @@ import {
     GiftOutlined,
     ThunderboltOutlined,
     PictureOutlined,
+    CustomerServiceOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -100,6 +101,11 @@ const AdminLayout: React.FC = () => {
             label: 'Customers',
         },
         {
+            key: '/support-tickets',
+            icon: <CustomerServiceOutlined />,
+            label: 'Support Tickets',
+        },
+        {
             key: '/analytics',
             icon: <BarChartOutlined />,
             label: 'Analytics',
@@ -178,6 +184,9 @@ const AdminLayout: React.FC = () => {
             }
             if (item.key === '/staff') {
                 return canManageStaff;
+            }
+            if (item.key === '/support-tickets') {
+                return can('support', 'read') || isSuperAdmin;
             }
             // Base-role-exclusive pages: 'users'/'branches'/'partners' are
             // deliberately excluded from the delegatable permission catalog
