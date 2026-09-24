@@ -156,6 +156,17 @@ interface CouponFormValues {
     dispatch_template?: string;
 }
 
+/**
+ * A Sri Lankan mobile number in +94 form, or null. The same rule the server
+ * uses (app/utils/identity.py), so the list shows what will actually match.
+ */
+const canonicalMobile = (value?: string | null): string | null => {
+    let digits = (value ?? '').replace(/\D/g, '');
+    if (digits.startsWith('94')) digits = digits.slice(2);
+    else if (digits.startsWith('0')) digits = digits.slice(1);
+    return /^7\d{8}$/.test(digits) ? `+94${digits}` : null;
+};
+
 const CouponList: React.FC = () => {
     const { message } = App.useApp();
     const { isSuperAdmin } = usePermissions();
@@ -335,15 +346,22 @@ const CouponList: React.FC = () => {
         form.resetFields();
     };
 
-    // Whitelist chip additions & removals
+    // Whitelist chip additions & removals. The server checks the coupon
+    // against the customer's MOBILE NUMBER, so a chip without one would be a
+    // customer the coupon can never recognise.
     const handleAddCustomerChip = () => {
-        if (!custNameInput.trim() && !custPhoneInput.trim()) {
-            message.warning('Please enter customer name or phone number.');
+        const phone = canonicalMobile(custPhoneInput);
+        if (!phone) {
+            message.warning('Enter the customer\'s mobile number, e.g. 0771234567.');
+            return;
+        }
+        if (whitelistedCustomers.some((c) => canonicalMobile(c.phone) === phone)) {
+            message.info('That number is already on the list.');
             return;
         }
         const newCust: WhitelistedCustomer = {
             name: custNameInput.trim() || custPhoneInput.trim(),
-            phone: custPhoneInput.trim() || undefined,
+            phone,
         };
         setWhitelistedCustomers((prev) => [...prev, newCust]);
         setCustNameInput('');
@@ -363,25 +381,41 @@ const CouponList: React.FC = () => {
             if (!text) return;
             const lines = text.split(/\r?\n/);
             const imported: WhitelistedCustomer[] = [];
+            const seen = new Set(whitelistedCustomers.map((c) => canonicalMobile(c.phone)));
+            const skipped: string[] = [];
             lines.forEach((line, idx) => {
                 if (!line.trim()) return;
                 const parts = line.split(',').map((p) => p.trim().replace(/^["']|["']$/g, ''));
                 if (idx === 0 && (parts[0].toLowerCase().includes('name') || parts[0].toLowerCase().includes('phone'))) {
                     return; // Skip header row
                 }
-                if (parts.length >= 1 && parts[0]) {
-                    imported.push({
-                        name: parts[0],
-                        phone: parts[1] || undefined,
-                        email: parts[2] || undefined,
-                    });
+                // Name, Phone, Email. A row without a usable mobile number is
+                // named back rather than silently kept: it could never match.
+                const phone = canonicalMobile(parts[1]);
+                if (!phone) {
+                    skipped.push(parts[0] || `line ${idx + 1}`);
+                    return;
                 }
+                if (seen.has(phone)) return;
+                seen.add(phone);
+                imported.push({
+                    name: parts[0] || phone,
+                    phone,
+                    email: parts[2] || undefined,
+                });
             });
             if (imported.length > 0) {
                 setWhitelistedCustomers((prev) => [...prev, ...imported]);
                 message.success(`Imported ${imported.length} customer(s) from CSV.`);
             } else {
-                message.error('No valid customer records found in the CSV file.');
+                message.error('No customers with a valid mobile number found in the CSV file.');
+            }
+            if (skipped.length > 0) {
+                message.warning(
+                    `Skipped ${skipped.length} row(s) without a valid mobile number: ` +
+                        skipped.slice(0, 5).join(', ') +
+                        (skipped.length > 5 ? '…' : ''),
+                );
             }
         };
         reader.readAsText(file);
@@ -460,6 +494,10 @@ const CouponList: React.FC = () => {
 
     const handleSubmit = async () => {
         const values = await form.validateFields();
+        if (values.target_customer_type === 'specific' && whitelistedCustomers.length === 0) {
+            message.error('Add at least one customer to the whitelist, or choose All Customers.');
+            return;
+        }
         const [from, to] = values.validity;
         const minOrder = values.min_order_value ?? 0;
         const payload: CouponPayload = {
@@ -1140,6 +1178,14 @@ const CouponList: React.FC = () => {
                                     Sample CSV
                                 </Button>
                             </Space>
+                            <Alert
+                                type="info"
+                                showIcon
+                                icon={<InfoCircleOutlined />}
+                                style={{ marginTop: 12 }}
+                                message="Only these customers"
+                                description="Matched on the mobile number. Only these customers see this offer in the app, and checkout refuses it for anyone else — including someone who signs up later with a listed number, who is matched too."
+                            />
                         </Card>
                     )}
 
