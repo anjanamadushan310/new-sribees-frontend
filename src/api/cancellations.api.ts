@@ -18,6 +18,8 @@ export interface CancellationRow {
     customer_name: string | null;
     customer_phone: string | null;
     customer_nic: string | null;
+    /** The account this was cancelled from has since been closed. */
+    customer_deleted?: boolean;
     /** 'customer' or 'admin'. Only the first counts against anyone. */
     cancelled_by: string;
     reason: string | null;
@@ -44,10 +46,14 @@ export interface CancellationRow {
 
 /** One customer's totals over the window. */
 export interface CancellationCustomerRow {
+    /** The person's live account, or the one they used last. */
     user_id: string;
     customer_name: string | null;
     customer_phone: string | null;
     customer_nic: string | null;
+    customer_deleted?: boolean;
+    /** Rows are per person (NIC). More than one: they closed an account and came back. */
+    accounts: number;
     cancellations: number;
     refunded_total: number;
     courier_fees_charged: number;
@@ -65,10 +71,13 @@ export interface LinkedAccount {
     customer_name: string | null;
     customer_phone?: string | null;
     customer_nic?: string | null;
+    customer_deleted?: boolean;
     cancellations?: number;
 }
 
 export interface LinkedAccounts {
+    /** The same person: accounts sharing this NIC, live or closed. */
+    by_nic: LinkedAccount[];
     by_device: LinkedAccount[];
     by_ip: LinkedAccount[];
     by_address: LinkedAccount[];

@@ -187,7 +187,16 @@ const Cancellations: React.FC = () => {
             width: 220,
             render: (_, row) => (
                 <Space direction="vertical" size={0}>
-                    <Text strong>{row.customer_name || '—'}</Text>
+                    <Space size={6}>
+                        <Text strong>{row.customer_name || '—'}</Text>
+                        {row.accounts > 1 && (
+                            <Tooltip title="Counted by NIC: these cancellations span an account they closed and the one they opened afterwards.">
+                                <Tag color="purple" style={{ marginInlineEnd: 0 }}>
+                                    {row.accounts} accounts
+                                </Tag>
+                            </Tooltip>
+                        )}
+                    </Space>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                         {row.customer_phone || ''}
                         {row.customer_nic ? ` · ${row.customer_nic}` : ''}
@@ -417,6 +426,11 @@ const Cancellations: React.FC = () => {
                             description={links.data.note}
                         />
                         <LinkGroup
+                            title="Same NIC"
+                            hint="The same person — an account they closed, or the one they opened after it."
+                            rows={links.data.by_nic ?? []}
+                        />
+                        <LinkGroup
                             title="Same device"
                             hint="The strongest signal — it survives a new number and a new name."
                             rows={links.data.by_device}
@@ -441,7 +455,12 @@ const Cancellations: React.FC = () => {
 const LinkGroup: React.FC<{
     title: string;
     hint: string;
-    rows: { user_id: string; customer_name: string | null; customer_phone?: string | null }[];
+    rows: {
+        user_id: string;
+        customer_name: string | null;
+        customer_phone?: string | null;
+        customer_deleted?: boolean;
+    }[];
 }> = ({ title, hint, rows }) => (
     <div style={{ marginBottom: 18 }}>
         <Text strong>{title}</Text>
@@ -456,6 +475,9 @@ const LinkGroup: React.FC<{
                     <Text>{r.customer_name || r.user_id}</Text>
                     {r.customer_phone && (
                         <Text type="secondary"> · {r.customer_phone}</Text>
+                    )}
+                    {r.customer_deleted && (
+                        <Tag style={{ marginInlineStart: 6 }}>Deleted</Tag>
                     )}
                 </div>
             ))
