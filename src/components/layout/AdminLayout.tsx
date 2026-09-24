@@ -23,6 +23,7 @@ import {
     PictureOutlined,
     CustomerServiceOutlined,
     EnvironmentOutlined,
+    CrownOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -178,6 +179,11 @@ const AdminLayout: React.FC = () => {
                         key: '/settings/platform',
                         icon: <SettingOutlined />,
                         label: 'Platform Settings',
+                    },
+                    {
+                        key: '/settings/loyalty',
+                        icon: <CrownOutlined />,
+                        label: 'Loyalty Levels',
                     },
                     {
                         key: '/settings/app',

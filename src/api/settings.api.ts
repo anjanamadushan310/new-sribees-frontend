@@ -13,6 +13,8 @@ import apiClient from './client';
 export interface PlatformSettings {
     order_tax_rate_percent: number;
     splash_video_url: string | null;
+    /** Rupees of order value (excluding delivery) per loyalty point. */
+    loyalty_spend_per_point: number;
 }
 
 export type PlatformSettingsUpdate = Partial<PlatformSettings>;

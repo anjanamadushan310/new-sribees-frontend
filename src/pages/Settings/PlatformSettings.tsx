@@ -19,7 +19,7 @@ import {
     Alert,
     App,
 } from 'antd';
-import { SaveOutlined, DollarOutlined, MobileOutlined } from '@ant-design/icons';
+import { SaveOutlined, DollarOutlined, MobileOutlined, CrownOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../api/settings.api';
 import type { PlatformSettings as PlatformSettingsType } from '../../api/settings.api';
@@ -43,6 +43,7 @@ const PlatformSettings: React.FC = () => {
             form.setFieldsValue({
                 order_tax_rate_percent: data.order_tax_rate_percent,
                 splash_video_url: data.splash_video_url ?? undefined,
+                loyalty_spend_per_point: data.loyalty_spend_per_point,
             });
         }
     }, [data, form]);
@@ -62,6 +63,7 @@ const PlatformSettings: React.FC = () => {
         saveMutation.mutate({
             order_tax_rate_percent: values.order_tax_rate_percent,
             splash_video_url: values.splash_video_url?.trim() || null,
+            loyalty_spend_per_point: values.loyalty_spend_per_point,
         });
     };
 
@@ -120,6 +122,32 @@ const PlatformSettings: React.FC = () => {
                                 step={0.5}
                                 style={{ width: 240 }}
                                 addonAfter="%"
+                            />
+                        </Form.Item>
+                    </Card>
+
+                    <Card
+                        title={
+                            <Space>
+                                <CrownOutlined />
+                                Loyalty Points
+                            </Space>
+                        }
+                        style={{ marginBottom: 16 }}
+                    >
+                        <Form.Item
+                            label="Rupees per point"
+                            name="loyalty_spend_per_point"
+                            rules={[{ required: true, message: 'Enter how many rupees earn one point' }]}
+                            extra="Order value without delivery, counted once the 12-hour return window closes. A change applies to orders that settle after it; points already earned never change. Levels are under Settings → Loyalty Levels."
+                        >
+                            <InputNumber
+                                min={1}
+                                max={1000000}
+                                step={100}
+                                style={{ width: 240 }}
+                                addonBefore="Rs"
+                                addonAfter="= 1 point"
                             />
                         </Form.Item>
                     </Card>

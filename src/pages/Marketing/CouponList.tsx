@@ -68,9 +68,9 @@ import type {
     CouponStatus,
     DiscountType,
     TargetCustomerType,
-    CustomerTierOption,
     WhitelistedCustomer,
 } from '../../api/coupons.api';
+import { loyaltyApi } from '../../api/loyalty.api';
 import { categoriesApi } from '../../api/categories.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -123,12 +123,6 @@ const FILTER_TABS: { label: string; value: CouponStatus | 'all' }[] = [
 const budgetColor = (pct: number): string =>
     pct >= 95 ? '#dc2626' : pct >= 70 ? '#d97706' : '#1677ff';
 
-const TIER_OPTIONS: { label: string; value: CustomerTierOption; hint: string }[] = [
-    { label: 'GOLD MEMBER (Points ≥ 1000)', value: 'GOLD', hint: 'High-value loyal app customers' },
-    { label: 'SILVER MEMBER (Points 200 - 999)', value: 'SILVER', hint: 'Active repeat shoppers' },
-    { label: 'MEMBER (Regular)', value: 'MEMBER', hint: 'Standard registered users' },
-    { label: 'Inactive Customers (> 60 days)', value: 'INACTIVE', hint: 'Win-back candidates with no recent orders' },
-];
 
 interface CouponFormValues {
     code: string;
@@ -153,7 +147,8 @@ interface CouponFormValues {
 
     // Targeted Promotions
     target_customer_type: TargetCustomerType;
-    customer_tier?: CustomerTierOption;
+    /** The loyalty level a members-only coupon starts at. */
+    min_tier_id?: string;
 
     // Dispatch Config
     dispatch_enabled?: boolean;
@@ -209,6 +204,15 @@ const CouponList: React.FC = () => {
         queryFn: () => categoriesApi.list(),
         enabled: modalOpen,
     });
+
+    // The real levels, so the list can name a coupon's level and the form can
+    // offer exactly the ones checkout enforces.
+    const tiersQuery = useQuery({
+        queryKey: ['admin', 'loyalty', 'tiers'],
+        queryFn: loyaltyApi.listTiers,
+    });
+    const tierName = (id: string | null | undefined) =>
+        (tiersQuery.data ?? []).find((t) => t.tier_id === id)?.name ?? 'a level';
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: [COUPONS_KEY] });
 
@@ -274,7 +278,7 @@ const CouponList: React.FC = () => {
             branch_scope: 'network',
             branch_id: null,
             target_customer_type: 'all',
-            customer_tier: undefined,
+            min_tier_id: undefined,
             dispatch_enabled: false,
             dispatch_channels: ['sms', 'push'],
             dispatch_template: 'Hi {customer_name}! Use promo code {coupon_code} to get {discount_value} OFF your next order. Valid until {validity_date}.',
@@ -307,8 +311,14 @@ const CouponList: React.FC = () => {
             category_ids: c.category_ids,
             branch_scope: c.branch_id ? 'branch' : 'network',
             branch_id: c.branch_id ?? undefined,
-            target_customer_type: c.target_customer_type ?? 'all',
-            customer_tier: c.customer_tier ?? undefined,
+            // The level is the stored fact; the old 'tier' choice was never
+            // saved by the server, so it is not trusted to mean anything.
+            target_customer_type: c.min_tier_id
+                ? 'tier'
+                : c.target_customer_type === 'tier'
+                    ? 'all'
+                    : (c.target_customer_type ?? 'all'),
+            min_tier_id: c.min_tier_id ?? undefined,
             dispatch_enabled: c.dispatch_config?.enabled ?? false,
             dispatch_channels: c.dispatch_config?.channels ?? ['sms', 'push'],
             dispatch_template: c.dispatch_config?.template ?? 'Hi {customer_name}! Use promo code {coupon_code} to get {discount_value} OFF your next order. Valid until {validity_date}.',
@@ -479,7 +489,7 @@ const CouponList: React.FC = () => {
 
             // Targeted Promotions & Customer Eligibility
             target_customer_type: values.target_customer_type,
-            customer_tier: values.target_customer_type === 'tier' ? values.customer_tier : null,
+            min_tier_id: values.target_customer_type === 'tier' ? (values.min_tier_id ?? null) : null,
             whitelisted_customers:
                 values.target_customer_type === 'specific' ? whitelistedCustomers : [],
             dispatch_config: {
@@ -521,9 +531,9 @@ const CouponList: React.FC = () => {
                                 In app
                             </Tag>
                         )}
-                        {c.target_customer_type === 'tier' && (
-                            <Tag color="cyan" style={{ marginInlineEnd: 0, fontSize: 11 }}>
-                                Tier: {c.customer_tier}
+                        {c.min_tier_id && (
+                            <Tag color="cyan" icon={<CrownOutlined />} style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                {tierName(c.min_tier_id)}+
                             </Tag>
                         )}
                         {c.target_customer_type === 'specific' && (
@@ -1009,16 +1019,17 @@ const CouponList: React.FC = () => {
                     {targetCustomerType === 'tier' && (
                         <Card size="small" style={{ background: '#f8fafc', marginBottom: 16 }}>
                             <Form.Item
-                                label="Select Customer Tier"
-                                name="customer_tier"
-                                rules={[{ required: true, message: 'Select a customer tier' }]}
-                                extra="Unlocks for Mobile App users based on Points / Wallet balance threshold and Backend loyalty filters."
+                                label="Members from this level up"
+                                name="min_tier_id"
+                                rules={[{ required: true, message: 'Select a loyalty level' }]}
+                                extra="Levels and their point thresholds are set by the Super Admin under Settings → Loyalty Levels."
                             >
                                 <Select
-                                    placeholder="Choose Loyalty Tier"
-                                    options={TIER_OPTIONS.map((t) => ({
-                                        label: t.label,
-                                        value: t.value,
+                                    placeholder="Choose a loyalty level"
+                                    loading={tiersQuery.isLoading}
+                                    options={(tiersQuery.data ?? []).map((t) => ({
+                                        label: `${t.name} (from ${t.min_points.toLocaleString()} points)${t.is_active ? '' : ' — switched off'}`,
+                                        value: t.tier_id,
                                     }))}
                                 />
                             </Form.Item>
@@ -1026,8 +1037,8 @@ const CouponList: React.FC = () => {
                                 type="info"
                                 showIcon
                                 icon={<InfoCircleOutlined />}
-                                message="Loyalty Tier Condition"
-                                description="Only customers matching the selected points threshold or inactive timeframe in the backend database will be allowed to collect or redeem this code."
+                                message="Members only"
+                                description="Only customers at this level or above see this offer in the app, and checkout refuses it for anyone else. Guests never see it."
                             />
                         </Card>
                     )}

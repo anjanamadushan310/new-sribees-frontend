@@ -66,6 +66,7 @@ const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList')
 const Settings = lazy(() => import('./pages/Settings'));
 const AppSettings = lazy(() => import('./pages/Settings/AppSettings'));
 const PlatformSettings = lazy(() => import('./pages/Settings/PlatformSettings'));
+const LoyaltyLevels = lazy(() => import('./pages/Settings/LoyaltyLevels'));
 const ServiceAreas = lazy(() => import('./pages/Settings/ServiceAreas'));
 
 // Loading Spinner Component
@@ -395,6 +396,17 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <PlatformSettings />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Loyalty Levels - Super Admin only: a level is a promise
+                            to every customer at once */}
+                        <Route
+                            path="settings/loyalty"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <LoyaltyLevels />
                                 </RoleGuard>
                             }
                         />

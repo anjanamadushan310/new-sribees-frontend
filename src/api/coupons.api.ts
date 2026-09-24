@@ -58,6 +58,8 @@ export interface Coupon {
 
     // ---- Eligibility & Targeting ------------------------------------------
     first_order_only: boolean;
+    /** Members-only: redeemable from this loyalty level up; enforced at checkout. */
+    min_tier_id: string | null;
     /** Issued to one named customer via Assign Promo; nobody else can redeem. */
     target_user_id: string | null;
     target_customer_type?: TargetCustomerType;
@@ -102,6 +104,8 @@ export interface CouponPayload {
     auto_stop_on_budget?: boolean;
     exclude_quick_sale?: boolean;
     first_order_only?: boolean;
+    /** null opens a members-only coupon to everyone again. */
+    min_tier_id?: string | null;
 
     target_customer_type?: TargetCustomerType;
     customer_tier?: CustomerTierOption | null;
