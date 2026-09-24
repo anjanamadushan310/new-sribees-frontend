@@ -82,6 +82,11 @@ export interface AdminProduct {
     is_featured: boolean;
     /** Short shelf life — the stock Quick Sale exists to clear before it spoils. */
     is_perishable?: boolean;
+    /**
+     * Whether customers may return it after delivery. Copied onto each order
+     * at checkout, so changing it only affects orders placed afterwards.
+     */
+    is_returnable?: boolean;
 
     // ---- Branch operations. Present only for a branch-scoped viewer; a Super
     // Admin is looking at the global catalog and has no single branch's shelf
@@ -134,6 +139,7 @@ export interface ProductPayload {
     is_active?: boolean;
     is_featured?: boolean;
     is_perishable?: boolean;
+    is_returnable?: boolean;
     images?: ImageLinkPayload[];
 }
 

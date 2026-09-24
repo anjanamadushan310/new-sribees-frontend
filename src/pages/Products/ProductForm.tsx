@@ -67,6 +67,7 @@ interface ProductFormValues {
     is_active: boolean;
     is_featured: boolean;
     is_perishable: boolean;
+    is_returnable: boolean;
     images?: GalleryImage[];
 }
 
@@ -135,6 +136,7 @@ const ProductForm: React.FC = () => {
                 is_active: product.is_active,
                 is_featured: product.is_featured,
                 is_perishable: product.is_perishable ?? false,
+                is_returnable: product.is_returnable ?? true,
             });
             let primaryAssigned = false;
             const loaded: GalleryImage[] = (product.images || [])
@@ -243,6 +245,7 @@ const ProductForm: React.FC = () => {
                 is_active: values.is_active,
                 is_featured: values.is_featured,
                 is_perishable: values.is_perishable ?? false,
+                is_returnable: values.is_returnable ?? true,
                 images: imagesPayload,
             };
 
@@ -399,7 +402,7 @@ const ProductForm: React.FC = () => {
                 form={form}
                 layout="vertical"
                 onFinish={(values) => saveMutation.mutate(values)}
-                initialValues={{ is_active: true, is_featured: false, weight_unit: 'kg' }}
+                initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg' }}
             >
                 <Row gutter={16}>
                     <Col xs={24} lg={16}>
@@ -821,6 +824,18 @@ const ProductForm: React.FC = () => {
                                 tooltip="Short shelf life — prioritised for Quick Sale clearance"
                             >
                                 <Switch disabled={catalogDisabled} checkedChildren="Perishable" unCheckedChildren="Shelf-stable" />
+                            </Form.Item>
+
+                            {/* Also catalog-level. The server copies it onto each
+                                order at checkout, so switching it off never takes
+                                a return away from an order already placed. */}
+                            <Form.Item
+                                label="Returnable"
+                                name="is_returnable"
+                                valuePropName="checked"
+                                tooltip="Off = final sale. Customers cannot select it in a return request. Applies to orders placed after you save."
+                            >
+                                <Switch disabled={catalogDisabled} checkedChildren="Returnable" unCheckedChildren="No returns" />
                             </Form.Item>
                         </Card>
                     </Col>
