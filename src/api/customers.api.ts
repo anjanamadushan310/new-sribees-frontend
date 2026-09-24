@@ -35,7 +35,7 @@ export interface CustomerPurchaseStats {
     segment: CustomerSegment;
 }
 
-export interface Customer extends CustomerPurchaseStats {
+export interface Customer extends CustomerPurchaseStats, CustomerClosure {
     user_id: string;
     email: string;
     full_name: string | null;
@@ -51,6 +51,26 @@ export interface Customer extends CustomerPurchaseStats {
     is_verified: boolean;
     created_at: string | null;
     last_login: string | null;
+}
+
+/**
+ * Whether the customer closed the account. A closed account keeps its row,
+ * NIC and orders; its phone and email are released (NULL) so the person can
+ * sign up again, and what it held is kept in deleted_phone / deleted_email.
+ */
+export interface CustomerClosure {
+    is_deleted: boolean;
+    deleted_at: string | null;
+    deletion_reason: string | null;
+    deleted_phone: string | null;
+    deleted_email: string | null;
+}
+
+/** The same person's other account, found through the NIC. */
+export interface LinkedAccount extends CustomerClosure {
+    user_id: string;
+    full_name: string | null;
+    created_at: string | null;
 }
 
 export interface CustomerAddress {
@@ -75,7 +95,7 @@ export interface CustomerStats extends CustomerPurchaseStats {
     total_spent: number;
 }
 
-export interface CustomerProfile {
+export interface CustomerProfile extends CustomerClosure {
     user_id: string;
     email: string | null;
     full_name: string | null;
@@ -88,6 +108,7 @@ export interface CustomerProfile {
     is_verified: boolean;
     created_at: string | null;
     last_login: string | null;
+    linked_accounts: LinkedAccount[];
     addresses: CustomerAddress[];
     stats: CustomerStats;
 }
@@ -117,6 +138,8 @@ export interface CustomerListParams {
     segment?: CustomerSegment;
     /** The Active / Blocked tabs. */
     is_blocked?: boolean;
+    /** The Deleted tab. Without it, closed accounts are left out. */
+    deleted?: boolean;
 }
 
 export interface CustomerListResult {

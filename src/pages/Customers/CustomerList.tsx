@@ -35,7 +35,7 @@ const SEGMENT_META: Record<CustomerSegment, { label: string; color: string; hint
     },
 };
 
-type FilterTab = 'all' | 'active' | 'blocked' | CustomerSegment;
+type FilterTab = 'all' | 'active' | 'blocked' | 'deleted' | CustomerSegment;
 
 const FILTER_TABS: { label: string; value: FilterTab }[] = [
     { label: 'All Customers', value: 'all' },
@@ -44,6 +44,9 @@ const FILTER_TABS: { label: string; value: FilterTab }[] = [
     { label: 'New', value: 'new' },
     { label: 'At Risk (30d+)', value: 'at_risk' },
     { label: 'Blocked', value: 'blocked' },
+    // Accounts the customer closed. Kept for their orders and NIC; the other
+    // tabs leave them out.
+    { label: 'Deleted', value: 'deleted' },
 ];
 
 const formatLKR = (value: number): string =>
@@ -98,6 +101,7 @@ const CustomerList: React.FC = () => {
                 page: 1,
                 limit: data?.total || 10000,
                 search: search || undefined,
+                deleted: tab === 'deleted' || undefined,
             });
             
             const exportData = result.customers;
@@ -106,10 +110,10 @@ const CustomerList: React.FC = () => {
                 c.full_name || 'Unnamed',
                 c.nic || '',
                 c.email || '',
-                c.phone || '',
+                c.phone || c.deleted_phone || '',
                 c.alternate_phone || '',
                 c.created_at ? slt(c.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
-                c.is_active ? 'Active' : 'Inactive'
+                c.is_deleted ? 'Deleted' : c.is_active ? 'Active' : 'Inactive'
             ]);
             
             const csvContent = [
@@ -153,6 +157,7 @@ const CustomerList: React.FC = () => {
                 segment:
                     tab === 'returning' || tab === 'new' || tab === 'at_risk' ? tab : undefined,
                 is_blocked: tab === 'blocked' ? true : tab === 'active' ? false : undefined,
+                deleted: tab === 'deleted' || undefined,
             }),
         placeholderData: keepPreviousData,
     });
@@ -307,7 +312,14 @@ const CustomerList: React.FC = () => {
             key: 'phone',
             render: (phone: string | null, record) => (
                 <>
-                    {phone || <span style={{ color: '#bbb' }}>—</span>}
+                    {phone ||
+                        (record.deleted_phone ? (
+                            <Tooltip title="Held when the account was closed; released since.">
+                                <Text type="secondary" delete>{record.deleted_phone}</Text>
+                            </Tooltip>
+                        ) : (
+                            <span style={{ color: '#bbb' }}>—</span>
+                        ))}
                     {record.alternate_phone ? (
                         <div style={{ color: '#888', fontSize: 12 }}>{record.alternate_phone}</div>
                     ) : null}
@@ -326,7 +338,20 @@ const CustomerList: React.FC = () => {
             title: 'Status',
             key: 'status',
             width: 180,
-            render: (_, record) => (
+            render: (_, record) => record.is_deleted ? (
+                <Tooltip
+                    title={record.deletion_reason ? `Reason: ${record.deletion_reason}` : undefined}
+                >
+                    <Space direction="vertical" size={0}>
+                        <Tag color="default">Deleted</Tag>
+                        {record.deleted_at && (
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                {slt(record.deleted_at).format('MMM DD, YYYY')}
+                            </Text>
+                        )}
+                    </Space>
+                </Tooltip>
+            ) : (
                 <Space>
                     <Switch
                         size="small"
@@ -367,7 +392,7 @@ const CustomerList: React.FC = () => {
                             setDrawerVisible(true);
                         }
                     },
-                    ...(canManageCustomers ? [
+                    ...(canManageCustomers && !record.is_deleted ? [
                         {
                             key: 'edit',
                             label: 'Edit Info',
@@ -403,7 +428,7 @@ const CustomerList: React.FC = () => {
                             }
                         },
                     ] : []),
-                    ...(isSuperAdmin ? [
+                    ...(isSuperAdmin && !record.is_deleted ? [
                         {
                             type: 'divider' as const
                         },
@@ -412,7 +437,7 @@ const CustomerList: React.FC = () => {
                             label: (
                                 <Popconfirm
                                     title="Delete/Anonymize Customer Account?"
-                                    description="Are you sure you want to delete this customer? If they have order history, they will be anonymized instead of hard-deleted."
+                                    description="Are you sure you want to delete this customer? If they have order history, the account is closed instead and moves to the Deleted tab."
                                     onConfirm={() => deleteMutation.mutate(record.user_id)}
                                     okText="Yes, Delete"
                                     cancelText="Cancel"
@@ -613,8 +638,26 @@ const CustomerList: React.FC = () => {
                                 <Descriptions.Item label="NIC">{profile.nic || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
                                 <Descriptions.Item label="Phone">{profile.phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
                                 <Descriptions.Item label="Second Phone">{profile.alternate_phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
+                                {profile.is_deleted && (
+                                    <>
+                                        <Descriptions.Item label="Deleted On">
+                                            {profile.deleted_at ? slt(profile.deleted_at).format('MMMM DD, YYYY hh:mm A') : '—'}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="Reason Given">
+                                            {profile.deletion_reason || <span style={{ color: '#bbb' }}>—</span>}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="Phone When Deleted">
+                                            {profile.deleted_phone || <span style={{ color: '#bbb' }}>—</span>}
+                                        </Descriptions.Item>
+                                        <Descriptions.Item label="Email When Deleted">
+                                            {profile.deleted_email || <span style={{ color: '#bbb' }}>—</span>}
+                                        </Descriptions.Item>
+                                    </>
+                                )}
                                 <Descriptions.Item label="Status">
-                                    {profile.is_blocked ? (
+                                    {profile.is_deleted ? (
+                                        <Tag color="default">Deleted</Tag>
+                                    ) : profile.is_blocked ? (
                                         <Space direction="vertical" size={2}>
                                             <Tag color="red">Blocked</Tag>
                                             <Text type="danger" style={{ fontSize: '12px' }}>Reason: {profile.blocked_reason}</Text>
@@ -628,6 +671,49 @@ const CustomerList: React.FC = () => {
                                 <Descriptions.Item label="Last Login">{profile.last_login ? slt(profile.last_login).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
                             </Descriptions>
                         </div>
+
+                        {profile.linked_accounts?.length > 0 && (
+                            <div>
+                                <Title level={5}>Other Accounts With This NIC</Title>
+                                <List
+                                    bordered
+                                    size="small"
+                                    dataSource={profile.linked_accounts}
+                                    renderItem={(acc) => (
+                                        <List.Item
+                                            actions={[
+                                                <Button
+                                                    key="open"
+                                                    type="link"
+                                                    size="small"
+                                                    onClick={() => {
+                                                        setSelectedCustomerId(acc.user_id);
+                                                        setOrdersPage(1);
+                                                    }}
+                                                >
+                                                    Open
+                                                </Button>,
+                                            ]}
+                                        >
+                                            <Space direction="vertical" size={0}>
+                                                <Space size={6}>
+                                                    <Text strong>{acc.full_name || 'Unnamed'}</Text>
+                                                    <Tag color={acc.is_deleted ? 'default' : 'green'}>
+                                                        {acc.is_deleted ? 'Deleted' : 'Live'}
+                                                    </Tag>
+                                                </Space>
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    Joined {acc.created_at ? slt(acc.created_at).format('MMM DD, YYYY') : '—'}
+                                                    {acc.is_deleted && acc.deleted_at
+                                                        ? ` · deleted ${slt(acc.deleted_at).format('MMM DD, YYYY')}`
+                                                        : ''}
+                                                </Text>
+                                            </Space>
+                                        </List.Item>
+                                    )}
+                                />
+                            </div>
+                        )}
 
                         <div>
                             <Title level={5}>Saved Addresses</Title>
