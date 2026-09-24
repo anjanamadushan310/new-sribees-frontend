@@ -25,6 +25,7 @@ const StaffDashboard = lazy(() => import('./pages/Dashboard/StaffDashboard'));
 
 // Products
 const ProductList = lazy(() => import('./pages/Products/ProductList'));
+const SearchMisses = lazy(() => import('./pages/Products/SearchMisses'));
 const ProductForm = lazy(() => import('./pages/Products/ProductForm'));
 
 // Categories
@@ -175,6 +176,18 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'products', action: 'read' }}>
                                     <ProductForm />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Zero-result customer searches. Reading needs products:read;
+                            the page hides Attach/Ignore without products:update,
+                            which the server enforces too. */}
+                        <Route
+                            path="search-misses"
+                            element={
+                                <RoleGuard requiredPermission={{ resource: 'products', action: 'read' }}>
+                                    <SearchMisses />
                                 </RoleGuard>
                             }
                         />

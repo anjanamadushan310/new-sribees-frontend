@@ -289,13 +289,29 @@ const ProductForm: React.FC = () => {
                 category: categoryName,
             });
         },
-        onSuccess: (suggested) => {
-            const existing = form.getFieldValue('search_keywords')?.trim();
-            form.setFieldValue(
-                'search_keywords',
-                existing ? `${existing}, ${suggested}` : suggested
-            );
-            message.success('Suggested keywords added — review before saving.');
+        onSuccess: ({ keywords, cached, remainingToday }) => {
+            // Merge rather than append: a second click, or a suggestion that
+            // repeats what the admin already typed, must not pile up copies.
+            const existing: string = form.getFieldValue('search_keywords') || '';
+            const seen = new Set<string>();
+            const merged = [...existing.split(','), ...keywords.split(',')]
+                .map((t) => t.trim())
+                .filter((t) => {
+                    const key = t.toLocaleLowerCase();
+                    if (!t || seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+            const added = merged.length - existing.split(',').filter((t) => t.trim()).length;
+            form.setFieldValue('search_keywords', merged.join(', '));
+            const allowance = cached
+                ? 'from cache, no AI cost'
+                : `${remainingToday} AI suggestions left today`;
+            if (added > 0) {
+                message.success(`Added ${added} keywords (${allowance}). Review before saving.`);
+            } else {
+                message.info(`Nothing new to add (${allowance}).`);
+            }
         },
         onError: (err: any) =>
             message.error(
@@ -545,7 +561,7 @@ const ProductForm: React.FC = () => {
                                     </Space>
                                 }
                                 name="search_keywords"
-                                extra="Sinhala/Tamil/Singlish/Tamilish alternate names, common misspellings — helps customers find this product however they search. Never shown to customers."
+                                extra="Other words shoppers use for this product: Sinhala, Tamil, Singlish, Tamilish, English. Spelling variants (thakkali / thakali) and typos are handled automatically, so add different words, not different spellings. Never shown to customers."
                             >
                                 <TextArea
                                     disabled={catalogDisabled}

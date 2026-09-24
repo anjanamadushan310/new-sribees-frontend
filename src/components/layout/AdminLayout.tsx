@@ -3,6 +3,7 @@ import { Layout, Menu, theme, Tag } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
     DashboardOutlined,
+    FileSearchOutlined,
     ShoppingOutlined,
     ShoppingCartOutlined,
     StopOutlined,
@@ -80,6 +81,11 @@ const AdminLayout: React.FC = () => {
             key: '/products',
             icon: <ShoppingOutlined />,
             label: 'Products',
+        },
+        {
+            key: '/search-misses',
+            icon: <FileSearchOutlined />,
+            label: 'Missed Searches',
         },
         {
             key: '/categories',
@@ -182,7 +188,7 @@ const AdminLayout: React.FC = () => {
         return allMenuItems.filter((item) => {
             if (!item || typeof item.key !== 'string') return false;
             // Catalog entries are gated on catalog access; others by route permission.
-            if (item.key === '/products' || item.key === '/categories') {
+            if (item.key === '/products' || item.key === '/categories' || item.key === '/search-misses') {
                 return canManageCatalog;
             }
             if (item.key === '/customers') {
@@ -223,6 +229,7 @@ const AdminLayout: React.FC = () => {
     const headerTitle = useMemo(() => {
         if (location.pathname === '/products') return 'Products';
         if (location.pathname === '/categories') return 'Categories';
+        if (location.pathname === '/search-misses') return 'Missed Searches';
         if (location.pathname === '/inventory') return 'Inventory';
         if (location.pathname === '/orders/cancellations') return 'Cancellations';
         if (location.pathname === '/orders') return 'Orders';

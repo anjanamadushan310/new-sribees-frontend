@@ -186,6 +186,13 @@ export interface ImageLinkPayload {
     sort_order?: number;
 }
 
+export interface KeywordSuggestion {
+    keywords: string;
+    /** Served from the server's cache: cost nothing, used no allowance. */
+    cached: boolean;
+    remainingToday: number;
+}
+
 export const productsApi = {
     list: async (params?: ProductListParams): Promise<ProductListResult> => {
         // Drop empty values so we don't send blank query params.
@@ -224,22 +231,25 @@ export const productsApi = {
     /**
      * AI-assisted search keyword suggestions (Sinhala/Tamil/Singlish/
      * Tamilish). Takes draft form fields directly, so it works before the
-     * product is saved too. Throws if GEMINI_API_KEY isn't configured.
+     * product is saved too. The server caps these per day and answers a
+     * repeat of the same product from cache for free; a 429 means today's
+     * allowance is spent.
      */
     suggestKeywords: async (payload: {
         name: string;
         description?: string | null;
         short_description?: string | null;
         category?: string | null;
-    }): Promise<string> => {
-        // Current Gemini flash models "think" before answering, which can
-        // run past the client's default 30s timeout for this prompt shape.
-        const res = await apiClient.post<{ data: { suggested_keywords: string } }>(
-            '/admin/products/suggest-keywords',
-            payload,
-            { timeout: 60000 }
-        );
-        return res.data.data.suggested_keywords;
+    }): Promise<KeywordSuggestion> => {
+        const res = await apiClient.post<{
+            data: { suggested_keywords: string; cached: boolean; remaining_today: number };
+        }>('/admin/products/suggest-keywords', payload, { timeout: 45000 });
+        const d = res.data.data;
+        return {
+            keywords: d.suggested_keywords,
+            cached: d.cached,
+            remainingToday: d.remaining_today,
+        };
     },
 
     /** Generate a guaranteed unique SKU based on name and category_id. */
