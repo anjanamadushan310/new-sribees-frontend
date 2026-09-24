@@ -13,6 +13,8 @@ export interface PostalCity {
     district: string;
     province: string;
     is_active: boolean;
+    /** Switched on in Settings > Service Areas; only these are offered to a branch. */
+    is_launched?: boolean;
     created_at?: string | null;
     updated_at?: string | null;
 }
@@ -28,6 +30,8 @@ export interface LocationFilter {
     province?: string;
     district?: string;
     active_only?: boolean;
+    /** Only postal areas switched on in Service Areas. */
+    launched_only?: boolean;
 }
 
 interface ListWire {

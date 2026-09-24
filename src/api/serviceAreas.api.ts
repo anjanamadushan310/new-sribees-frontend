@@ -4,9 +4,9 @@
  * Where customers may be served, as three switches:
  *   province unlocked -> district unlocked -> postal area active
  *
- * A postal area is active when a branch is mapped to it and switched on; that
- * is also what routes its orders to the branch. Locked provinces and districts
- * are shown to customers as "Coming soon".
+ * Switching a postal area on here makes the branch form offer it; giving it a
+ * branch there is what makes it live for customers. Locked provinces and
+ * districts are shown to customers as "Coming soon".
  */
 import apiClient from './client';
 
@@ -24,7 +24,10 @@ export interface DistrictRollout {
     updated_by: string | null;
     postal_total: number;
     courier_linked: number;
+    /** Switched on here. */
     active: number;
+    /** Switched on, but no branch covers it yet: not offered to customers. */
+    needs_branch: number;
     saved_addresses: number;
     /** What a customer actually gets: unlocked all the way up, with something active. */
     live: boolean;
@@ -48,6 +51,8 @@ export interface RolloutTotals {
     districts_live: number;
     postal_total: number;
     postal_active: number;
+    /** Switched on and covered by a branch: what customers can pick. */
+    postal_serving: number;
     courier_linked: number;
 }
 
@@ -114,15 +119,11 @@ export const serviceAreasApi = {
             )
         ).data.data,
 
-    activate: async (
-        district: string,
-        postalCities: string[],
-        branchId: string
-    ): Promise<ActivationResult> =>
+    activate: async (district: string, postalCities: string[]): Promise<ActivationResult> =>
         (
             await apiClient.post<{ data: ActivationResult }>(
                 `${base}/districts/${encodeURIComponent(district)}/postal-areas/activate`,
-                { postal_cities: postalCities, branch_id: branchId }
+                { postal_cities: postalCities }
             )
         ).data.data,
 

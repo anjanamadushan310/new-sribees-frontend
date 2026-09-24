@@ -81,15 +81,35 @@ const BranchList: React.FC = () => {
         queryFn: branchesApi.list,
     });
 
-    // The ENTIRE national Postal City directory — deliberately not filtered by the
-    // branch's district. A branch near a district border routinely delivers across
-    // it, so coverage is a logistics decision, not a consequence of the branch's
-    // own address. The district only decides how the list is *ordered* below.
-    const { data: postalCities = [], isFetching: poLoading } = useQuery({
-        queryKey: ['admin', 'locations', 'all'],
-        queryFn: () => locationsApi.list({ active_only: true }),
+    // Every postal area switched on in Settings > Service Areas — deliberately
+    // not filtered by the branch's district. A branch near a district border
+    // routinely delivers across it, so coverage is a logistics decision, not a
+    // consequence of the branch's own address. The district only decides how
+    // the list is *ordered* below. Postal areas that are not switched on are
+    // not offered: opening an area is the Service Areas decision, and this form
+    // only says which branch serves it.
+    const { data: launchedPostalCities = [], isFetching: poLoading } = useQuery({
+        queryKey: ['admin', 'locations', 'launched'],
+        queryFn: () => locationsApi.list({ active_only: true, launched_only: true }),
         enabled: modalOpen,
     });
+    // What the branch already covers stays listed even if it has since been
+    // switched off, so saving an edit never silently drops it. Customers are
+    // not offered those until the postal area is switched back on.
+    const postalCities = React.useMemo(() => {
+        const known = new Set(launchedPostalCities.map((p) => p.postal_city));
+        const kept = (editing?.coverage_postal_cities ?? [])
+            .filter((name) => !known.has(name))
+            .map((name) => ({
+                id: name,
+                postal_city: name,
+                district: 'Switched off in Service Areas',
+                province: '',
+                is_active: true,
+                is_launched: false,
+            }));
+        return [...launchedPostalCities, ...kept];
+    }, [launchedPostalCities, editing]);
 
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: BRANCHES_KEY });
@@ -455,8 +475,8 @@ const BranchList: React.FC = () => {
                         name="coverage_postal_cities"
                         extra={
                             districtValue
-                                ? `Post offices this branch delivers to. ${districtValue} is listed first, but you can select from any district — border branches often deliver across one. Manage the master list in Settings → Delivery Zones.`
-                                : 'Post offices this branch delivers to, from anywhere in the country. Pick a district above to float its postal cities to the top.'
+                                ? `Postal areas this branch delivers to. ${districtValue} is listed first, but you can select from any district — border branches often deliver across one. Only postal areas switched on in Settings → Service Areas are listed.`
+                                : 'Postal areas this branch delivers to, from anywhere in the country. Only postal areas switched on in Settings → Service Areas are listed.'
                         }
                     >
                         <Select

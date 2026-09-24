@@ -3,11 +3,12 @@
  *
  *   1. Unlock a province   (locked ones show to customers as "Coming soon")
  *   2. Unlock a district   (its postal areas become available to switch on)
- *   3. Activate postal areas, each served by a branch
+ *   3. Switch postal areas on (the branch form then offers them)
  *
- * A customer can pick an address only where all three are on, and checkout
- * applies the same rule, so what this page shows is exactly what the app
- * offers. Nothing here deletes anything: locking hides, and unlocking again
+ * Which branch serves a postal area is chosen on the branch form, not here.
+ * A customer can pick an address only where all three are on AND a branch
+ * covers it, and checkout applies the same rule, so what this page shows is
+ * exactly what the app offers. Nothing here deletes anything: locking hides, and unlocking again
  * restores exactly what was live.
  */
 import React, { useMemo, useState } from 'react';
@@ -22,7 +23,6 @@ import {
     Modal,
     Row,
     Segmented,
-    Select,
     Space,
     Spin,
     Statistic,
@@ -51,7 +51,6 @@ import {
     type ProvinceRollout,
     type RolloutOverview,
 } from '../../api/serviceAreas.api';
-import { branchesApi } from '../../api/branches.api';
 import { courierApi } from '../../api/courier.api';
 
 const { Title, Text, Paragraph } = Typography;
@@ -152,6 +151,9 @@ const ProvinceCard: React.FC<{
                             <Text style={{ fontWeight: isSelected ? 700 : 500 }}>{d.name}</Text>
                             <div style={{ fontSize: 12, color: '#8c8c97' }}>
                                 {d.active} active of {d.postal_total}
+                                {d.needs_branch > 0 && (
+                                    <span style={{ color: '#d48806' }}> · {d.needs_branch} need a branch</span>
+                                )}
                             </div>
                         </div>
                         {d.live ? (
@@ -230,18 +232,11 @@ const DistrictPanel: React.FC<{
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
-    const [branchChoice, setBranchChoice] = useState<string | undefined>();
 
     const { data, isLoading } = useQuery({
         queryKey: areasKey(district.name),
         queryFn: () => serviceAreasApi.postalAreas(district.name),
     });
-    const { data: branches = [] } = useQuery({ queryKey: ['branches'], queryFn: branchesApi.list });
-
-    const liveBranches = branches.filter((b) => b.is_active);
-    // Default to the branch standing in this district, when there is exactly one.
-    const localBranch = liveBranches.filter((b) => b.district === district.name);
-    const branchId = branchChoice ?? (localBranch.length === 1 ? localBranch[0].branch_id : undefined);
 
     const refresh = () => {
         queryClient.invalidateQueries({ queryKey: areasKey(district.name) });
@@ -249,10 +244,12 @@ const DistrictPanel: React.FC<{
     };
 
     const activate = useMutation({
-        mutationFn: ({ names, branch }: { names: string[]; branch: string }) =>
-            serviceAreasApi.activate(district.name, names, branch),
+        mutationFn: (names: string[]) => serviceAreasApi.activate(district.name, names),
         onSuccess: (r) => {
-            if (r.activated.length) message.success(`${r.activated.length} postal area(s) are live.`);
+            if (r.activated.length)
+                message.success(
+                    `${r.activated.length} postal area(s) switched on. Branches can now cover them.`
+                );
             r.skipped.forEach((s) => message.warning(`${s.postal_city}: ${s.reason}`));
             setSelectedKeys([]);
             refresh();
@@ -279,14 +276,6 @@ const DistrictPanel: React.FC<{
         );
     }, [data, search, filter]);
 
-    const turnOn = (names: string[], rowBranch?: string | null) => {
-        const branch = rowBranch ?? branchId;
-        if (!branch) {
-            message.warning('Choose the branch that will serve these postal areas first.');
-            return;
-        }
-        activate.mutate({ names, branch });
-    };
 
     const columns: ColumnsType<PostalArea> = [
         { title: 'Postal area', dataIndex: 'postal_city', sorter: (a, b) => a.postal_city.localeCompare(b.postal_city) },
@@ -303,7 +292,17 @@ const DistrictPanel: React.FC<{
         {
             title: 'Branch',
             dataIndex: 'branch_name',
-            render: (name: string | null) => name ?? <Text type="secondary">—</Text>,
+            // Read-only: a postal area is given its branch on the branch form.
+            render: (name: string | null, row) =>
+                name ? (
+                    name
+                ) : row.is_active ? (
+                    <Tooltip title="Switched on, but no branch covers it yet, so customers do not see it. Add it in Branches → Edit → Coverage Areas.">
+                        <Tag color="gold">Needs a branch</Tag>
+                    </Tooltip>
+                ) : (
+                    <Text type="secondary">—</Text>
+                ),
         },
         {
             title: 'Saved addresses',
@@ -324,7 +323,7 @@ const DistrictPanel: React.FC<{
                     disabled={!district.is_unlocked || row.courier === 'not_served'}
                     loading={activate.isPending || deactivate.isPending}
                     onChange={(next) =>
-                        next ? turnOn([row.postal_city], row.branch_id) : deactivate.mutate([row.postal_city])
+                        next ? activate.mutate([row.postal_city]) : deactivate.mutate([row.postal_city])
                     }
                 />
             ),
@@ -375,7 +374,16 @@ const DistrictPanel: React.FC<{
                             showIcon
                             style={{ marginBottom: 12 }}
                             message="Unlocked, but not live yet"
-                            description="Customers see this district only once at least one postal area here is active."
+                            description="Switch on the postal areas you serve, then add them to a branch in Branches → Coverage Areas."
+                        />
+                    )}
+                    {district.needs_branch > 0 && (
+                        <Alert
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 12 }}
+                            message={`${district.needs_branch} switched-on postal area(s) have no branch yet`}
+                            description="Customers see a postal area once a branch covers it. Add them in Branches → Edit → Coverage Areas; only switched-on postal areas are listed there."
                         />
                     )}
                     <Space wrap style={{ marginBottom: 12, width: '100%', justifyContent: 'space-between' }}>
@@ -399,22 +407,11 @@ const DistrictPanel: React.FC<{
                             />
                         </Space>
                         <Space wrap>
-                            <Select
-                                placeholder="Serve with branch"
-                                style={{ width: 220 }}
-                                value={branchId}
-                                onChange={setBranchChoice}
-                                options={liveBranches.map((b) => ({
-                                    value: b.branch_id,
-                                    label: `${b.name}${b.district ? ` · ${b.district}` : ''}`,
-                                }))}
-                                notFoundContent="No live branches"
-                            />
                             <Button
                                 type="primary"
                                 disabled={!selectedNames.length}
                                 loading={activate.isPending}
-                                onClick={() => turnOn(selectedNames)}
+                                onClick={() => activate.mutate(selectedNames)}
                             >
                                 Activate {selectedNames.length ? `(${selectedNames.length})` : ''}
                             </Button>
@@ -535,9 +532,10 @@ const ServiceAreas: React.FC = () => {
                 Service Areas
             </Title>
             <Paragraph type="secondary" style={{ maxWidth: 820 }}>
-                Open delivery one district at a time: unlock a province, unlock a district, then activate the
-                postal areas you serve and choose the branch for each. Locked provinces and districts appear in
-                the app as <b>Coming soon</b>, and checkout follows the same rules.
+                Open delivery one district at a time: unlock a province, unlock a district, then switch on the
+                postal areas you serve. Switched-on postal areas are what the branch form offers under Coverage
+                Areas, and a postal area goes live once a branch covers it. Locked provinces and districts appear
+                in the app as <b>Coming soon</b>, and checkout follows the same rules.
             </Paragraph>
 
             <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
@@ -554,9 +552,9 @@ const ServiceAreas: React.FC = () => {
                 <Col xs={12} md={6}>
                     <Card size="small">
                         <Statistic
-                            title="Postal areas active"
-                            value={t.postal_active}
-                            suffix={`/ ${t.postal_total.toLocaleString()}`}
+                            title="Postal areas live"
+                            value={t.postal_serving}
+                            suffix={`/ ${t.postal_active} switched on`}
                         />
                     </Card>
                 </Col>
