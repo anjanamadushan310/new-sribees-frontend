@@ -53,6 +53,7 @@ interface ProductFormValues {
     slug: string;
     sku?: string;
     price?: number | null;
+    cashback_percentage?: number | null;
     category_id?: string;
     subcategory_id?: string;
     description?: string;
@@ -122,6 +123,10 @@ const ProductForm: React.FC = () => {
                 slug: product.slug,
                 sku: product.sku ?? undefined,
                 price: globalPrice !== null && globalPrice !== undefined ? Number(globalPrice) : undefined,
+                cashback_percentage:
+                    product.global_cashback_percentage !== null && product.global_cashback_percentage !== undefined
+                        ? Number(product.global_cashback_percentage)
+                        : undefined,
                 category_id: product.category_id ?? undefined,
                 subcategory_id: product.subcategory_id ?? undefined,
                 description: product.description ?? undefined,
@@ -240,6 +245,7 @@ const ProductForm: React.FC = () => {
                 short_description_ta: values.short_description_ta?.trim() || null,
                 search_keywords: values.search_keywords?.trim() || null,
                 price: values.price !== undefined && values.price !== null ? Number(values.price) : 0,
+                cashback_percentage: values.cashback_percentage ?? null,
                 weight: Number(values.weight),
                 weight_unit: values.weight_unit || 'kg',
                 is_active: values.is_active,
@@ -712,6 +718,22 @@ const ProductForm: React.FC = () => {
                                     style={{ width: '100%' }}
                                     prefix="LKR"
                                     placeholder="0.00"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Cashback (%)"
+                                name="cashback_percentage"
+                                tooltip="The cashback % this product earns, used instead of the platform default rate. Set it higher than the default to make this a bonus product; the app shows a Cash Back badge only on products with a rate set here."
+                                extra="Leave empty to use the platform default rate. A branch can still override this from Quick Sale."
+                            >
+                                <InputNumber
+                                    disabled={catalogDisabled}
+                                    min={0}
+                                    max={100}
+                                    step={0.1}
+                                    style={{ width: '100%' }}
+                                    placeholder="Platform default"
                                 />
                             </Form.Item>
                         </Card>

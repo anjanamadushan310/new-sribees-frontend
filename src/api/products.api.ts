@@ -98,10 +98,17 @@ export interface AdminProduct {
     /** Already discounted in this branch's Quick Sale feed. */
     is_on_quick_sale?: boolean;
     /**
-     * Global cashback % across all branches. null = platform default rate.
-     * A branch's Marketing Manager can override it per product.
+     * Resolved cashback % a customer actually earns on this product right
+     * now (branch override -> this product's own rate -> platform default).
+     * Never null — use `global_cashback_percentage` to edit the raw override.
      */
     cashback_percentage?: number | null;
+    /**
+     * This product's own cashback % override, unresolved. null = no override
+     * set, inherits the platform default rate. A branch's Marketing Manager
+     * can still override this per branch from Quick Sale.
+     */
+    global_cashback_percentage?: number | null;
     category_id: string | null;
     subcategory_id: string | null;
     category: ProductCategoryRef | null;
@@ -130,6 +137,8 @@ export interface ProductPayload {
     price?: number | null;
     compare_at_price?: number | null;
     cost_price?: number | null;
+    /** This product's own cashback % override. null clears it back to the platform rate. */
+    cashback_percentage?: number | null;
     category_id?: string | null;
     // Must be a child of category_id — the backend rejects a mismatched pair.
     subcategory_id?: string | null;
