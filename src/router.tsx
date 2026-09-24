@@ -66,6 +66,7 @@ const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList')
 const Settings = lazy(() => import('./pages/Settings'));
 const AppSettings = lazy(() => import('./pages/Settings/AppSettings'));
 const PlatformSettings = lazy(() => import('./pages/Settings/PlatformSettings'));
+const ServiceAreas = lazy(() => import('./pages/Settings/ServiceAreas'));
 
 // Loading Spinner Component
 const PageLoader: React.FC = () => (
@@ -373,6 +374,17 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <AppSettings />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Service Areas - Super Admin only: which provinces, districts
+                            and postal areas customers may order from */}
+                        <Route
+                            path="settings/service-areas"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <ServiceAreas />
                                 </RoleGuard>
                             }
                         />

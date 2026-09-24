@@ -22,6 +22,7 @@ import {
     ThunderboltOutlined,
     PictureOutlined,
     CustomerServiceOutlined,
+    EnvironmentOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -168,6 +169,11 @@ const AdminLayout: React.FC = () => {
                 },
                 // Platform & App Settings - Only visible to Super Admin
                 ...(user?.role === AdminRole.SUPER_ADMIN ? [
+                    {
+                        key: '/settings/service-areas',
+                        icon: <EnvironmentOutlined />,
+                        label: 'Service Areas',
+                    },
                     {
                         key: '/settings/platform',
                         icon: <SettingOutlined />,
