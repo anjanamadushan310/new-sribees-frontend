@@ -286,20 +286,27 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
 
     const confirmApproveReturn = () => {
         if (!order) return;
+        // A reverse pickup does not refund on approval: the wallet is credited
+        // when the rider hands the goods to the branch and is given the
+        // handover code. The button and this dialog say so.
+        const pickup = returnResolution === 'reverse_pickup';
         modal.confirm({
             title: 'Approve return?',
             content: (
                 <span>
                     Approve the return for <b>{order.order_number}</b> as{' '}
                     <b>
-                        {returnResolution === 'reverse_pickup'
+                        {pickup
                             ? 'a reverse pickup (rider collects the goods)'
                             : 'a returnless refund (no pickup)'}
                     </b>
-                    ? The returned items' value will be refunded to the customer's SRIBEES Wallet.
+                    ?{' '}
+                    {pickup
+                        ? "A rider is booked to collect the goods. The returned items' value goes to the customer's SRIBEES Wallet once the rider hands them to the branch and enters the handover code."
+                        : "The returned items' value will be refunded to the customer's SRIBEES Wallet."}
                 </span>
             ),
-            okText: 'Approve & Refund',
+            okText: pickup ? 'Approve & Schedule Pickup' : 'Approve & Refund',
             onOk: () => approveReturnMutation.mutateAsync(order.order_id),
         });
     };
@@ -691,7 +698,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                             loading={approveReturnMutation.isPending}
                                             onClick={confirmApproveReturn}
                                         >
-                                            Approve &amp; Refund
+                                            {returnResolution === 'reverse_pickup'
+                                                ? 'Approve & Schedule Pickup'
+                                                : 'Approve & Refund'}
                                         </Button>
                                         <Button
                                             danger
