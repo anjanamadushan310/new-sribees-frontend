@@ -37,3 +37,6 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Unit-test coverage output (npm run test:coverage)
+/coverage/

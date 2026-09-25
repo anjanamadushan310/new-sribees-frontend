@@ -1,0 +1,84 @@
+# =============================================================================
+# SRIBEESonline Admin — CI: quality and security gate
+#
+# Runs on every push and pull request, in seconds, before the slower browser
+# suite (e2e.yml) and independently of it:
+#
+#   quality   typecheck, unit/component tests with a coverage floor, the
+#             production build, and lint (advisory: a pre-existing backlog of
+#             `any` in page components -- see the step)
+#   security  npm audit of what ships (runtime dependencies, high and up) and a
+#             secret scan of the full history
+#
+# Vercel builds and deploys on its own. To make this gate block a deploy,
+# require the "CI / quality" and "CI / security" checks on main in the GitHub
+# branch protection settings (Settings > Branches), so nothing reaches main
+# without them. docs: fastapi_backend/docs/TESTING.md.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and component tests (with coverage floor)
+        run: npm run test:coverage
+      - name: Production build
+        run: npm run build
+      # Advisory until the backlog (~90 `no-explicit-any` in pages) is cleared;
+      # then drop `|| true`. New files should not add to it.
+      - name: Lint (advisory)
+        run: npm run lint || true
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: unit-coverage
+          path: coverage/
+          retention-days: 14
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: npm audit (runtime dependencies)
+        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit (everything, advisory)
+        run: npm audit || true
+      - name: gitleaks (full history)
+        env:
+          GITLEAKS_VERSION: "8.28.0"
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks git --redact --verbose .
