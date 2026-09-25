@@ -54,7 +54,8 @@ export type Resource =
     | 'marketing'
     | 'banners'
     | 'partners'
-    | 'support';
+    | 'support'
+    | 'briefings';
 
 // Action types
 export type Action = 'create' | 'read' | 'update' | 'delete' | '*';
@@ -121,6 +122,8 @@ export const ROLE_PERMISSIONS: Partial<Record<AdminRole, Permission[]>> = {
         { resource: 'settings', action: 'read' },
         { resource: 'support', action: 'read' },
         { resource: 'support', action: 'update' },
+        // AI Briefings — what the branch tells the chat assistant (migration 072).
+        { resource: 'briefings', action: '*' },
     ],
     [AdminRole.MARKETING_MANAGER]: [
         { resource: 'dashboard', action: 'read' },

@@ -25,6 +25,7 @@ import {
     EnvironmentOutlined,
     CrownOutlined,
     NotificationOutlined,
+    RobotOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -119,6 +120,11 @@ const AdminLayout: React.FC = () => {
             key: '/support-tickets',
             icon: <CustomerServiceOutlined />,
             label: 'Support Tickets',
+        },
+        {
+            key: '/assistant-briefings',
+            icon: <RobotOutlined />,
+            label: 'AI Briefings',
         },
         {
             key: '/analytics',
@@ -256,6 +262,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname === '/coupons') return 'Coupons';
         if (location.pathname === '/quick-sale') return 'Quick Sale';
         if (location.pathname === '/push-campaigns') return 'Push Campaigns';
+        if (location.pathname === '/assistant-briefings') return 'AI Briefings';
         if (location.pathname === '/banners') return 'Home Banners';
         if (location.pathname === '/branches') return 'Branches';
         if (location.pathname === '/users') return 'Admin Users';
