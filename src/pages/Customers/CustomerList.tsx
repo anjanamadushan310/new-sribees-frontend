@@ -794,11 +794,14 @@ const CustomerList: React.FC = () => {
                     >
                         <Input placeholder="john@example.com" />
                     </Form.Item>
+                    {/* The phone is the customer's OTP login, so only a Super
+                        Admin may change it (the API refuses anyone else). */}
                     <Form.Item
                         name="phone"
                         label="Phone Number"
+                        extra={isSuperAdmin ? undefined : 'Only a Super Admin can change this.'}
                     >
-                        <Input placeholder="+94771234567" />
+                        <Input placeholder="+94771234567" disabled={!isSuperAdmin} />
                     </Form.Item>
                     {/* The customer cannot change their own NIC, so this form
                         is the only way a mistyped one ever gets corrected. */}
