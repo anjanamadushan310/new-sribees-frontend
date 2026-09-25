@@ -24,6 +24,7 @@ import {
     CustomerServiceOutlined,
     EnvironmentOutlined,
     CrownOutlined,
+    NotificationOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -133,6 +134,11 @@ const AdminLayout: React.FC = () => {
             key: '/quick-sale',
             icon: <ThunderboltOutlined />,
             label: 'Quick Sale',
+        },
+        {
+            key: '/push-campaigns',
+            icon: <NotificationOutlined />,
+            label: 'Push Campaigns',
         },
         {
             key: '/banners',
@@ -249,6 +255,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname === '/analytics') return 'Analytics';
         if (location.pathname === '/coupons') return 'Coupons';
         if (location.pathname === '/quick-sale') return 'Quick Sale';
+        if (location.pathname === '/push-campaigns') return 'Push Campaigns';
         if (location.pathname === '/banners') return 'Home Banners';
         if (location.pathname === '/branches') return 'Branches';
         if (location.pathname === '/users') return 'Admin Users';

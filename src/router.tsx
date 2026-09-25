@@ -35,6 +35,7 @@ const CategoryList = lazy(() => import('./pages/Categories/CategoryList'));
 const CouponList = lazy(() => import('./pages/Marketing/CouponList'));
 const QuickSale = lazy(() => import('./pages/Marketing/QuickSale'));
 const BannerList = lazy(() => import('./pages/Marketing/BannerList'));
+const PushCampaigns = lazy(() => import('./pages/Marketing/PushCampaigns'));
 
 // Orders
 const OrderList = lazy(() => import('./pages/Orders/OrderList'));
@@ -285,6 +286,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'marketing', action: 'read' }}>
                                     <QuickSale />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Marketing — Push Campaigns */}
+                        <Route
+                            path="push-campaigns"
+                            element={
+                                <RoleGuard requiredPermission={{ resource: 'marketing', action: 'read' }}>
+                                    <PushCampaigns />
                                 </RoleGuard>
                             }
                         />
