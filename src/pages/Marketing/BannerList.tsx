@@ -441,7 +441,11 @@ const BannerList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 130,
+            width: 190,
+            // Pinned: the table is wider than a laptop screen, and an unpinned
+            // last column left Edit and Delete scrolled out of sight — admins
+            // reported that a banner could not be deleted at all.
+            fixed: 'right',
             render: (_, record) => {
                 const allowed = canModify(record);
                 return (
@@ -461,15 +465,27 @@ const BannerList: React.FC = () => {
                         <Popconfirm
                             title="Delete this banner?"
                             description="It disappears from the app immediately."
+                            okText="Delete"
+                            okButtonProps={{ danger: true }}
                             onConfirm={() => deleteMutation.mutate(record.banner_id)}
                             disabled={!allowed}
                         >
-                            <Button
-                                type="link"
-                                danger
-                                icon={<DeleteOutlined />}
-                                disabled={!allowed}
-                            />
+                            <Tooltip
+                                title={allowed ? undefined : 'Only a Super Admin can delete this.'}
+                            >
+                                <Button
+                                    type="link"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    disabled={!allowed}
+                                    loading={
+                                        deleteMutation.isPending &&
+                                        deleteMutation.variables === record.banner_id
+                                    }
+                                >
+                                    Delete
+                                </Button>
+                            </Tooltip>
                         </Popconfirm>
                     </Space>
                 );
@@ -545,6 +561,36 @@ const BannerList: React.FC = () => {
                 okText={editing ? 'Save' : 'Create'}
                 confirmLoading={saveMutation.isPending}
                 destroyOnHidden
+                // A second way to delete, where an admin looking at one banner
+                // naturally looks for it.
+                footer={(buttons) =>
+                    editing && canModify(editing) ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Popconfirm
+                                title="Delete this banner?"
+                                description="It disappears from the app immediately."
+                                okText="Delete"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() =>
+                                    deleteMutation.mutate(editing.banner_id, {
+                                        onSuccess: closeModal,
+                                    })
+                                }
+                            >
+                                <Button
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    loading={deleteMutation.isPending}
+                                >
+                                    Delete banner
+                                </Button>
+                            </Popconfirm>
+                            <Space>{buttons}</Space>
+                        </div>
+                    ) : (
+                        buttons
+                    )
+                }
             >
                 <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
                     <Form.Item
