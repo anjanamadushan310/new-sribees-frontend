@@ -117,6 +117,11 @@ const AdminLayout: React.FC = () => {
             label: 'Customers',
         },
         {
+            key: '/app-users',
+            icon: <MobileOutlined />,
+            label: 'App Users',
+        },
+        {
             key: '/support-tickets',
             icon: <CustomerServiceOutlined />,
             label: 'Support Tickets',
@@ -233,7 +238,12 @@ const AdminLayout: React.FC = () => {
             // or Super Admin's own nav items for them silently disappear
             // (their effective permission set has no 'users'/'branches'/
             // 'partners' entries either, by the same design).
-            if (item.key === '/users' || item.key === '/branches' || item.key === '/partners') {
+            if (
+                item.key === '/users' ||
+                item.key === '/branches' ||
+                item.key === '/partners' ||
+                item.key === '/app-users'
+            ) {
                 return isSuperAdmin;
             }
             return canAccessRoute(item.key);
@@ -258,6 +268,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname === '/orders/cancellations') return 'Cancellations';
         if (location.pathname === '/orders') return 'Orders';
         if (location.pathname === '/customers') return 'Customers';
+        if (location.pathname === '/app-users') return 'App Users';
         if (location.pathname === '/analytics') return 'Analytics';
         if (location.pathname === '/coupons') return 'Coupons';
         if (location.pathname === '/quick-sale') return 'Quick Sale';

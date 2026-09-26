@@ -62,6 +62,7 @@ const StaffList = lazy(() => import('./pages/Staff/StaffList'));
 
 // Customers & Support
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
+const AppUsers = lazy(() => import('./pages/AppUsers/AppUsers'));
 const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList'));
 
 // Settings
@@ -327,6 +328,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'customers', action: 'read' }}>
                                     <CustomerList />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* App Users — who has the app open, versions, daily use */}
+                        <Route
+                            path="app-users"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <AppUsers />
                                 </RoleGuard>
                             }
                         />
