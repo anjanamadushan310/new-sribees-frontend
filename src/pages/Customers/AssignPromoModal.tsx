@@ -22,7 +22,6 @@ import {
     Modal,
     Select,
     Space,
-    Tag,
     Typography,
 } from 'antd';
 import { GiftOutlined, NotificationOutlined } from '@ant-design/icons';
@@ -208,10 +207,7 @@ const AssignPromoModal: React.FC<Props> = ({ open, userId, customerName, onClose
                     <span>
                         The coupon is added to their wallet automatically and a push
                         notification tells them it is there — a retention offer nobody opens
-                        the app to find does not retain anyone.{' '}
-                        <Tag color="orange" style={{ marginInlineStart: 4 }}>
-                            Excludes Quick Sale items
-                        </Tag>
+                        the app to find does not retain anyone.
                     </span>
                 }
             />
