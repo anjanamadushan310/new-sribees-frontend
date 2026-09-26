@@ -17,16 +17,31 @@ export default defineConfig({
         globals: false,
         setupFiles: ['./src/test/setup.ts'],
         include: ['src/**/*.test.{ts,tsx}'],
+        // Page tests render real Ant Design screens in jsdom: seconds, not ms.
+        testTimeout: 30000,
         // Sri Lanka time is the product's time; run the suite in a zone that is
         // NOT Colombo so a helper that leans on the machine's zone fails here.
         env: { TZ: 'America/New_York' },
         coverage: {
             provider: 'v8',
             reporter: ['text-summary', 'lcov', 'json-summary'],
-            include: ['src/utils/**', 'src/hooks/**', 'src/store/**', 'src/api/client.ts', 'src/components/guards/**'],
-            // A ratchet, set just under what the suite measures today: raise it as
-            // tests are added, never lower it to get a build through.
-            thresholds: { lines: 57, functions: 32, branches: 62, statements: 53 },
+            include: [
+                'src/utils/**', 'src/hooks/**', 'src/store/**', 'src/api/client.ts', 'src/components/guards/**',
+                // Pages with their own tests. Add a page here when it gets one.
+                'src/pages/Auth/Login.tsx', 'src/pages/Customers/CustomerList.tsx',
+                'src/pages/Orders/OrderList.tsx', 'src/pages/Marketing/CouponList.tsx',
+            ],
+            // Ratchets, set just under what the suite measures today: raise them
+            // as tests are added, never lower them to get a build through. The
+            // global figure counts every included file, pages too; the logic the
+            // pages stand on keeps its own, higher bar.
+            thresholds: {
+                lines: 50, functions: 35, branches: 38, statements: 48,
+                '{src/utils,src/hooks,src/store,src/components/guards}/**': {
+                    lines: 59, functions: 38, branches: 65, statements: 56,
+                },
+                'src/pages/**': { lines: 40, functions: 30, branches: 25, statements: 39 },
+            },
         },
     },
 });
