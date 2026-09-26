@@ -14,10 +14,11 @@
 # ---------------------------------------------------------------------------
 # Setup, once:
 #
-#   If the backend repository is PRIVATE, add a repository secret named
-#   BACKEND_REPO_TOKEN — a fine-grained PAT with read access to
-#   anjanamadushan310/new-sribees-backend. If it is public, nothing is needed:
-#   the job falls back to the automatic GITHUB_TOKEN.
+#   The backend repository is PRIVATE. This repo's BACKEND_DEPLOY_KEY secret
+#   holds the private half of a READ-ONLY deploy key on
+#   anjanamadushan610/Sribees-Online-Backend ("admin-e2e (read-only)"): it can
+#   clone that one repository and nothing else. To rotate it, make a new
+#   ed25519 pair, replace the deploy key and this secret together.
 #
 #   Override BACKEND_REPO / BACKEND_REF below if either ever moves.
 # ---------------------------------------------------------------------------
@@ -32,7 +33,7 @@ on:
   workflow_dispatch:
 
 env:
-  BACKEND_REPO: anjanamadushan310/new-sribees-backend
+  BACKEND_REPO: anjanamadushan610/Sribees-Online-Backend
   BACKEND_REF: main
   PGUSER: sribees
   PGPASSWORD: sribees
@@ -74,9 +75,8 @@ jobs:
           repository: ${{ env.BACKEND_REPO }}
           ref: ${{ env.BACKEND_REF }}
           path: backend
-          # Falls back to the automatic token, which is enough for a public
-          # repository. See the setup note at the top of this file.
-          token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
+          # Read-only deploy key; see the setup note at the top of this file.
+          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
