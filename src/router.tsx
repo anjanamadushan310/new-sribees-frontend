@@ -63,6 +63,7 @@ const StaffList = lazy(() => import('./pages/Staff/StaffList'));
 // Customers & Support
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
 const AppUsers = lazy(() => import('./pages/AppUsers/AppUsers'));
+const SmsSettings = lazy(() => import('./pages/Sms/SmsSettings'));
 const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList'));
 
 // Settings
@@ -328,6 +329,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'customers', action: 'read' }}>
                                     <CustomerList />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* SMS — sign-in code texts: provider, credit, daily limit */}
+                        <Route
+                            path="sms"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <SmsSettings />
                                 </RoleGuard>
                             }
                         />

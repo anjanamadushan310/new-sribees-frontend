@@ -26,6 +26,7 @@ import {
     CrownOutlined,
     NotificationOutlined,
     RobotOutlined,
+    MessageOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -120,6 +121,11 @@ const AdminLayout: React.FC = () => {
             key: '/app-users',
             icon: <MobileOutlined />,
             label: 'App Users',
+        },
+        {
+            key: '/sms',
+            icon: <MessageOutlined />,
+            label: 'SMS',
         },
         {
             key: '/support-tickets',
@@ -242,7 +248,8 @@ const AdminLayout: React.FC = () => {
                 item.key === '/users' ||
                 item.key === '/branches' ||
                 item.key === '/partners' ||
-                item.key === '/app-users'
+                item.key === '/app-users' ||
+                item.key === '/sms'
             ) {
                 return isSuperAdmin;
             }
@@ -269,6 +276,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname === '/orders') return 'Orders';
         if (location.pathname === '/customers') return 'Customers';
         if (location.pathname === '/app-users') return 'App Users';
+        if (location.pathname === '/sms') return 'SMS';
         if (location.pathname === '/analytics') return 'Analytics';
         if (location.pathname === '/coupons') return 'Coupons';
         if (location.pathname === '/quick-sale') return 'Quick Sale';
