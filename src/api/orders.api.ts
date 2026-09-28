@@ -5,6 +5,7 @@
 import apiClient from './client';
 
 export type OrderStatus =
+    | 'awaiting_payment'
     | 'pending'
     | 'confirmed'
     | 'processing'
@@ -429,6 +430,10 @@ interface OrderDetailWire {
 // Presentation metadata for order statuses (label + Ant Design Tag color),
 // in natural lifecycle order.
 export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: string }> = {
+    // Card / bank-transfer order the gateway has not confirmed yet. Not an
+    // order the branch can act on: it becomes Confirmed when paid, or is
+    // cancelled by the server when the payment window closes.
+    awaiting_payment: { label: 'Awaiting Payment', color: 'default' },
     pending: { label: 'Pending', color: 'gold' },
     confirmed: { label: 'Confirmed', color: 'blue' },
     processing: { label: 'Processing', color: 'geekblue' },
