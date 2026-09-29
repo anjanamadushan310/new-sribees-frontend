@@ -40,14 +40,20 @@ test.describe('Delivery lifecycle (Super Admin)', () => {
 
         await page.locator('tbody tr').filter({ hasText: /SO-|FC-/ }).first().locator('a').first().click();
         
-        // Wait for order details to appear (either full page /orders/:id or drawer)
-        const orderView = page.locator('.ant-layout-content, .ant-drawer-body, #order-detail-page');
-        await expect(orderView.first()).toBeVisible();
-
-        const logistics = orderView.getByRole('tab', { name: /logistics|courier|delivery/i }).first();
-        if (await logistics.count()) await logistics.click();
-
-        await expect(orderView.first()).toContainText(/Courier|SribeesExpress/i);
-        await expect(orderView.first()).not.toContainText(/post office/i);
+        const drawer = page.locator('.ant-drawer-body');
+        if (await drawer.isVisible({ timeout: 1500 }).catch(() => false)) {
+            const logistics = drawer.getByRole('tab', { name: /logistics|courier|delivery/i }).first();
+            if (await logistics.isVisible().catch(() => false)) {
+                await logistics.click();
+            }
+            await expect(drawer).toContainText(/Courier|SribeesExpress/i);
+            await expect(drawer).not.toContainText(/post office/i);
+        } else {
+            await page.waitForURL(/\/orders\/.+/);
+            const content = page.locator('#order-detail-page, .ant-layout-content');
+            await expect(content.first()).toBeVisible();
+            await expect(content.first()).toContainText(/Courier|SribeesExpress/i);
+            await expect(content.first()).not.toContainText(/post office/i);
+        }
     });
 });
