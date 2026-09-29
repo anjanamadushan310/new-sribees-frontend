@@ -78,15 +78,25 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
     const [raiseMessage, setRaiseMessage] = useState('');
 
     // Separate tickets into:
-    // Tab B (My Tickets): Raised by current logged in admin
-    // Tab A (Support Tickets): Raised by Support / Call Center / other users for branch attention
-    const myTickets = escalations.filter(
-        (e) =>
-            currentUser?.admin_id &&
-            (e.raised_by_name?.toLowerCase().includes(currentUser.full_name?.toLowerCase() || '___') ||
-                e.raised_by_name?.toLowerCase().includes('branch'))
-    );
-    const supportTickets = escalations.filter((e) => !myTickets.includes(e));
+    // Tab B (My Tickets): Strictly raised by current logged in admin (created_by_user_id === current_user.id)
+    // Tab A (Support Tickets / Inbox): Raised by other roles/teams and received for action
+    const isCreatedByMe = (e: OrderEscalation) => {
+        if (!currentUser) return false;
+        // 1. Direct Admin ID match (UUID match)
+        if (e.raised_by_admin_id && currentUser.admin_id) {
+            return e.raised_by_admin_id === currentUser.admin_id;
+        }
+        // 2. Name or Email match fallback
+        const creator = (e.raised_by_name || '').trim().toLowerCase();
+        const myName = (currentUser.full_name || '').trim().toLowerCase();
+        const myEmail = (currentUser.email || '').trim().toLowerCase();
+        if (myName && creator.includes(myName)) return true;
+        if (myEmail && creator.includes(myEmail)) return true;
+        return false;
+    };
+
+    const myTickets = escalations.filter(isCreatedByMe);
+    const supportTickets = escalations.filter((e) => !isCreatedByMe(e));
 
     // Filter Support Tickets
     const filteredSupportTickets = supportTickets.filter((e) => {

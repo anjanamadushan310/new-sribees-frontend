@@ -143,6 +143,7 @@ export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
 export interface OrderEscalation {
     escalation_id: string;
     order_id: string;
+    raised_by_admin_id?: string | null;
     category: EscalationCategory;
     message: string;
     status: EscalationStatus;
