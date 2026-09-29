@@ -176,8 +176,12 @@ const Login: React.FC = () => {
                                 autoComplete="email"
                                 value={email}
                                 onChange={(e) => {
-                                    setEmail(e.target.value);
+                                    const cleanVal = e.target.value.replace(/\s+/g, '');
+                                    setEmail(cleanVal);
                                     if (emailError) setEmailError(null);
+                                }}
+                                onBlur={() => {
+                                    setEmail((prev) => prev.trim());
                                 }}
                                 required
                             />
