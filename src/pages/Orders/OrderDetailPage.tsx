@@ -390,7 +390,7 @@ const OrderDetailPage: React.FC = () => {
     }
 
     return (
-        <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 40 }}>
+        <div id="order-detail-page" className="order-detail-page" style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 40 }}>
             {/* Header navigation bar */}
             <div style={{ marginBottom: 16 }}>
                 <Breadcrumb

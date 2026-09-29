@@ -39,13 +39,15 @@ test.describe('Delivery lifecycle (Super Admin)', () => {
         await waitForDataLoaded(page);
 
         await page.locator('tbody tr').filter({ hasText: /SO-|FC-/ }).first().locator('a').first().click();
-        const drawer = page.locator('.ant-drawer-body');
-        await expect(drawer).toBeVisible();
+        
+        // Wait for order details to appear (either full page /orders/:id or drawer)
+        const orderView = page.locator('.ant-layout-content, .ant-drawer-body, #order-detail-page');
+        await expect(orderView.first()).toBeVisible();
 
-        const logistics = drawer.getByRole('tab', { name: /logistics|courier|delivery/i }).first();
+        const logistics = orderView.getByRole('tab', { name: /logistics|courier|delivery/i }).first();
         if (await logistics.count()) await logistics.click();
 
-        await expect(drawer).toContainText(/Courier|SribeesExpress/i);
-        await expect(drawer).not.toContainText(/post office/i);
+        await expect(orderView.first()).toContainText(/Courier|SribeesExpress/i);
+        await expect(orderView.first()).not.toContainText(/post office/i);
     });
 });
