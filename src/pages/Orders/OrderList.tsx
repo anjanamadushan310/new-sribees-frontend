@@ -11,6 +11,7 @@
  * come from the same context-filtered `status_counts` map the list returns.
  */
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, App, Badge, Button, Card, DatePicker, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { EyeOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -20,7 +21,7 @@ import { ordersApi, ORDER_TABS, sumCounts } from '../../api/orders.api';
 import type { OrderListItem, OrderStatus } from '../../api/orders.api';
 import { transfersApi } from '../../api/transfers.api';
 import { usePermissions } from '../../hooks/usePermissions';
-import OrderDetails, { statusTag } from './OrderDetails';
+import { statusTag } from './OrderDetails';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 import { slt } from '../../utils/datetime';
 
@@ -40,6 +41,7 @@ const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
 
 const OrderList: React.FC = () => {
+    const navigate = useNavigate();
     const { message } = App.useApp();
     const { isSuperAdmin, isSupport } = usePermissions();
     const isNetworkWide = isSuperAdmin || isSupport;
@@ -51,8 +53,10 @@ const OrderList: React.FC = () => {
     const [pillKey, setPillKey] = useState<string | undefined>(undefined);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
-    const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-    const [drawerOpen, setDrawerOpen] = useState(false);
+
+    const openOrder = (orderId: string) => {
+        navigate(`/orders/${orderId}`);
+    };
 
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [exportingCsv, setExportingCsv] = useState(false);
@@ -102,11 +106,6 @@ const OrderList: React.FC = () => {
         setSelectedRowKeys([]);
     };
 
-    const openDrawer = (id: string) => {
-        setOpenOrderId(id);
-        setDrawerOpen(true);
-    };
-
     const runExport = async (kind: 'csv' | 'pdf', useSelection: boolean) => {
         const set = kind === 'csv' ? setExportingCsv : setExportingPdf;
         try {
@@ -147,7 +146,7 @@ const OrderList: React.FC = () => {
             width: 175,
             render: (num: string, record) => (
                 <a
-                    onClick={() => openDrawer(record.order_id)}
+                    onClick={() => openOrder(record.order_id)}
                     style={{
                         fontWeight: 600,
                         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -267,7 +266,7 @@ const OrderList: React.FC = () => {
             width: 90,
             align: 'center',
             render: (_, record) => (
-                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDrawer(record.order_id)}>
+                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openOrder(record.order_id)}>
                     View
                 </Button>
             ),
@@ -423,8 +422,6 @@ const OrderList: React.FC = () => {
                     }}
                 />
             </Card>
-
-            <OrderDetails orderId={openOrderId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
         </div>
     );
 };

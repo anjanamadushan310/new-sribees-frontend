@@ -34,8 +34,8 @@ import {
 import {
     ClockCircleOutlined,
     DownloadOutlined,
-    FlagOutlined,
     PhoneOutlined,
+    PictureOutlined,
     RobotOutlined,
     SettingOutlined,
     UserOutlined,
@@ -45,15 +45,14 @@ import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordersApi, ORDER_STATUS_META } from '../../api/orders.api';
 import type {
-    EscalationCategory,
     FulfilmentContacts,
-    OrderEscalation,
     OrderItem,
     OrderStatus,
     ReturnResolution,
 } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import CourierPanel from './CourierPanel';
+import EscalationSection from './components/EscalationSection';
 import { slt } from '../../utils/datetime';
 
 const { Text, Title } = Typography;
@@ -81,14 +80,6 @@ interface OrderDetailsProps {
     onClose: () => void;
 }
 
-const ESC_CATEGORIES: { value: EscalationCategory; label: string }[] = [
-    { value: 'cancel_request', label: 'Urgent Cancellation' },
-    { value: 'address_correction', label: 'Address Correction' },
-    { value: 'hold_shipment', label: 'Hold Shipment' },
-    { value: 'customer_complaint', label: 'Customer Complaint' },
-    { value: 'other', label: 'Other' },
-];
-const escLabel = (c: string) => ESC_CATEGORIES.find((x) => x.value === c)?.label ?? c;
 const telHref = (p?: string | null) => (p ? `tel:${p.replace(/\s+/g, '')}` : undefined);
 const waHref = (p?: string | null) =>
     p ? `https://wa.me/${p.replace(/[^\d]/g, '')}` : undefined;
@@ -96,7 +87,7 @@ const waHref = (p?: string | null) =>
 const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) => {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
-    const { isSuperAdmin, isBranchManager, isSupport } = usePermissions();
+    const { isSuperAdmin, isBranchManager } = usePermissions();
     const canDecideReturn = isSuperAdmin || isBranchManager;
 
     const [overrideOpen, setOverrideOpen] = useState(false);
@@ -106,9 +97,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
     const [returnResolution, setReturnResolution] = useState<ReturnResolution>('returnless_refund');
     const [returnNote, setReturnNote] = useState('');
     const [proofNote, setProofNote] = useState('');
-    const [escOpen, setEscOpen] = useState(false);
-    const [escCategory, setEscCategory] = useState<EscalationCategory>('cancel_request');
-    const [escMessage, setEscMessage] = useState('');
 
     const { data: order, isLoading } = useQuery({
         queryKey: ['admin', 'order', orderId],
@@ -129,9 +117,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         setReturnResolution('returnless_refund');
         setReturnNote('');
         setProofNote('');
-        setEscOpen(false);
-        setEscCategory('cancel_request');
-        setEscMessage('');
     }, [orderId]);
 
     const invalidateOrder = () => {
@@ -139,29 +124,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
         queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
     };
 
-    const escalations = order?.escalations ?? [];
     const contacts: FulfilmentContacts | undefined = order?.fulfilment_contacts;
-
-    const raiseEscMut = useMutation({
-        mutationFn: () => ordersApi.raiseEscalation(order!.order_id, escCategory, escMessage.trim()),
-        onSuccess: () => {
-            message.success('Escalation raised.');
-            setEscOpen(false);
-            setEscMessage('');
-            invalidateOrder();
-        },
-        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to raise escalation.'),
-    });
-
-    const escUpdateMut = useMutation({
-        mutationFn: ({ eid, status, note }: { eid: string; status: 'acknowledged' | 'resolved'; note?: string }) =>
-            ordersApi.updateEscalation(order!.order_id, eid, status, note),
-        onSuccess: (_r, v) => {
-            message.success(`Escalation ${v.status}.`);
-            invalidateOrder();
-        },
-        onError: (err: any) => message.error(err.response?.data?.detail || 'Failed to update escalation.'),
-    });
 
     const proofMut = useMutation({
         mutationFn: () => ordersApi.addReturnNote(order!.order_id, proofNote.trim()),
@@ -348,13 +311,39 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
             title: 'Product',
             key: 'product',
             render: (_, r) => (
-                <Space direction="vertical" size={0}>
-                    <Text>{r.product_name}</Text>
-                    {r.product_sku && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                            {r.product_sku}
-                        </Text>
+                <Space align="center" size={12}>
+                    {r.product_image ? (
+                        <Image
+                            src={r.product_image}
+                            width={48}
+                            height={48}
+                            style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #eee' }}
+                            preview={{ mask: null }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 4,
+                                background: '#f0f0f0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#bbb',
+                            }}
+                        >
+                            <PictureOutlined style={{ fontSize: 20 }} />
+                        </div>
                     )}
+                    <Space direction="vertical" size={0}>
+                        <Text strong style={{ fontSize: 13 }}>{r.product_name}</Text>
+                        {r.product_sku && (
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                {r.product_sku}
+                            </Text>
+                        )}
+                    </Space>
                 </Space>
             ),
         },
@@ -908,100 +897,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                         <Text type="secondary">No status history records available.</Text>
                     )}
 
-                    <Divider titlePlacement="start">
-                        <Space>
-                            <FlagOutlined /> Escalation Tickets
-                            {escalations.some((e) => e.status !== 'resolved') && (
-                                <Tag color="red">
-                                    {escalations.filter((e) => e.status !== 'resolved').length} open
-                                </Tag>
-                            )}
-                        </Space>
-                    </Divider>
-                    <Space direction="vertical" style={{ width: '100%' }} size={8}>
-                        {escalations.length === 0 && (
-                            <Text type="secondary">No escalations raised on this order.</Text>
-                        )}
-                        {escalations.map((e: OrderEscalation) => (
-                            <div
-                                key={e.escalation_id}
-                                style={{
-                                    padding: 10,
-                                    borderRadius: 8,
-                                    border: '1px solid #f0f0f0',
-                                    background: e.status === 'resolved' ? '#fafafa' : '#fffef7',
-                                }}
-                            >
-                                <Space wrap size={6}>
-                                    <Tag color="geekblue">{escLabel(e.category)}</Tag>
-                                    <Tag color={e.status === 'open' ? 'red' : e.status === 'acknowledged' ? 'gold' : 'green'}>
-                                        {e.status}
-                                    </Tag>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>
-                                        {e.raised_by_name}
-                                        {e.created_at ? ` · ${slt(e.created_at).format('MMM DD, HH:mm')}` : ''}
-                                    </Text>
-                                </Space>
-                                <div style={{ marginTop: 4 }}>{e.message}</div>
-                                {e.resolution_note && (
-                                    <div style={{ marginTop: 4 }}>
-                                        <Text type="secondary" style={{ fontSize: 12 }}>
-                                            ↳ {e.handled_by_name}: {e.resolution_note}
-                                        </Text>
-                                    </div>
-                                )}
-                                {canDecideReturn && e.status !== 'resolved' && (
-                                    <Space style={{ marginTop: 8 }}>
-                                        {e.status === 'open' && (
-                                            <Button
-                                                size="small"
-                                                loading={escUpdateMut.isPending}
-                                                onClick={() =>
-                                                    escUpdateMut.mutate({ eid: e.escalation_id, status: 'acknowledged' })
-                                                }
-                                            >
-                                                Acknowledge
-                                            </Button>
-                                        )}
-                                        <Button
-                                            size="small"
-                                            type="primary"
-                                            loading={escUpdateMut.isPending}
-                                            onClick={() => {
-                                                let note = '';
-                                                modal.confirm({
-                                                    title: 'Resolve escalation',
-                                                    content: (
-                                                        <Input.TextArea
-                                                            rows={3}
-                                                            placeholder="Resolution note (optional)…"
-                                                            onChange={(ev) => (note = ev.target.value)}
-                                                        />
-                                                    ),
-                                                    okText: 'Resolve',
-                                                    onOk: () =>
-                                                        escUpdateMut.mutateAsync({
-                                                            eid: e.escalation_id,
-                                                            status: 'resolved',
-                                                            note: note.trim() || undefined,
-                                                        }),
-                                                });
-                                            }}
-                                        >
-                                            Resolve
-                                        </Button>
-                                    </Space>
-                                )}
-                            </div>
-                        ))}
-                        <Button
-                            icon={<FlagOutlined />}
-                            onClick={() => setEscOpen(true)}
-                            style={{ alignSelf: 'flex-start' }}
-                        >
-                            Raise Escalation
-                        </Button>
-                    </Space>
+                    <EscalationSection
+                        orderId={order.order_id}
+                        escalations={order.escalations || []}
+                        canDecide={canDecideReturn}
+                        onChanged={invalidateOrder}
+                    />
 
                     <Divider titlePlacement="start">Actions</Divider>
                     {actions.length > 0 ? (
@@ -1110,49 +1011,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                 showIcon
                                 message="Overriding status bypasses standard operational validations and will be logged permanently in the audit trail."
                             />
-                        </Space>
-                    </Modal>
-
-                    <Modal
-                        title="🚩 Raise Internal Escalation"
-                        open={escOpen}
-                        onCancel={() => setEscOpen(false)}
-                        okText="Raise Escalation"
-                        okButtonProps={{
-                            disabled: escMessage.trim().length < 5,
-                            loading: raiseEscMut.isPending,
-                        }}
-                        onOk={() => raiseEscMut.mutate()}
-                    >
-                        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                            <div>
-                                <Text strong>Category</Text>
-                                <Select
-                                    style={{ width: '100%', marginTop: 4 }}
-                                    value={escCategory}
-                                    onChange={setEscCategory}
-                                    options={ESC_CATEGORIES}
-                                />
-                            </div>
-                            <div>
-                                <Text strong>What needs the branch's attention?</Text>
-                                <Input.TextArea
-                                    style={{ marginTop: 4 }}
-                                    rows={4}
-                                    maxLength={2000}
-                                    showCount
-                                    placeholder="e.g. Customer called to cancel — order is still Confirmed, please hold before packing."
-                                    value={escMessage}
-                                    onChange={(e) => setEscMessage(e.target.value)}
-                                />
-                            </div>
-                            {isSupport && (
-                                <Alert
-                                    type="info"
-                                    showIcon
-                                    message="The Branch Manager is notified and will acknowledge / resolve this ticket."
-                                />
-                            )}
                         </Space>
                     </Modal>
                 </>

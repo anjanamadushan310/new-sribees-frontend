@@ -40,6 +40,7 @@ const AssistantBriefings = lazy(() => import('./pages/Assistant/AssistantBriefin
 
 // Orders
 const OrderList = lazy(() => import('./pages/Orders/OrderList'));
+const OrderDetailPage = lazy(() => import('./pages/Orders/OrderDetailPage'));
 const Cancellations = lazy(() => import('./pages/Orders/Cancellations'));
 
 // Inventory
@@ -209,9 +210,8 @@ const AppRouter: React.FC = () => {
                         />
 
                         {/* Orders */}
-                        {/* Order details open in a drawer from the list. Open to
-                            any authenticated admin — unchanged. */}
                         <Route path="orders" element={<OrderList />} />
+                        <Route path="orders/:id" element={<OrderDetailPage />} />
                         {/* Read-only review of who cancels and what it
                             costs. Same orders:read surface as the list,
                             so a Branch Manager sees their own branch. */}
