@@ -45,6 +45,7 @@ import type {
 import { usePermissions } from '../../hooks/usePermissions';
 import CourierPanel from './CourierPanel';
 import EscalationSection from './components/EscalationSection';
+import HorizontalOrderStepper from './components/HorizontalOrderStepper';
 import { slt } from '../../utils/datetime';
 
 const { Text, Title } = Typography;
@@ -468,6 +469,9 @@ const OrderDetailPage: React.FC = () => {
                     )}
                 </Space>
             </div>
+
+            {/* Horizontal Order Status Stepper */}
+            <HorizontalOrderStepper order={order} />
 
             {/* Main 2-Column Responsive Layout */}
             <Row gutter={[20, 20]}>
