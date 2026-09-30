@@ -113,6 +113,23 @@ export interface CustomerProfile extends CustomerClosure {
     stats: CustomerStats;
 }
 
+export interface CustomerOrderItemPreview {
+    product_name: string;
+    product_image: string | null;
+    quantity: number;
+    total_items_count: number;
+    extra_items_count: number;
+}
+
+export interface CustomerOrderAnalytics {
+    total_orders: number;
+    delivered_count: number;
+    cancelled_count: number;
+    returned_count: number;
+    return_rate: number;
+    is_high_return_risk: boolean;
+}
+
 export interface CustomerOrder {
     order_id: string;
     order_number: string;
@@ -120,10 +137,20 @@ export interface CustomerOrder {
     status: string;
     payment_status: string;
     created_at: string | null;
+    items_preview?: CustomerOrderItemPreview;
+}
+
+export interface CustomerOrdersParams {
+    page?: number;
+    limit?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
 }
 
 export interface CustomerOrdersResult {
     orders: CustomerOrder[];
+    analytics: CustomerOrderAnalytics;
     total: number;
     page: number;
     limit: number;
@@ -182,12 +209,47 @@ export const customersApi = {
         return res.data.data;
     },
 
-    getOrders: async (userId: string, page = 1, limit = 10): Promise<CustomerOrdersResult> => {
-        const res = await apiClient.get<{ success: boolean; data: { orders: CustomerOrder[]; pagination: { total: number; page: number; limit: number; pages: number } } }>(
-            `/admin/customers/${userId}/orders`,
-            { params: { page, limit } }
-        );
-        return { orders: res.data.data.orders, ...res.data.data.pagination };
+    getOrders: async (
+        userId: string,
+        paramsOrPage: number | CustomerOrdersParams = 1,
+        limit = 10
+    ): Promise<CustomerOrdersResult> => {
+        const params: Record<string, unknown> = {};
+        if (typeof paramsOrPage === 'number') {
+            params.page = paramsOrPage;
+            params.limit = limit;
+        } else {
+            if (paramsOrPage.page) params.page = paramsOrPage.page;
+            if (paramsOrPage.limit) params.limit = paramsOrPage.limit;
+            if (paramsOrPage.status && paramsOrPage.status !== 'all') params.status = paramsOrPage.status;
+            if (paramsOrPage.start_date) params.start_date = paramsOrPage.start_date;
+            if (paramsOrPage.end_date) params.end_date = paramsOrPage.end_date;
+        }
+
+        const res = await apiClient.get<{
+            success: boolean;
+            data: {
+                orders: CustomerOrder[];
+                analytics?: CustomerOrderAnalytics;
+                pagination: { total: number; page: number; limit: number; pages: number };
+            };
+        }>(`/admin/customers/${userId}/orders`, { params });
+
+        const rawData = res.data.data;
+        const fallbackAnalytics: CustomerOrderAnalytics = {
+            total_orders: rawData.pagination.total,
+            delivered_count: 0,
+            cancelled_count: 0,
+            returned_count: 0,
+            return_rate: 0,
+            is_high_return_risk: false,
+        };
+
+        return {
+            orders: rawData.orders || [],
+            analytics: rawData.analytics || fallbackAnalytics,
+            ...rawData.pagination,
+        };
     },
 
     update: async (userId: string, data: { full_name: string; email?: string | null; phone?: string | null }): Promise<void> => {
