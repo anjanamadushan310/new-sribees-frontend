@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Drawer, Form, Popconfirm, Descriptions, List, Segmented, Avatar, Tooltip, Statistic, Row, Col } from 'antd';
-import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined, HomeOutlined } from '@ant-design/icons';
+import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Form, Popconfirm, Segmented, Avatar, Tooltip } from 'antd';
+import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import AssignPromoModal from './AssignPromoModal';
+import CustomerProfileDrawer from './CustomerProfileDrawer';
 import type { CustomerSegment } from '../../api/customers.api';
 import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
@@ -79,20 +80,20 @@ const CustomerList: React.FC = () => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [blockModalVisible, setBlockModalVisible] = useState(false);
     const [blockReason, setBlockReason] = useState('');
-    const [ordersPage, setOrdersPage] = useState(1);
+
 
     // Fetch profile and order history
-    const { data: profile, isLoading: isProfileLoading } = useQuery({
+    const { data: profile } = useQuery({
         queryKey: ['customerProfile', selectedCustomerId],
         queryFn: () => customersApi.getProfile(selectedCustomerId!),
         enabled: !!selectedCustomerId && drawerVisible,
     });
 
-    const { data: ordersData, isLoading: isOrdersLoading } = useQuery({
-        queryKey: ['customerOrders', selectedCustomerId, ordersPage],
-        queryFn: () => customersApi.getOrders(selectedCustomerId!, ordersPage, 5),
-        enabled: !!selectedCustomerId && drawerVisible,
-    });
+
+
+
+
+
 
     const exportToCSV = async () => {
         setExporting(true);
@@ -388,7 +389,7 @@ const CustomerList: React.FC = () => {
                         icon: <EyeOutlined />,
                         onClick: () => {
                             setSelectedCustomerId(record.user_id);
-                            setOrdersPage(1);
+
                             setDrawerVisible(true);
                         }
                     },
@@ -532,239 +533,17 @@ const CustomerList: React.FC = () => {
                 customerName={profile?.full_name || profile?.email || 'this customer'}
                 onClose={() => setPromoOpen(false)}
             />
-
-            {/* View Profile Drawer */}
-            <Drawer
-                title="Customer Profile Details"
-                placement="right"
-                width={640}
+                  {/* View Profile Drawer */}
+            <CustomerProfileDrawer
+                customerId={selectedCustomerId}
+                visible={drawerVisible}
                 onClose={() => setDrawerVisible(false)}
-                open={drawerVisible}
-                loading={isProfileLoading}
-            >
-                {profile && (
-                    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-                                <UserOutlined style={{ fontSize: 32, marginRight: 16, color: '#1890ff' }} />
-                                <div>
-                                    <Title level={4} style={{ margin: 0 }}>{profile.full_name || 'Unnamed'}</Title>
-                                    <Text type="secondary">User ID: {profile.user_id}</Text>
-                                </div>
-                            </div>
-                            
-                            {/* Retention action, above the numbers that justify it:
-                                a manager who has just read "At Risk" should not
-                                have to scroll to do something about it. */}
-                            <Card
-                                size="small"
-                                style={{
-                                    marginBottom: 16,
-                                    background: 'linear-gradient(135deg, #eff6ff, #f5f3ff)',
-                                    borderColor: '#bfdbfe',
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: 12,
-                                        flexWrap: 'wrap',
-                                    }}
-                                >
-                                    <div>
-                                        <Text strong style={{ color: '#1e3a8a' }}>
-                                            🎁 Issue exclusive coupon
-                                        </Text>
-                                        <div style={{ fontSize: 12, color: '#3b82f6' }}>
-                                            A code only this customer can redeem, sent straight
-                                            to their wallet.
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="primary"
-                                        onClick={() => setPromoOpen(true)}
-                                    >
-                                        ⚡ Assign Promo
-                                    </Button>
-                                </div>
-                            </Card>
+                onSelectCustomer={(newId) => {
+                    setSelectedCustomerId(newId);
+                }}
+            />
 
-                            <Row gutter={12} style={{ marginBottom: 16 }}>
-                                <Col span={12}>
-                                    <Card size="small">
-                                        <Statistic
-                                            title={
-                                                <Tooltip title="Delivered orders only. Refunded money is excluded — it is not revenue from this customer.">
-                                                    <span>Total Spent (Net)</span>
-                                                </Tooltip>
-                                            }
-                                            value={profile.stats.net_spent}
-                                            precision={2}
-                                            prefix="Rs."
-                                        />
-                                        {profile.stats.has_refund && (
-                                            <Text type="warning" style={{ fontSize: 11 }}>
-                                                {formatLKR(profile.stats.refunded_amount)} refunded
-                                                and excluded
-                                            </Text>
-                                        )}
-                                    </Card>
-                                </Col>
-                                <Col span={12}>
-                                    <Card size="small">
-                                        <Statistic
-                                            title="Completed Orders"
-                                            value={profile.stats.completed_orders}
-                                        />
-                                        <Tag
-                                            color={
-                                                (SEGMENT_META[profile.stats.segment] ??
-                                                    SEGMENT_META.new).color
-                                            }
-                                        >
-                                            {
-                                                (SEGMENT_META[profile.stats.segment] ??
-                                                    SEGMENT_META.new).label
-                                            }
-                                        </Tag>
-                                    </Card>
-                                </Col>
-                            </Row>
 
-                            <Descriptions bordered column={1} size="small">
-                                <Descriptions.Item label="Email">{profile.email || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
-                                <Descriptions.Item label="NIC">{profile.nic || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
-                                <Descriptions.Item label="Phone">{profile.phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
-                                <Descriptions.Item label="Second Phone">{profile.alternate_phone || <span style={{ color: '#bbb' }}>—</span>}</Descriptions.Item>
-                                {profile.is_deleted && (
-                                    <>
-                                        <Descriptions.Item label="Deleted On">
-                                            {profile.deleted_at ? slt(profile.deleted_at).format('MMMM DD, YYYY hh:mm A') : '—'}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="Reason Given">
-                                            {profile.deletion_reason || <span style={{ color: '#bbb' }}>—</span>}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="Phone When Deleted">
-                                            {profile.deleted_phone || <span style={{ color: '#bbb' }}>—</span>}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="Email When Deleted">
-                                            {profile.deleted_email || <span style={{ color: '#bbb' }}>—</span>}
-                                        </Descriptions.Item>
-                                    </>
-                                )}
-                                <Descriptions.Item label="Status">
-                                    {profile.is_deleted ? (
-                                        <Tag color="default">Deleted</Tag>
-                                    ) : profile.is_blocked ? (
-                                        <Space direction="vertical" size={2}>
-                                            <Tag color="red">Blocked</Tag>
-                                            <Text type="danger" style={{ fontSize: '12px' }}>Reason: {profile.blocked_reason}</Text>
-                                        </Space>
-                                    ) : (
-                                        <Tag color={profile.is_active ? 'green' : 'default'}>{profile.is_active ? 'Active' : 'Inactive'}</Tag>
-                                    )}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Email Verified">{profile.is_verified ? <Tag color="green">Yes</Tag> : <Tag color="orange">No</Tag>}</Descriptions.Item>
-                                <Descriptions.Item label="Joined Date">{profile.created_at ? slt(profile.created_at).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
-                                <Descriptions.Item label="Last Login">{profile.last_login ? slt(profile.last_login).format('MMMM DD, YYYY hh:mm A') : '—'}</Descriptions.Item>
-                            </Descriptions>
-                        </div>
-
-                        {profile.linked_accounts?.length > 0 && (
-                            <div>
-                                <Title level={5}>Other Accounts With This NIC</Title>
-                                <List
-                                    bordered
-                                    size="small"
-                                    dataSource={profile.linked_accounts}
-                                    renderItem={(acc) => (
-                                        <List.Item
-                                            actions={[
-                                                <Button
-                                                    key="open"
-                                                    type="link"
-                                                    size="small"
-                                                    onClick={() => {
-                                                        setSelectedCustomerId(acc.user_id);
-                                                        setOrdersPage(1);
-                                                    }}
-                                                >
-                                                    Open
-                                                </Button>,
-                                            ]}
-                                        >
-                                            <Space direction="vertical" size={0}>
-                                                <Space size={6}>
-                                                    <Text strong>{acc.full_name || 'Unnamed'}</Text>
-                                                    <Tag color={acc.is_deleted ? 'default' : 'green'}>
-                                                        {acc.is_deleted ? 'Deleted' : 'Live'}
-                                                    </Tag>
-                                                </Space>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                                    Joined {acc.created_at ? slt(acc.created_at).format('MMM DD, YYYY') : '—'}
-                                                    {acc.is_deleted && acc.deleted_at
-                                                        ? ` · deleted ${slt(acc.deleted_at).format('MMM DD, YYYY')}`
-                                                        : ''}
-                                                </Text>
-                                            </Space>
-                                        </List.Item>
-                                    )}
-                                />
-                            </div>
-                        )}
-
-                        <div>
-                            <Title level={5}>Saved Addresses</Title>
-                            {profile.addresses && profile.addresses.length > 0 ? (
-                                <List
-                                    bordered
-                                    dataSource={profile.addresses}
-                                    renderItem={(addr) => (
-                                        <List.Item>
-                                            <div style={{ width: '100%' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                    <Text strong><HomeOutlined /> Address</Text>
-                                                    {addr.is_default && <Tag color="blue">Default</Tag>}
-                                                </div>
-                                                <Text>{addr.address_line1}{addr.address_line2 ? `, ${addr.address_line2}` : ''}</Text>
-                                                <br />
-                                                <Text type="secondary">{addr.postal_city}, {addr.district}, {addr.province} (Postal Code: {addr.postal_code})</Text>
-                                            </div>
-                                        </List.Item>
-                                    )}
-                                />
-                            ) : (
-                                <Text type="secondary">No saved addresses found.</Text>
-                            )}
-                        </div>
-
-                        <div>
-                            <Title level={5}>Order History</Title>
-                            <Table
-                                size="small"
-                                rowKey="order_id"
-                                dataSource={ordersData?.orders ?? []}
-                                loading={isOrdersLoading}
-                                pagination={{
-                                    current: ordersPage,
-                                    pageSize: 5,
-                                    total: ordersData?.total ?? 0,
-                                    size: 'small',
-                                    onChange: (p) => setOrdersPage(p),
-                                }}
-                                columns={[
-                                    { title: 'Order No', dataIndex: 'order_number', key: 'order_number' },
-                                    { title: 'Amount', dataIndex: 'total_amount', key: 'total_amount', render: (val) => `Rs. ${val.toLocaleString()}` },
-                                    { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'completed' ? 'green' : s === 'cancelled' ? 'red' : 'blue'}>{s.toUpperCase()}</Tag> },
-                                    { title: 'Date', dataIndex: 'created_at', key: 'created_at', render: (d) => slt(d).format('MMM DD, YYYY') }
-                                ]}
-                            />
-                        </div>
-                    </Space>
-                )}
-            </Drawer>
 
             {/* Edit Info Modal */}
             <Modal
@@ -850,7 +629,7 @@ const CustomerList: React.FC = () => {
                         rows={4}
                         placeholder="e.g. Repeated fraudulent transactions, Fake cash-on-delivery orders"
                         value={blockReason}
-                        onChange={(e) => setBlockReason(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBlockReason(e.target.value)}
                     />
                 </Space>
             </Modal>
