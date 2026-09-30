@@ -215,52 +215,75 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             key: 'product_preview',
             render: (_, record) => {
                 const preview = record.items_preview;
-                if (!preview || !preview.product_name) {
-                    return <Text type="secondary">—</Text>;
-                }
+                const hasItem = preview && preview.product_name && preview.product_name !== 'No items';
+                const productName = hasItem ? preview.product_name : 'Order Items (Direct Order)';
+                const productImage = hasItem ? preview.product_image : null;
+                const quantity = hasItem ? (preview.quantity || 1) : 1;
+                const extraCount = preview?.extra_items_count || 0;
+
                 return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {preview.product_image ? (
+                        {productImage ? (
                             <Image
-                                src={preview.product_image}
-                                alt={preview.product_name}
-                                width={48}
-                                height={48}
+                                src={productImage}
+                                alt={productName}
+                                width={44}
+                                height={44}
                                 style={{
                                     objectFit: 'cover',
                                     borderRadius: 6,
                                     border: '1px solid #f0f0f0',
                                 }}
-                                fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' fill='%23eee'><rect width='48' height='48'/></svg>"
+                                fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' fill='%23eee'><rect width='44' height='44'/></svg>"
                             />
                         ) : (
                             <div
                                 style={{
-                                    width: 48,
-                                    height: 48,
+                                    width: 44,
+                                    height: 44,
                                     borderRadius: 6,
-                                    background: '#f5f5f5',
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#bfbfbf',
-                                    fontSize: 20,
+                                    color: '#94a3b8',
+                                    fontSize: 18,
+                                    flexShrink: 0,
                                 }}
                             >
                                 <ShoppingOutlined />
                             </div>
                         )}
-                        <div style={{ maxWidth: 280 }}>
-                            <Text strong style={{ fontSize: 13, display: 'block', lineHeight: 1.3 }} ellipsis={{ tooltip: preview.product_name }}>
-                                {preview.product_name}
+                        <div style={{ maxWidth: 260, minWidth: 140 }}>
+                            <Text
+                                strong
+                                style={{
+                                    fontSize: 13,
+                                    display: 'block',
+                                    lineHeight: 1.3,
+                                    color: hasItem ? '#1e293b' : '#64748b',
+                                }}
+                                ellipsis={{ tooltip: productName }}
+                            >
+                                {productName}
                             </Text>
                             <Space size={6} style={{ marginTop: 2 }}>
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                    Qty: {preview.quantity}
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                    Qty: {quantity}
                                 </Text>
-                                {preview.extra_items_count > 0 && (
-                                    <Tag color="default" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
-                                        +{preview.extra_items_count} more item{preview.extra_items_count > 1 ? 's' : ''}
+                                {extraCount > 0 && (
+                                    <Tag
+                                        color="blue"
+                                        style={{
+                                            fontSize: 10,
+                                            lineHeight: '16px',
+                                            padding: '0 4px',
+                                            margin: 0,
+                                            borderRadius: 4,
+                                        }}
+                                    >
+                                        +{extraCount} more
                                     </Tag>
                                 )}
                             </Space>
