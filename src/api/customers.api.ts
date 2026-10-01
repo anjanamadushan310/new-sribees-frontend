@@ -231,13 +231,22 @@ export const customersApi = {
             data: {
                 orders: CustomerOrder[];
                 analytics?: CustomerOrderAnalytics;
-                pagination: { total: number; page: number; limit: number; pages: number };
+                pagination?: { total: number; page: number; limit: number; pages: number };
+                total?: number;
+                page?: number;
+                limit?: number;
+                pages?: number;
             };
         }>(`/admin/customers/${userId}/orders`, { params });
 
         const rawData = res.data.data;
+        const total = rawData.pagination?.total ?? rawData.total ?? 0;
+        const page = rawData.pagination?.page ?? rawData.page ?? 1;
+        const limitRes = rawData.pagination?.limit ?? rawData.limit ?? 10;
+        const pages = rawData.pagination?.pages ?? rawData.pages ?? 1;
+
         const fallbackAnalytics: CustomerOrderAnalytics = {
-            total_orders: rawData.pagination.total,
+            total_orders: total,
             delivered_count: 0,
             cancelled_count: 0,
             returned_count: 0,
@@ -248,7 +257,10 @@ export const customersApi = {
         return {
             orders: rawData.orders || [],
             analytics: rawData.analytics || fallbackAnalytics,
-            ...rawData.pagination,
+            total,
+            page,
+            limit: limitRes,
+            pages,
         };
     },
 
