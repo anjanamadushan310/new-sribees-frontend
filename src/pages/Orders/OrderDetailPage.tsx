@@ -105,6 +105,22 @@ const OrderDetailPage: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
     };
 
+    // Deep-link: scroll into hash anchor (e.g. #return-claim-review, #escalation-center)
+    React.useEffect(() => {
+        if (!isLoading && order) {
+            const hash = window.location.hash;
+            if (hash) {
+                const timer = setTimeout(() => {
+                    const el = document.querySelector(hash);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 350);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isLoading, order]);
+
     const statusMutation = useMutation({
         mutationFn: ({ status }: { status: OrderStatus }) =>
             ordersApi.updateStatus(order!.order_id, status),
@@ -743,11 +759,12 @@ const OrderDetailPage: React.FC = () => {
                         {/* 3. Customer Return Claim & Decisions (if active or requested) */}
                         {(order.status === 'return_requested' ||
                             order.return_requested_at != null) && (
-                            <Card
-                                title="🔄 Return Claim Review"
-                                size="small"
-                                style={{ borderRadius: 8, borderColor: '#faad14' }}
-                            >
+                            <div id="return-claim-review">
+                                <Card
+                                    title="🔄 Return Claim Review"
+                                    size="small"
+                                    style={{ borderRadius: 8, borderColor: '#faad14' }}
+                                >
                                 <Descriptions column={1} size="small" bordered>
                                     <Descriptions.Item label="Reason">
                                         <b>{order.return_reason || '—'}</b>
@@ -936,6 +953,7 @@ const OrderDetailPage: React.FC = () => {
                                     </div>
                                 )}
                             </Card>
+                            </div>
                         )}
 
                         {/* 4. Status History & Audit Trail */}
@@ -1006,7 +1024,7 @@ const OrderDetailPage: React.FC = () => {
             </Row>
 
             {/* Escalation Tickets Section - Full Width under main content for maximum readability */}
-            <div style={{ marginTop: 24 }}>
+            <div id="escalation-center" style={{ marginTop: 24 }}>
                 <EscalationSection
                     orderId={order.order_id}
                     escalations={order.escalations || []}

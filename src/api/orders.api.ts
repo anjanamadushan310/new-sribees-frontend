@@ -44,6 +44,7 @@ export interface OrderListItem {
     user_id: string;
     customer_name: string | null;
     customer_email: string | null;
+    customer_phone?: string | null;
     branch_id: string | null;
     branch_name: string | null;
     status: OrderStatus;
@@ -51,6 +52,10 @@ export interface OrderListItem {
     total_amount: number;
     item_count: number;
     created_at: string | null;
+    delivered_at?: string | null;
+    return_requested_at?: string | null;
+    return_reason?: string | null;
+    return_images?: string[];
     /**
      * Enough courier state to spot a parcel that needs a human without opening
      * every order. `failed` here is the one that matters: the order sits at
@@ -144,6 +149,9 @@ export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
 export interface OrderEscalation {
     escalation_id: string;
     order_id: string;
+    order_number?: string;
+    branch_id?: string | null;
+    branch_name?: string | null;
     raised_by_admin_id?: string | null;
     raised_by_role?: string | null;
     category: EscalationCategory;
@@ -155,6 +163,12 @@ export interface OrderEscalation {
     created_at: string | null;
     acknowledged_at: string | null;
     resolved_at: string | null;
+}
+
+export interface EscalationQueueResponse {
+    items: OrderEscalation[];
+    total: number;
+    open_count: number;
 }
 
 export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
@@ -555,6 +569,13 @@ export const ordersApi = {
             `/admin/orders/${id}/escalations`,
         );
         return res.data.data.escalations;
+    },
+    listEscalationQueue: async (params?: { status?: string; limit?: number }): Promise<EscalationQueueResponse> => {
+        const res = await apiClient.get<{ success: boolean; data: EscalationQueueResponse }>(
+            '/admin/orders/escalations/queue',
+            { params },
+        );
+        return res.data.data;
     },
     raiseEscalation: async (
         id: string,
