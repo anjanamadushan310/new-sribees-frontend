@@ -77,16 +77,37 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
     const [raiseCategory, setRaiseCategory] = useState<EscalationCategory>('cancel_request');
     const [raiseMessage, setRaiseMessage] = useState('');
 
+    const userRole = currentUser?.role;
+    const isBM = userRole === 'branch_manager';
+    const isCS = userRole === 'customer_support';
+    const isSA = userRole === 'super_admin';
+    const canActOnTicket = canDecide || isSA || isBM || isCS;
+
+    // Helper for role tags
+    const renderRoleBadge = (role?: string | null) => {
+        if (!role) return null;
+        const map: Record<string, { label: string; color: string }> = {
+            branch_manager: { label: 'Branch Manager', color: 'orange' },
+            customer_support: { label: 'Customer Support', color: 'blue' },
+            super_admin: { label: 'Super Admin', color: 'red' },
+            admin: { label: 'Admin', color: 'default' },
+        };
+        const item = map[role] || { label: role.replace(/_/g, ' '), color: 'default' };
+        return (
+            <Tag color={item.color} style={{ fontSize: 10, margin: 0, textTransform: 'capitalize' }}>
+                {item.label}
+            </Tag>
+        );
+    };
+
     // Separate tickets into:
-    // Tab B (My Tickets): Strictly raised by current logged in admin (created_by_user_id === current_user.id)
+    // Tab B (My Tickets): Strictly raised by current logged in admin
     // Tab A (Support Tickets / Inbox): Raised by other roles/teams and received for action
     const isCreatedByMe = (e: OrderEscalation) => {
         if (!currentUser) return false;
-        // 1. Direct Admin ID match (UUID match)
         if (e.raised_by_admin_id && currentUser.admin_id) {
             return e.raised_by_admin_id === currentUser.admin_id;
         }
-        // 2. Name or Email match fallback
         const creator = (e.raised_by_name || '').trim().toLowerCase();
         const myName = (currentUser.full_name || '').trim().toLowerCase();
         const myEmail = (currentUser.email || '').trim().toLowerCase();
@@ -96,7 +117,16 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
     };
 
     const myTickets = escalations.filter(isCreatedByMe);
-    const supportTickets = escalations.filter((e) => !isCreatedByMe(e));
+    const supportTickets = escalations.filter((e) => {
+        if (isCreatedByMe(e)) return false;
+        if (isBM) {
+            return e.raised_by_role !== 'branch_manager';
+        }
+        if (isCS) {
+            return e.raised_by_role === 'branch_manager' || !e.raised_by_role;
+        }
+        return true;
+    });
 
     // Filter Support Tickets
     const filteredSupportTickets = supportTickets.filter((e) => {
@@ -208,15 +238,18 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
             ),
         },
         {
-            title: 'Created By & Time',
+            title: 'Created By & Role',
             key: 'created',
-            width: 200,
+            width: 220,
             render: (_, r) => (
-                <Space direction="vertical" size={0}>
-                    <Text strong style={{ fontSize: 12 }}>
-                        <UserOutlined style={{ marginRight: 4 }} />
-                        {r.raised_by_name}
-                    </Text>
+                <Space direction="vertical" size={2}>
+                    <Space size={6} wrap>
+                        <Text strong style={{ fontSize: 12 }}>
+                            <UserOutlined style={{ marginRight: 4 }} />
+                            {r.raised_by_name}
+                        </Text>
+                        {renderRoleBadge(r.raised_by_role)}
+                    </Space>
                     <Text type="secondary" style={{ fontSize: 11 }}>
                         <ClockCircleOutlined style={{ marginRight: 4 }} />
                         {r.created_at ? slt(r.created_at).format('MMM DD, YYYY · hh:mm A') : '—'}
@@ -303,7 +336,7 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
             ),
         },
         {
-            title: 'Super Admin Status',
+            title: 'Resolution Status',
             key: 'status',
             width: 140,
             align: 'center',
@@ -313,6 +346,9 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
                 if (r.status === 'open') {
                     color = 'orange';
                     label = 'Open';
+                } else if (r.status === 'acknowledged') {
+                    color = 'gold';
+                    label = 'Acknowledged';
                 } else if (r.status === 'resolved') {
                     color = 'green';
                     label = 'Resolved';
@@ -567,12 +603,13 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
                                     description={
                                         <div style={{ marginTop: 6 }}>
                                             <Text type="secondary" style={{ fontSize: 12 }}>
-                                                Click to confirm the branch manager has seen this issue and is working on it.
+                                                Click to confirm you have reviewed this issue and are taking action.
                                             </Text>
                                             <div style={{ marginTop: 8 }}>
                                                 <Button
                                                     type="primary"
                                                     size="small"
+                                                    disabled={!canActOnTicket}
                                                     loading={updateMut.isPending}
                                                     onClick={() => handleAcknowledge(supportModalTicket)}
                                                 >
@@ -589,7 +626,7 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
                                     message={
                                         <span>
                                             Acknowledged by{' '}
-                                            <b>{supportModalTicket.handled_by_name || 'Branch Manager'}</b>
+                                            <b>{supportModalTicket.handled_by_name || 'Admin'}</b>
                                             {supportModalTicket.acknowledged_at && (
                                                 <> at {slt(supportModalTicket.acknowledged_at).format('MMM DD, YYYY · hh:mm A')}</>
                                             )}
@@ -655,7 +692,7 @@ const EscalationSection: React.FC<EscalationSectionProps> = ({
                                             type="primary"
                                             style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                                             loading={updateMut.isPending}
-                                            disabled={!canDecide}
+                                            disabled={!canActOnTicket}
                                             onClick={() => handleResolve(supportModalTicket)}
                                         >
                                             Submit &amp; Resolve

@@ -144,6 +144,7 @@ export interface OrderEscalation {
     escalation_id: string;
     order_id: string;
     raised_by_admin_id?: string | null;
+    raised_by_role?: string | null;
     category: EscalationCategory;
     message: string;
     status: EscalationStatus;
