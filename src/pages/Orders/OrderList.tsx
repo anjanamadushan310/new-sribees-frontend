@@ -325,13 +325,13 @@ const OrderList: React.FC = () => {
                 <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
                     <Space wrap>
                         <DebouncedSearchInput
-                            placeholder="Search order #, customer, phone, email…"
+                            placeholder="Search order #, customer, phone, email, waybill…"
                             value={search}
                             onChange={(v) => {
                                 setPage(1);
                                 setSearch(v);
                             }}
-                            style={{ width: 320 }}
+                            style={{ width: 340 }}
                         />
                         {showBranchColumn && (
                             <Select
