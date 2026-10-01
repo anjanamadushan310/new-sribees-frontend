@@ -21,6 +21,7 @@ export type OrderStatus =
     | 'cancelled'
     | 'return_requested'
     | 'return_approved'
+    | 'return_rejected'
     | 'refunded';
 
 /** One contextual action button from GET /admin/orders/{id}/next-statuses (B1 §3). */
@@ -268,6 +269,7 @@ export interface OrderDetail {
     /** Photos the customer attached, already resolved to fetchable URLs. */
     return_images: string[] | null;
     return_requested_at: string | null;
+    return_rejected_at: string | null;
     refund_amount: number | null;
     return_resolution: ReturnResolution | null;
     return_resolution_note: string | null;
@@ -451,6 +453,7 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     cancelled: { label: 'Cancelled', color: 'red' },
     return_requested: { label: 'Return Requested', color: 'orange' },
     return_approved: { label: 'Return Approved', color: 'gold' },
+    return_rejected: { label: 'Return Rejected', color: 'red' },
     refunded: { label: 'Refunded', color: 'volcano' },
 };
 

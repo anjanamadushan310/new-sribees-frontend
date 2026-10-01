@@ -251,15 +251,32 @@ const OrderDetailPage: React.FC = () => {
 
     const confirmRejectReturn = () => {
         if (!order) return;
+        if (!returnNote.trim()) {
+            message.error('Please enter a Decision Note explaining why the return claim is being rejected.');
+            return;
+        }
         modal.confirm({
-            title: 'Reject return?',
+            title: 'Reject return claim?',
             content: (
-                <span>
-                    Reject the return for <b>{order.order_number}</b>? The order will revert to
-                    Delivered and no refund will be issued.
-                </span>
+                <div>
+                    <p>
+                        Reject the return claim for <b>{order.order_number}</b>? The return request will be
+                        marked as <b>Rejected</b> and the customer will see this reason in their app.
+                    </p>
+                    <div
+                        style={{
+                            background: '#fff1f0',
+                            border: '1px solid #ffccc7',
+                            padding: '8px 12px',
+                            borderRadius: 6,
+                            marginTop: 8,
+                        }}
+                    >
+                        <strong>Decision Reason:</strong> {returnNote.trim()}
+                    </div>
+                </div>
             ),
-            okText: 'Reject',
+            okText: 'Reject Claim',
             okButtonProps: { danger: true },
             onOk: () => rejectReturnMutation.mutateAsync(order.order_id),
         });
@@ -814,6 +831,25 @@ const OrderDetailPage: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* Rejection Details if Rejected */}
+                                {order.status === 'return_rejected' && (
+                                    <div style={{ marginTop: 12 }}>
+                                        <Divider style={{ margin: '10px 0' }}>Rejection Details</Divider>
+                                        <Alert
+                                            type="error"
+                                            showIcon
+                                            message="Return Claim Rejected"
+                                            description={
+                                                <div>
+                                                    <div style={{ marginTop: 4 }}>
+                                                        <strong>Decision Reason:</strong> {order.return_resolution_note || 'No reason specified.'}
+                                                    </div>
+                                                </div>
+                                            }
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Decision Actions if pending */}
                                 {canDecideReturn && order.status === 'return_requested' && (
                                     <div style={{ marginTop: 14 }}>
@@ -838,10 +874,12 @@ const OrderDetailPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Decision Note (Optional):</Text>
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    Decision Note <span style={{ color: '#ff4d4f' }}>*(Mandatory for Reject, Optional for Approve)*</span>:
+                                                </Text>
                                                 <Input.TextArea
                                                     rows={2}
-                                                    placeholder="Reason or operational instructions…"
+                                                    placeholder="Enter reason for rejection or operational instructions…"
                                                     value={returnNote}
                                                     onChange={(e) => setReturnNote(e.target.value)}
                                                 />
