@@ -81,6 +81,8 @@ export const HorizontalOrderStepper: React.FC<HorizontalOrderStepperProps> = ({ 
                 return order.return_requested_at || historyMap['return_requested'] || null;
             case 'return_approved':
                 return order.return_approved_at || historyMap['return_approved'] || null;
+            case 'return_rejected':
+                return order.return_rejected_at || historyMap['return_rejected'] || null;
             case 'refunded':
                 return historyMap['refunded'] || order.return_received_at || null;
             case 'cancelled':
@@ -102,9 +104,10 @@ export const HorizontalOrderStepper: React.FC<HorizontalOrderStepperProps> = ({ 
     const isReturnFlow = [
         'return_requested',
         'return_approved',
+        'return_rejected',
         'rto_initiated',
         'rto_delivered',
-    ].includes(currentStatus) || (currentStatus === 'refunded' && (order.delivered_at || historyMap['delivered'] || order.return_requested_at));
+    ].includes(currentStatus) || (currentStatus === 'refunded' && (order.delivered_at || historyMap['delivered'] || order.return_requested_at)) || order.return_requested_at || historyMap['return_requested'] || order.return_rejected_at;
 
     if (isCancelled) {
         // Pre-delivery cancellation: Add all milestones passed before cancel
@@ -156,6 +159,24 @@ export const HorizontalOrderStepper: React.FC<HorizontalOrderStepperProps> = ({ 
             isCompleted: true,
             isCurrent: currentStatus === 'return_requested',
         });
+
+        // Append return rejected if rejected
+        if (
+            currentStatus === 'return_rejected' ||
+            order.return_rejected_at ||
+            historyMap['return_rejected']
+        ) {
+            steps.push({
+                key: 'return_rejected',
+                number: 11,
+                label: 'Return Rejected',
+                icon: <CloseCircleOutlined />,
+                timestamp: getTimestamp('return_rejected'),
+                isCompleted: true,
+                isCurrent: currentStatus === 'return_rejected',
+                isFailedOrCancelled: true,
+            });
+        }
 
         // Append return approved if reached
         if (

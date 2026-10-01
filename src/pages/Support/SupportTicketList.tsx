@@ -4,7 +4,8 @@
  * Super Admin sees all branches with optional branch filter.
  * Branch Manager & Customer Support are branch-scoped.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Card,
     Table,
@@ -76,10 +77,29 @@ export const SupportTicketList: React.FC = () => {
     const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState<string>('');
 
+    const [searchParams, setSearchParams] = useSearchParams();
+
     // Selected ticket for drawer
     const [selectedTicket, setSelectedTicket] = useState<SupportTicketItem | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [form] = Form.useForm();
+
+    // Deep-link: auto-open drawer when ticketId is in query params
+    useEffect(() => {
+        const ticketId = searchParams.get('ticketId');
+        if (ticketId) {
+            supportApi.get(ticketId).then((item) => {
+                setSelectedTicket(item);
+                form.setFieldsValue({
+                    status: item.status,
+                    resolution_notes: item.resolution_notes,
+                });
+                setDrawerOpen(true);
+            }).catch(() => {
+                message.warning('Ticket not found or inaccessible.');
+            });
+        }
+    }, [searchParams, form, message]);
 
     // Query tickets
     const { data, isLoading } = useQuery({
@@ -396,7 +416,14 @@ export const SupportTicketList: React.FC = () => {
                 }
                 width={520}
                 open={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
+                onClose={() => {
+                    setDrawerOpen(false);
+                    if (searchParams.has('ticketId')) {
+                        const nextParams = new URLSearchParams(searchParams);
+                        nextParams.delete('ticketId');
+                        setSearchParams(nextParams, { replace: true });
+                    }
+                }}
                 footer={
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                         <Button onClick={() => setDrawerOpen(false)}>Cancel</Button>

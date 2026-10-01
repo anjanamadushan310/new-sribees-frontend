@@ -26,6 +26,8 @@ import {
     ArrowLeftOutlined,
     ClockCircleOutlined,
     DownloadOutlined,
+    ExportOutlined,
+    HistoryOutlined,
     PhoneOutlined,
     PictureOutlined,
     RobotOutlined,
@@ -102,6 +104,22 @@ const OrderDetailPage: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['admin', 'order', id] });
         queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
     };
+
+    // Deep-link: scroll into hash anchor (e.g. #return-claim-review, #escalation-center)
+    React.useEffect(() => {
+        if (!isLoading && order) {
+            const hash = window.location.hash;
+            if (hash) {
+                const timer = setTimeout(() => {
+                    const el = document.querySelector(hash);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 350);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isLoading, order]);
 
     const statusMutation = useMutation({
         mutationFn: ({ status }: { status: OrderStatus }) =>
@@ -251,15 +269,32 @@ const OrderDetailPage: React.FC = () => {
 
     const confirmRejectReturn = () => {
         if (!order) return;
+        if (!returnNote.trim()) {
+            message.error('Please enter a Decision Note explaining why the return claim is being rejected.');
+            return;
+        }
         modal.confirm({
-            title: 'Reject return?',
+            title: 'Reject return claim?',
             content: (
-                <span>
-                    Reject the return for <b>{order.order_number}</b>? The order will revert to
-                    Delivered and no refund will be issued.
-                </span>
+                <div>
+                    <p>
+                        Reject the return claim for <b>{order.order_number}</b>? The return request will be
+                        marked as <b>Rejected</b> and the customer will see this reason in their app.
+                    </p>
+                    <div
+                        style={{
+                            background: '#fff1f0',
+                            border: '1px solid #ffccc7',
+                            padding: '8px 12px',
+                            borderRadius: 6,
+                            marginTop: 8,
+                        }}
+                    >
+                        <strong>Decision Reason:</strong> {returnNote.trim()}
+                    </div>
+                </div>
             ),
-            okText: 'Reject',
+            okText: 'Reject Claim',
             okButtonProps: { danger: true },
             onOk: () => rejectReturnMutation.mutateAsync(order.order_id),
         });
@@ -479,7 +514,37 @@ const OrderDetailPage: React.FC = () => {
                 <Col xs={24} lg={14}>
                     <Space orientation="vertical" size={20} style={{ width: '100%' }}>
                         {/* 1. Customer & Delivery Address */}
-                        <Card title="👤 Customer &amp; Delivery Information" size="small" style={{ borderRadius: 8 }}>
+                        <Card
+                            title="👤 Customer &amp; Delivery Information"
+                            size="small"
+                            style={{ borderRadius: 8 }}
+                            extra={
+                                order.customer?.user_id ? (
+                                    <Button
+                                        size="small"
+                                        type="default"
+                                        icon={<HistoryOutlined />}
+                                        onClick={() => {
+                                            const custId = order.customer!.user_id;
+                                            window.open(`/customers?customerId=${encodeURIComponent(custId)}`, '_blank', 'noopener,noreferrer');
+                                        }}
+                                        style={{
+                                            fontSize: 12,
+                                            borderRadius: 6,
+                                            borderColor: '#bfdbfe',
+                                            backgroundColor: '#eff6ff',
+                                            color: '#2563eb',
+                                            fontWeight: 600,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                        }}
+                                    >
+                                        View Customer History <ExportOutlined style={{ fontSize: 10 }} />
+                                    </Button>
+                                ) : null
+                            }
+                        >
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} sm={12}>
                                     <Text type="secondary" style={{ fontSize: 12 }}>Customer Details</Text>
@@ -694,11 +759,12 @@ const OrderDetailPage: React.FC = () => {
                         {/* 3. Customer Return Claim & Decisions (if active or requested) */}
                         {(order.status === 'return_requested' ||
                             order.return_requested_at != null) && (
-                            <Card
-                                title="🔄 Return Claim Review"
-                                size="small"
-                                style={{ borderRadius: 8, borderColor: '#faad14' }}
-                            >
+                            <div id="return-claim-review">
+                                <Card
+                                    title="🔄 Return Claim Review"
+                                    size="small"
+                                    style={{ borderRadius: 8, borderColor: '#faad14' }}
+                                >
                                 <Descriptions column={1} size="small" bordered>
                                     <Descriptions.Item label="Reason">
                                         <b>{order.return_reason || '—'}</b>
@@ -814,6 +880,25 @@ const OrderDetailPage: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* Rejection Details if Rejected */}
+                                {order.status === 'return_rejected' && (
+                                    <div style={{ marginTop: 12 }}>
+                                        <Divider style={{ margin: '10px 0' }}>Rejection Details</Divider>
+                                        <Alert
+                                            type="error"
+                                            showIcon
+                                            message="Return Claim Rejected"
+                                            description={
+                                                <div>
+                                                    <div style={{ marginTop: 4 }}>
+                                                        <strong>Decision Reason:</strong> {order.return_resolution_note || 'No reason specified.'}
+                                                    </div>
+                                                </div>
+                                            }
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Decision Actions if pending */}
                                 {canDecideReturn && order.status === 'return_requested' && (
                                     <div style={{ marginTop: 14 }}>
@@ -838,10 +923,12 @@ const OrderDetailPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Decision Note (Optional):</Text>
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    Decision Note <span style={{ color: '#ff4d4f' }}>*(Mandatory for Reject, Optional for Approve)*</span>:
+                                                </Text>
                                                 <Input.TextArea
                                                     rows={2}
-                                                    placeholder="Reason or operational instructions…"
+                                                    placeholder="Enter reason for rejection or operational instructions…"
                                                     value={returnNote}
                                                     onChange={(e) => setReturnNote(e.target.value)}
                                                 />
@@ -866,6 +953,7 @@ const OrderDetailPage: React.FC = () => {
                                     </div>
                                 )}
                             </Card>
+                            </div>
                         )}
 
                         {/* 4. Status History & Audit Trail */}
@@ -936,7 +1024,7 @@ const OrderDetailPage: React.FC = () => {
             </Row>
 
             {/* Escalation Tickets Section - Full Width under main content for maximum readability */}
-            <div style={{ marginTop: 24 }}>
+            <div id="escalation-center" style={{ marginTop: 24 }}>
                 <EscalationSection
                     orderId={order.order_id}
                     escalations={order.escalations || []}

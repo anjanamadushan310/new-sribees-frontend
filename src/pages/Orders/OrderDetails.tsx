@@ -276,15 +276,32 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
 
     const confirmRejectReturn = () => {
         if (!order) return;
+        if (!returnNote.trim()) {
+            message.error('Please enter a Decision Note explaining why the return claim is being rejected.');
+            return;
+        }
         modal.confirm({
-            title: 'Reject return?',
+            title: 'Reject return claim?',
             content: (
-                <span>
-                    Reject the return for <b>{order.order_number}</b>? The order will revert to
-                    Delivered and no refund will be issued.
-                </span>
+                <div>
+                    <p>
+                        Reject the return claim for <b>{order.order_number}</b>? The return will be permanently
+                        marked as <b>Rejected</b> and the customer will see this reason in their app.
+                    </p>
+                    <div
+                        style={{
+                            background: '#fff1f0',
+                            border: '1px solid #ffccc7',
+                            padding: '8px 12px',
+                            borderRadius: 6,
+                            marginTop: 8,
+                        }}
+                    >
+                        <strong>Decision Reason:</strong> {returnNote.trim()}
+                    </div>
+                </div>
             ),
-            okText: 'Reject',
+            okText: 'Reject Claim',
             okButtonProps: { danger: true },
             onOk: () => rejectReturnMutation.mutateAsync(order.order_id),
         });
@@ -709,6 +726,22 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                                 />
                             )}
                         </>
+                    )}
+
+                    {order.status === 'return_rejected' && (
+                        <div style={{ marginTop: 16 }}>
+                            <Divider titlePlacement="start">Rejection Details</Divider>
+                            <Alert
+                                type="error"
+                                showIcon
+                                message="Return Claim Rejected"
+                                description={
+                                    <div style={{ marginTop: 4 }}>
+                                        <strong>Decision Reason:</strong> {order.return_resolution_note || 'No reason specified.'}
+                                    </div>
+                                }
+                            />
+                        </div>
                     )}
 
                     {order.status === 'return_approved' && (

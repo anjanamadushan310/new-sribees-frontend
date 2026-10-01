@@ -21,6 +21,7 @@ export type OrderStatus =
     | 'cancelled'
     | 'return_requested'
     | 'return_approved'
+    | 'return_rejected'
     | 'refunded';
 
 /** One contextual action button from GET /admin/orders/{id}/next-statuses (B1 §3). */
@@ -43,6 +44,7 @@ export interface OrderListItem {
     user_id: string;
     customer_name: string | null;
     customer_email: string | null;
+    customer_phone?: string | null;
     branch_id: string | null;
     branch_name: string | null;
     status: OrderStatus;
@@ -50,6 +52,10 @@ export interface OrderListItem {
     total_amount: number;
     item_count: number;
     created_at: string | null;
+    delivered_at?: string | null;
+    return_requested_at?: string | null;
+    return_reason?: string | null;
+    return_images?: string[];
     /**
      * Enough courier state to spot a parcel that needs a human without opening
      * every order. `failed` here is the one that matters: the order sits at
@@ -143,6 +149,9 @@ export type EscalationStatus = 'open' | 'acknowledged' | 'resolved';
 export interface OrderEscalation {
     escalation_id: string;
     order_id: string;
+    order_number?: string;
+    branch_id?: string | null;
+    branch_name?: string | null;
     raised_by_admin_id?: string | null;
     raised_by_role?: string | null;
     category: EscalationCategory;
@@ -154,6 +163,12 @@ export interface OrderEscalation {
     created_at: string | null;
     acknowledged_at: string | null;
     resolved_at: string | null;
+}
+
+export interface EscalationQueueResponse {
+    items: OrderEscalation[];
+    total: number;
+    open_count: number;
 }
 
 export type ReturnResolution = 'returnless_refund' | 'reverse_pickup';
@@ -268,6 +283,7 @@ export interface OrderDetail {
     /** Photos the customer attached, already resolved to fetchable URLs. */
     return_images: string[] | null;
     return_requested_at: string | null;
+    return_rejected_at: string | null;
     refund_amount: number | null;
     return_resolution: ReturnResolution | null;
     return_resolution_note: string | null;
@@ -451,6 +467,7 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; color: stri
     cancelled: { label: 'Cancelled', color: 'red' },
     return_requested: { label: 'Return Requested', color: 'orange' },
     return_approved: { label: 'Return Approved', color: 'gold' },
+    return_rejected: { label: 'Return Rejected', color: 'red' },
     refunded: { label: 'Refunded', color: 'volcano' },
 };
 
@@ -552,6 +569,13 @@ export const ordersApi = {
             `/admin/orders/${id}/escalations`,
         );
         return res.data.data.escalations;
+    },
+    listEscalationQueue: async (params?: { status?: string; limit?: number }): Promise<EscalationQueueResponse> => {
+        const res = await apiClient.get<{ success: boolean; data: EscalationQueueResponse }>(
+            '/admin/orders/escalations/queue',
+            { params },
+        );
+        return res.data.data;
     },
     raiseEscalation: async (
         id: string,
