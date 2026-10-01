@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Table, Input, Tag, Switch, Space, Typography, App, Button, Dropdown, Modal, Form, Popconfirm, Segmented, Avatar, Tooltip } from 'antd';
 import { UserOutlined, CheckCircleOutlined, DownloadOutlined, EyeOutlined, EditOutlined, LockOutlined, UnlockOutlined, DeleteOutlined, EllipsisOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -73,6 +74,7 @@ const CustomerList: React.FC = () => {
     const [exporting, setExporting] = useState(false);
     const [tab, setTab] = useState<FilterTab>('all');
     const [promoOpen, setPromoOpen] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Selected customer & popup state
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -80,6 +82,15 @@ const CustomerList: React.FC = () => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [blockModalVisible, setBlockModalVisible] = useState(false);
     const [blockReason, setBlockReason] = useState('');
+
+    // Deep-link: auto-open drawer if customerId is present in query params
+    useEffect(() => {
+        const customerIdFromUrl = searchParams.get('customerId');
+        if (customerIdFromUrl) {
+            setSelectedCustomerId(customerIdFromUrl);
+            setDrawerVisible(true);
+        }
+    }, [searchParams]);
 
 
     // Fetch profile and order history
@@ -537,7 +548,14 @@ const CustomerList: React.FC = () => {
             <CustomerProfileDrawer
                 customerId={selectedCustomerId}
                 visible={drawerVisible}
-                onClose={() => setDrawerVisible(false)}
+                onClose={() => {
+                    setDrawerVisible(false);
+                    if (searchParams.has('customerId')) {
+                        const nextParams = new URLSearchParams(searchParams);
+                        nextParams.delete('customerId');
+                        setSearchParams(nextParams, { replace: true });
+                    }
+                }}
                 onSelectCustomer={(newId) => {
                     setSelectedCustomerId(newId);
                 }}

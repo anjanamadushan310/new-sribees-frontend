@@ -26,6 +26,8 @@ import {
     ArrowLeftOutlined,
     ClockCircleOutlined,
     DownloadOutlined,
+    ExportOutlined,
+    HistoryOutlined,
     PhoneOutlined,
     PictureOutlined,
     RobotOutlined,
@@ -496,7 +498,37 @@ const OrderDetailPage: React.FC = () => {
                 <Col xs={24} lg={14}>
                     <Space orientation="vertical" size={20} style={{ width: '100%' }}>
                         {/* 1. Customer & Delivery Address */}
-                        <Card title="👤 Customer &amp; Delivery Information" size="small" style={{ borderRadius: 8 }}>
+                        <Card
+                            title="👤 Customer &amp; Delivery Information"
+                            size="small"
+                            style={{ borderRadius: 8 }}
+                            extra={
+                                order.customer?.user_id ? (
+                                    <Button
+                                        size="small"
+                                        type="default"
+                                        icon={<HistoryOutlined />}
+                                        onClick={() => {
+                                            const custId = order.customer!.user_id;
+                                            window.open(`/customers?customerId=${encodeURIComponent(custId)}`, '_blank', 'noopener,noreferrer');
+                                        }}
+                                        style={{
+                                            fontSize: 12,
+                                            borderRadius: 6,
+                                            borderColor: '#bfdbfe',
+                                            backgroundColor: '#eff6ff',
+                                            color: '#2563eb',
+                                            fontWeight: 600,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                        }}
+                                    >
+                                        View Customer History <ExportOutlined style={{ fontSize: 10 }} />
+                                    </Button>
+                                ) : null
+                            }
+                        >
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} sm={12}>
                                     <Text type="secondary" style={{ fontSize: 12 }}>Customer Details</Text>
