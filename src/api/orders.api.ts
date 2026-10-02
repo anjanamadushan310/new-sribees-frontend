@@ -570,7 +570,7 @@ export const ordersApi = {
         );
         return res.data.data.escalations;
     },
-    listEscalationQueue: async (params?: { status?: string; limit?: number }): Promise<EscalationQueueResponse> => {
+    listEscalationQueue: async (params?: { status?: string; for_role?: string; limit?: number }): Promise<EscalationQueueResponse> => {
         const res = await apiClient.get<{ success: boolean; data: EscalationQueueResponse }>(
             '/admin/orders/escalations/queue',
             { params },

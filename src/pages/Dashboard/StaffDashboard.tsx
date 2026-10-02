@@ -93,14 +93,14 @@ const StaffDashboard: React.FC = () => {
         refetchInterval: 30000,
     });
 
-    // 2. Branch Escalations (Open & Acknowledged)
+    // 2. Branch Escalations (Inbox: tickets from BM/SuperAdmin or with BM responses)
     const {
         data: escalationsData,
         isLoading: escalationsLoading,
         isRefetching: escalationsRefetching,
     } = useQuery({
-        queryKey: ['admin', 'dashboard', 'escalationsQueue'],
-        queryFn: () => ordersApi.listEscalationQueue({ status: 'open', limit: 50 }),
+        queryKey: ['admin', 'dashboard', 'escalationsQueue', 'customer_support'],
+        queryFn: () => ordersApi.listEscalationQueue({ for_role: 'customer_support', limit: 50 }),
         refetchInterval: 30000,
     });
 
@@ -292,26 +292,42 @@ const StaffDashboard: React.FC = () => {
             ),
         },
         {
-            title: 'BM Message',
-            dataIndex: 'message',
-            key: 'message',
+            title: 'Message / BM Note',
+            key: 'message_note',
             ellipsis: true,
-            render: (msg) => (
-                <Tooltip title={msg}>
-                    <Text style={{ fontSize: 13 }}>{msg}</Text>
-                </Tooltip>
-            ),
+            render: (_, esc) => {
+                if (esc.resolution_note) {
+                    return (
+                        <Tooltip title={`BM Response: ${esc.resolution_note}`}>
+                            <div>
+                                <Tag color="green" style={{ marginRight: 6, fontWeight: 600 }}>BM Reply</Tag>
+                                <Text style={{ fontSize: 13, color: '#065f46' }}>{esc.resolution_note}</Text>
+                            </div>
+                        </Tooltip>
+                    );
+                }
+                return (
+                    <Tooltip title={esc.message}>
+                        <Text style={{ fontSize: 13 }}>{esc.message}</Text>
+                    </Tooltip>
+                );
+            },
         },
         {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
             width: 110,
-            render: (st) => (
-                <Tag color={st === 'open' ? 'red' : 'orange'} style={{ textTransform: 'capitalize' }}>
-                    {st}
-                </Tag>
-            ),
+            render: (st, esc) => {
+                const isResolved = st === 'resolved';
+                const isAck = st === 'acknowledged';
+                const tagColor = isResolved ? 'green' : isAck ? 'orange' : 'red';
+                return (
+                    <Tag color={tagColor} style={{ textTransform: 'capitalize', fontWeight: 600 }}>
+                        {st}
+                    </Tag>
+                );
+            },
         },
         {
             title: 'Raised At',
