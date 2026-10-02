@@ -12,13 +12,33 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, App, Badge, Button, Card, DatePicker, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
-import { EyeOutlined, FileExcelOutlined, PrinterOutlined } from '@ant-design/icons';
+import {
+    Alert,
+    App,
+    Badge,
+    Button,
+    Card,
+    DatePicker,
+    Select,
+    Space,
+    Table,
+    Tabs,
+    Tag,
+    Tooltip,
+    Typography,
+} from 'antd';
+import {
+    ClockCircleOutlined,
+    ExportOutlined,
+    EyeOutlined,
+    FileExcelOutlined,
+    PrinterOutlined,
+} from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ordersApi, ORDER_TABS, sumCounts } from '../../api/orders.api';
-import type { OrderListItem, OrderStatus } from '../../api/orders.api';
+import type { OrderEscalation, OrderListItem, OrderStatus } from '../../api/orders.api';
 import { transfersApi } from '../../api/transfers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { statusTag } from './OrderDetails';
@@ -37,13 +57,21 @@ const rangePresets: { label: string; value: [dayjs.Dayjs, dayjs.Dayjs] }[] = [
     { label: 'Last Month', value: [slt().subtract(1, 'month').startOf('month'), slt().subtract(1, 'month').endOf('month')] },
 ];
 
+const ESC_CATEGORY_META: Record<string, { label: string; color: string }> = {
+    cancel_request: { label: 'Urgent Cancellation', color: 'red' },
+    address_correction: { label: 'Address Correction', color: 'orange' },
+    hold_shipment: { label: 'Hold Shipment', color: 'volcano' },
+    customer_complaint: { label: 'Customer Complaint', color: 'magenta' },
+    other: { label: 'General Escalation', color: 'default' },
+};
+
 const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
 
 const OrderList: React.FC = () => {
     const navigate = useNavigate();
     const { message } = App.useApp();
-    const { isSuperAdmin, isSupport } = usePermissions();
+    const { isSuperAdmin, isSupport, isBranchManager } = usePermissions();
     const isNetworkWide = isSuperAdmin || isSupport;
 
     const [page, setPage] = useState(1);
@@ -53,6 +81,10 @@ const OrderList: React.FC = () => {
     const [pillKey, setPillKey] = useState<string | undefined>(undefined);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+
+    // Escalations state
+    const [escalationBox, setEscalationBox] = useState<'inbox' | 'outbox' | 'resolved'>('inbox');
+    const [escalationPill, setEscalationPill] = useState<string | undefined>(undefined);
 
     const openOrder = (orderId: string) => {
         navigate(`/orders/${orderId}`);
@@ -66,8 +98,8 @@ const OrderList: React.FC = () => {
     const toDate = dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined;
 
     const activeTab = ORDER_TABS.find((t) => t.key === tabKey) ?? ORDER_TABS[0];
-    const activePill = activeTab.subPills.find((p) => p.key === pillKey);
-    const filterStatuses: OrderStatus[] = activePill?.statuses ?? activeTab.statuses;
+    const activePill = activeTab.subPills?.find((p) => p.key === pillKey);
+    const filterStatuses: OrderStatus[] = activePill?.statuses ?? activeTab.statuses ?? [];
     const orderStatusesParam = filterStatuses.length ? filterStatuses.join(',') : undefined;
     const statusFilterForExport = filterStatuses.length === 1 ? filterStatuses[0] : undefined;
 
@@ -90,6 +122,35 @@ const OrderList: React.FC = () => {
                 to_date: toDate,
             }),
         placeholderData: keepPreviousData,
+        enabled: tabKey !== 'escalations',
+    });
+
+    const forRole = isSupport ? 'customer_support' : (isBranchManager ? 'branch_manager' : undefined);
+
+    // Global escalation badge count (unread/open)
+    const { data: escalationBadgeData } = useQuery({
+        queryKey: ['admin', 'orders', 'escalationsBadge', { branchId, forRole }],
+        queryFn: () =>
+            ordersApi.listEscalationQueue({
+                box: 'inbox',
+                for_role: forRole,
+                limit: 1,
+            }),
+        refetchInterval: 30000,
+    });
+
+    // Escalations table data
+    const { data: escalationQueueData, isLoading: escalationsLoading } = useQuery({
+        queryKey: ['admin', 'orders', 'escalationsQueue', { escalationBox, escalationPill, branchId, forRole }],
+        queryFn: () =>
+            ordersApi.listEscalationQueue({
+                box: escalationBox,
+                status: escalationBox === 'inbox' || escalationBox === 'outbox' ? (escalationPill || undefined) : undefined,
+                for_role: forRole,
+                limit: 100,
+            }),
+        enabled: tabKey === 'escalations',
+        refetchInterval: 15000,
     });
 
     if (isError) {
@@ -273,20 +334,166 @@ const OrderList: React.FC = () => {
         },
     ];
 
-    const tabItems = ORDER_TABS.map((t) => ({
-        key: t.key,
-        label: (
-            <span>
-                {t.label}{' '}
-                <Badge
-                    count={sumCounts(counts, t.statuses)}
-                    showZero
-                    overflowCount={9999}
-                    style={{ backgroundColor: t.key === tabKey ? '#1677ff' : '#bfbfbf' }}
-                />
-            </span>
-        ),
-    }));
+    const escalationColumns: ColumnsType<OrderEscalation> = [
+        {
+            title: 'Order Ref',
+            dataIndex: 'order_number',
+            key: 'order_number',
+            width: 165,
+            render: (num: string, record) => (
+                <a
+                    onClick={() => navigate(`/orders/${record.order_id}#escalation-center`)}
+                    style={{
+                        fontWeight: 600,
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontSize: 13,
+                        color: '#2563eb',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    {num || 'Order Details'}
+                </a>
+            ),
+        },
+        {
+            title: 'Category',
+            dataIndex: 'category',
+            key: 'category',
+            width: 170,
+            render: (cat: string) => {
+                const meta = ESC_CATEGORY_META[cat] || { label: cat, color: 'default' };
+                return <Tag color={meta.color} style={{ fontWeight: 500 }}>{meta.label}</Tag>;
+            },
+        },
+        {
+            title: 'Branch & Raised By',
+            key: 'branch_raised',
+            width: 200,
+            render: (_, record) => (
+                <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {record.branch_name || 'Assigned Branch'}
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                        by {record.raised_by_name} ({record.raised_by_role || 'Staff'})
+                    </Text>
+                </div>
+            ),
+        },
+        {
+            title: 'Message / Response Note',
+            key: 'message_note',
+            ellipsis: true,
+            render: (_, record) => {
+                if (record.resolution_note) {
+                    return (
+                        <Tooltip title={`BM Response: ${record.resolution_note}`}>
+                            <div>
+                                <Tag color="green" style={{ marginRight: 6, fontWeight: 600 }}>BM Reply</Tag>
+                                <Text style={{ fontSize: 13, color: '#065f46' }}>{record.resolution_note}</Text>
+                            </div>
+                        </Tooltip>
+                    );
+                }
+                return (
+                    <Tooltip title={record.message}>
+                        <Text style={{ fontSize: 13 }}>{record.message}</Text>
+                    </Tooltip>
+                );
+            },
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status',
+            key: 'status',
+            width: 120,
+            align: 'center',
+            render: (st: string) => {
+                const isResolved = st === 'resolved';
+                const isAck = st === 'acknowledged';
+                const tagColor = isResolved ? 'green' : isAck ? 'orange' : 'red';
+                return (
+                    <Tag color={tagColor} style={{ textTransform: 'capitalize', fontWeight: 600 }}>
+                        {st}
+                    </Tag>
+                );
+            },
+        },
+        {
+            title: 'Raised At',
+            dataIndex: 'created_at',
+            key: 'created_at',
+            width: 160,
+            render: (d: string | null) => (
+                <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                    <ClockCircleOutlined style={{ marginRight: 4 }} />
+                    {d ? slt(d).format('MMM DD, YYYY hh:mm A') : '—'}
+                </Text>
+            ),
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            width: 120,
+            align: 'center',
+            render: (_, record) => (
+                <Button
+                    type="primary"
+                    size="small"
+                    danger={record.status === 'open'}
+                    icon={<ExportOutlined />}
+                    onClick={() => navigate(`/orders/${record.order_id}#escalation-center`)}
+                >
+                    View Ticket
+                </Button>
+            ),
+        },
+    ];
+
+    const tabItems = [
+        ...ORDER_TABS.map((t) => ({
+            key: t.key,
+            label: (
+                <span>
+                    {t.label}{' '}
+                    <Badge
+                        count={sumCounts(counts, t.statuses)}
+                        showZero
+                        overflowCount={9999}
+                        style={{ backgroundColor: t.key === tabKey ? '#1677ff' : '#bfbfbf' }}
+                    />
+                </span>
+            ),
+        })),
+        {
+            key: 'escalations',
+            label: (
+                <span>
+                    Escalations{' '}
+                    <Badge
+                        count={escalationBadgeData?.open_count ?? 0}
+                        showZero={false}
+                        overflowCount={99}
+                        style={{ backgroundColor: tabKey === 'escalations' ? '#1677ff' : '#ff4d4f' }}
+                    />
+                </span>
+            ),
+        },
+    ];
+
+    const displayedEscalations = (escalationQueueData?.items ?? []).filter((esc) => {
+        if (branchId && esc.branch_id !== branchId) return false;
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+            esc.order_number?.toLowerCase().includes(q) ||
+            esc.message?.toLowerCase().includes(q) ||
+            esc.resolution_note?.toLowerCase().includes(q) ||
+            esc.raised_by_name?.toLowerCase().includes(q) ||
+            esc.branch_name?.toLowerCase().includes(q) ||
+            esc.category?.toLowerCase().includes(q)
+        );
+    });
 
     return (
         <div>
@@ -300,130 +507,251 @@ const OrderList: React.FC = () => {
                     activeKey={tabKey}
                     items={tabItems}
                     onChange={(k) => resetTo(k)}
-                    tabBarStyle={{ marginBottom: 8 }}
+                    tabBarStyle={{ marginBottom: 12 }}
                 />
 
-                {/* Tier 2: sub-status pills */}
-                {activeTab.subPills.length > 0 && (
-                    <Space wrap size={8} style={{ marginBottom: 16 }}>
-                        <Tag.CheckableTag checked={!pillKey} onChange={() => resetTo(tabKey)}>
-                            All ({sumCounts(counts, activeTab.statuses)})
-                        </Tag.CheckableTag>
-                        {activeTab.subPills.map((p) => (
-                            <Tag.CheckableTag
-                                key={p.key}
-                                checked={pillKey === p.key}
-                                onChange={() => resetTo(tabKey, pillKey === p.key ? undefined : p.key)}
-                            >
-                                {p.label} ({sumCounts(counts, p.statuses)})
-                            </Tag.CheckableTag>
-                        ))}
-                    </Space>
-                )}
-
-                {/* Row 3: secondary filters + exports */}
-                <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-                    <Space wrap>
-                        <DebouncedSearchInput
-                            placeholder="Search order #, customer, phone, email, waybill…"
-                            value={search}
-                            onChange={(v) => {
-                                setPage(1);
-                                setSearch(v);
+                {tabKey === 'escalations' ? (
+                    <div>
+                        {/* Escalation Sub-tabs: Inbox, Outbox, Resolved */}
+                        <Tabs
+                            activeKey={escalationBox}
+                            onChange={(k) => {
+                                setEscalationBox(k as 'inbox' | 'outbox' | 'resolved');
+                                setEscalationPill(undefined);
                             }}
-                            style={{ width: 340 }}
+                            type="card"
+                            tabBarStyle={{ marginBottom: 12 }}
+                            items={[
+                                {
+                                    key: 'inbox',
+                                    label: (
+                                        <span>
+                                            📥 Inbox / Received
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'outbox',
+                                    label: <span>📤 Sent by Me / Outbox</span>,
+                                },
+                                {
+                                    key: 'resolved',
+                                    label: <span>✅ Resolved / Closed</span>,
+                                },
+                            ]}
                         />
-                        {showBranchColumn && (
-                            <Select
-                                placeholder="All branches"
-                                style={{ width: 220 }}
-                                allowClear
-                                value={branchId}
-                                onChange={(v) => {
-                                    setPage(1);
-                                    setBranchId(v);
-                                }}
-                                options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+
+                        {/* Sub-status pills for Inbox */}
+                        {escalationBox === 'inbox' && (
+                            <Space wrap size={8} style={{ marginBottom: 16 }}>
+                                <Tag.CheckableTag checked={!escalationPill} onChange={() => setEscalationPill(undefined)}>
+                                    All Received
+                                </Tag.CheckableTag>
+                                <Tag.CheckableTag
+                                    checked={escalationPill === 'open'}
+                                    onChange={() => setEscalationPill(escalationPill === 'open' ? undefined : 'open')}
+                                >
+                                    Open
+                                </Tag.CheckableTag>
+                                <Tag.CheckableTag
+                                    checked={escalationPill === 'acknowledged'}
+                                    onChange={() => setEscalationPill(escalationPill === 'acknowledged' ? undefined : 'acknowledged')}
+                                >
+                                    Acknowledged
+                                </Tag.CheckableTag>
+                            </Space>
+                        )}
+
+                        {/* Sub-status pills for Outbox */}
+                        {escalationBox === 'outbox' && (
+                            <Space wrap size={8} style={{ marginBottom: 16 }}>
+                                <Tag.CheckableTag checked={!escalationPill} onChange={() => setEscalationPill(undefined)}>
+                                    All Sent
+                                </Tag.CheckableTag>
+                                <Tag.CheckableTag
+                                    checked={escalationPill === 'open'}
+                                    onChange={() => setEscalationPill(escalationPill === 'open' ? undefined : 'open')}
+                                >
+                                    Open
+                                </Tag.CheckableTag>
+                                <Tag.CheckableTag
+                                    checked={escalationPill === 'acknowledged'}
+                                    onChange={() => setEscalationPill(escalationPill === 'acknowledged' ? undefined : 'acknowledged')}
+                                >
+                                    Acknowledged
+                                </Tag.CheckableTag>
+                                <Tag.CheckableTag
+                                    checked={escalationPill === 'resolved'}
+                                    onChange={() => setEscalationPill(escalationPill === 'resolved' ? undefined : 'resolved')}
+                                >
+                                    Resolved
+                                </Tag.CheckableTag>
+                            </Space>
+                        )}
+
+                        {/* Search & Branch filter */}
+                        <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+                            <Space wrap>
+                                <DebouncedSearchInput
+                                    placeholder="Search tickets by order #, message, note…"
+                                    value={search}
+                                    onChange={(v) => setSearch(v)}
+                                    style={{ width: 340 }}
+                                />
+                                {showBranchColumn && (
+                                    <Select
+                                        placeholder="All branches"
+                                        style={{ width: 220 }}
+                                        allowClear
+                                        value={branchId}
+                                        onChange={(v) => setBranchId(v)}
+                                        options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                                    />
+                                )}
+                            </Space>
+                        </Space>
+
+                        <Table
+                            rowKey="escalation_id"
+                            size="middle"
+                            columns={escalationColumns}
+                            dataSource={displayedEscalations}
+                            loading={escalationsLoading}
+                            scroll={{ x: 'max-content' }}
+                            locale={{ emptyText: 'No escalation tickets found.' }}
+                            pagination={{
+                                pageSize: 10,
+                                showSizeChanger: true,
+                                showTotal: (t) => `Total ${t} tickets`,
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <div>
+                        {/* Tier 2: sub-status pills for normal order tabs */}
+                        {activeTab.subPills && activeTab.subPills.length > 0 && (
+                            <Space wrap size={8} style={{ marginBottom: 16 }}>
+                                <Tag.CheckableTag checked={!pillKey} onChange={() => resetTo(tabKey)}>
+                                    All ({sumCounts(counts, activeTab.statuses)})
+                                </Tag.CheckableTag>
+                                {activeTab.subPills.map((p) => (
+                                    <Tag.CheckableTag
+                                        key={p.key}
+                                        checked={pillKey === p.key}
+                                        onChange={() => resetTo(tabKey, pillKey === p.key ? undefined : p.key)}
+                                    >
+                                        {p.label} ({sumCounts(counts, p.statuses)})
+                                    </Tag.CheckableTag>
+                                ))}
+                            </Space>
+                        )}
+
+                        {/* Row 3: secondary filters + exports */}
+                        <Space wrap style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+                            <Space wrap>
+                                <DebouncedSearchInput
+                                    placeholder="Search order #, customer, phone, email, waybill…"
+                                    value={search}
+                                    onChange={(v) => {
+                                        setPage(1);
+                                        setSearch(v);
+                                    }}
+                                    style={{ width: 340 }}
+                                />
+                                {showBranchColumn && (
+                                    <Select
+                                        placeholder="All branches"
+                                        style={{ width: 220 }}
+                                        allowClear
+                                        value={branchId}
+                                        onChange={(v) => {
+                                            setPage(1);
+                                            setBranchId(v);
+                                        }}
+                                        options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                                    />
+                                )}
+                                <RangePicker
+                                    presets={rangePresets}
+                                    value={dateRange}
+                                    onChange={(dates) => {
+                                        setPage(1);
+                                        setDateRange(dates as any);
+                                    }}
+                                    style={{ width: 280 }}
+                                    allowClear
+                                />
+                            </Space>
+
+                            <Space wrap>
+                                <Button icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', false)}>
+                                    Export CSV
+                                </Button>
+                                <Button
+                                    type="primary"
+                                    icon={<PrinterOutlined />}
+                                    loading={exportingPdf}
+                                    onClick={() => runExport('pdf', false)}
+                                >
+                                    Dispatch PDF
+                                </Button>
+                            </Space>
+                        </Space>
+
+                        {selectedRowKeys.length > 0 && (
+                            <Alert
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                                message={
+                                    <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+                                        <span>
+                                            <b>{selectedRowKeys.length}</b>{' '}
+                                            {selectedRowKeys.length === 1 ? 'order' : 'orders'} selected
+                                        </span>
+                                        <Space wrap>
+                                            <Button size="small" icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', true)}>
+                                                Export Selected (CSV)
+                                            </Button>
+                                            <Button size="small" type="primary" icon={<PrinterOutlined />} loading={exportingPdf} onClick={() => runExport('pdf', true)}>
+                                                Export Selected (PDF)
+                                            </Button>
+                                            <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>
+                                                Clear Selection
+                                            </Button>
+                                        </Space>
+                                    </Space>
+                                }
                             />
                         )}
-                        <RangePicker
-                            presets={rangePresets}
-                            value={dateRange}
-                            onChange={(dates) => {
-                                setPage(1);
-                                setDateRange(dates as any);
+
+                        <Table
+                            rowKey="order_id"
+                            size="middle"
+                            rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) }}
+                            columns={columns}
+                            dataSource={data?.orders ?? []}
+                            loading={isLoading}
+                            scroll={{ x: 'max-content' }}
+                            locale={{ emptyText: isError ? 'Failed to load orders.' : 'No orders found.' }}
+                            pagination={{
+                                current: page,
+                                pageSize,
+                                total: data?.total ?? 0,
+                                showSizeChanger: true,
+                                showTotal: (t) => `Total ${t} orders`,
+                                onChange: (nextPage, nextSize) => {
+                                    setPage(nextPage);
+                                    setPageSize(nextSize);
+                                },
                             }}
-                            style={{ width: 280 }}
-                            allowClear
                         />
-                    </Space>
-
-                    <Space wrap>
-                        <Button icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', false)}>
-                            Export CSV
-                        </Button>
-                        <Button
-                            type="primary"
-                            icon={<PrinterOutlined />}
-                            loading={exportingPdf}
-                            onClick={() => runExport('pdf', false)}
-                        >
-                            Dispatch PDF
-                        </Button>
-                    </Space>
-                </Space>
-
-                {selectedRowKeys.length > 0 && (
-                    <Alert
-                        type="info"
-                        showIcon
-                        style={{ marginBottom: 16 }}
-                        message={
-                            <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-                                <span>
-                                    <b>{selectedRowKeys.length}</b>{' '}
-                                    {selectedRowKeys.length === 1 ? 'order' : 'orders'} selected
-                                </span>
-                                <Space wrap>
-                                    <Button size="small" icon={<FileExcelOutlined />} loading={exportingCsv} onClick={() => runExport('csv', true)}>
-                                        Export Selected (CSV)
-                                    </Button>
-                                    <Button size="small" type="primary" icon={<PrinterOutlined />} loading={exportingPdf} onClick={() => runExport('pdf', true)}>
-                                        Export Selected (PDF)
-                                    </Button>
-                                    <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>
-                                        Clear Selection
-                                    </Button>
-                                </Space>
-                            </Space>
-                        }
-                    />
+                    </div>
                 )}
-
-                <Table
-                    rowKey="order_id"
-                    size="middle"
-                    rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys) }}
-                    columns={columns}
-                    dataSource={data?.orders ?? []}
-                    loading={isLoading}
-                    scroll={{ x: 'max-content' }}
-                    locale={{ emptyText: isError ? 'Failed to load orders.' : 'No orders found.' }}
-                    pagination={{
-                        current: page,
-                        pageSize,
-                        total: data?.total ?? 0,
-                        showSizeChanger: true,
-                        showTotal: (t) => `Total ${t} orders`,
-                        onChange: (nextPage, nextSize) => {
-                            setPage(nextPage);
-                            setPageSize(nextSize);
-                        },
-                    }}
-                />
             </Card>
         </div>
     );
 };
 
 export default OrderList;
+
