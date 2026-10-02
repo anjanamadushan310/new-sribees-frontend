@@ -318,7 +318,7 @@ const StaffDashboard: React.FC = () => {
             dataIndex: 'status',
             key: 'status',
             width: 110,
-            render: (st, esc) => {
+            render: (st) => {
                 const isResolved = st === 'resolved';
                 const isAck = st === 'acknowledged';
                 const tagColor = isResolved ? 'green' : isAck ? 'orange' : 'red';

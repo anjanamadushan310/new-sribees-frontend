@@ -33,7 +33,6 @@ import {
     Row,
     Col,
     Badge,
-    Tooltip,
 } from 'antd';
 import {
     EditOutlined,
@@ -90,7 +89,7 @@ interface QuickSaleFormValues {
     discount_percentage?: number | null;
     cashback_percentage?: number | null;
     is_on_sale: boolean;
-    date_range?: [dayjs.Dayjs, dayjs.Dayjs] | null;
+    date_range?: [dayjs.Dayjs, dayjs.Dayjs];
     all_stock?: boolean;
     deal_quota?: number | null;
     max_units_per_customer?: number | null;
@@ -209,7 +208,7 @@ const QuickSale: React.FC = () => {
             all_stock: true,
             deal_quota: null,
             max_units_per_customer: null,
-            date_range: null,
+            date_range: undefined,
         });
     };
 
