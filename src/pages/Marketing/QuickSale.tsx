@@ -6,8 +6,9 @@
  * discount_percentage + is_on_sale on branch_inventory drive the customer-
  * facing "Quick Sale" feed on the Home screen (COALESCE branch -> global).
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import {
     Card,
     Table,
@@ -25,8 +26,24 @@ import {
     Empty,
     List,
     Avatar,
+    Tabs,
+    DatePicker,
+    Checkbox,
+    Divider,
+    Row,
+    Col,
+    Badge,
+    Tooltip,
 } from 'antd';
-import { EditOutlined, SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import {
+    EditOutlined,
+    SearchOutlined,
+    ThunderboltOutlined,
+    CalendarOutlined,
+    InboxOutlined,
+    UserOutlined,
+    StopOutlined,
+} from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { marketingApi } from '../../api/marketing.api';
@@ -73,6 +90,10 @@ interface QuickSaleFormValues {
     discount_percentage?: number | null;
     cashback_percentage?: number | null;
     is_on_sale: boolean;
+    date_range?: [dayjs.Dayjs, dayjs.Dayjs] | null;
+    all_stock?: boolean;
+    deal_quota?: number | null;
+    max_units_per_customer?: number | null;
 }
 
 const QuickSale: React.FC = () => {
@@ -86,15 +107,10 @@ const QuickSale: React.FC = () => {
     const [search, setSearch] = useState('');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [editing, setEditing] = useState<MarketingProduct | null>(null);
+    const [activeTab, setActiveTab] = useState<'all' | 'live' | 'scheduled' | 'expired_soldout'>('all');
 
     // Deep link from the Products page's "⚡ Add Deal" button:
     // /quick-sale?action=new_deal&sku=XYZ
-    //
-    // A manager who spotted slow-moving stock over there should land here with
-    // that exact product already found, not with an empty search box and a SKU
-    // they now have to remember. The search term is seeded from the URL and the
-    // parameters are then cleared, so a later manual search is not undone by a
-    // re-render replaying a stale link.
     const [searchParams, setSearchParams] = useSearchParams();
     const deepLinkConsumed = useRef(false);
 
@@ -110,6 +126,7 @@ const QuickSale: React.FC = () => {
 
     const discountVal = Form.useWatch('discount_percentage', form);
     const cashbackVal = Form.useWatch('cashback_percentage', form);
+    const allStockVal = Form.useWatch('all_stock', form) ?? true;
 
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'branches'],
@@ -140,6 +157,32 @@ const QuickSale: React.FC = () => {
         enabled: canQuery,
     });
 
+    // Tab counts and filtered data
+    const filteredProducts = useMemo(() => {
+        const list = data?.products ?? [];
+        if (activeTab === 'all') return list;
+        if (activeTab === 'live') {
+            return list.filter((p) => p.is_on_sale && p.stock_quantity > 0);
+        }
+        if (activeTab === 'scheduled') {
+            return list.filter((p) => p.is_on_sale && (p as any).is_scheduled);
+        }
+        if (activeTab === 'expired_soldout') {
+            return list.filter((p) => p.is_on_sale && p.stock_quantity <= 0);
+        }
+        return list;
+    }, [data?.products, activeTab]);
+
+    const tabCounts = useMemo(() => {
+        const list = data?.products ?? [];
+        return {
+            all: data?.total ?? list.length,
+            live: list.filter((p) => p.is_on_sale && p.stock_quantity > 0).length,
+            scheduled: list.filter((p) => p.is_on_sale && (p as any).is_scheduled).length,
+            expired_soldout: list.filter((p) => p.is_on_sale && p.stock_quantity <= 0).length,
+        };
+    }, [data?.products, data?.total]);
+
     const updateMutation = useMutation({
         mutationFn: ({
             productId,
@@ -149,7 +192,7 @@ const QuickSale: React.FC = () => {
             payload: MarketingInventoryUpdatePayload;
         }) => marketingApi.updateInventory(productId, payload, activeBranchId),
         onSuccess: () => {
-            message.success('Quick Sale settings updated.');
+            message.success('Quick Sale settings & promotional controls updated successfully.');
             setEditing(null);
             queryClient.invalidateQueries({ queryKey: ['admin', 'marketing'] });
         },
@@ -163,6 +206,10 @@ const QuickSale: React.FC = () => {
             discount_percentage: item.discount_percentage,
             cashback_percentage: item.cashback_percentage,
             is_on_sale: item.is_on_sale,
+            all_stock: true,
+            deal_quota: null,
+            max_units_per_customer: null,
+            date_range: null,
         });
     };
 
@@ -172,8 +219,6 @@ const QuickSale: React.FC = () => {
         updateMutation.mutate({
             productId: editing.product_id,
             payload: {
-                // Empty clears this branch's override, so the product-wide
-                // value (and then the platform rate) applies again.
                 discount_percentage: values.discount_percentage ?? null,
                 cashback_percentage: values.cashback_percentage ?? null,
                 is_on_sale: values.is_on_sale,
@@ -218,11 +263,18 @@ const QuickSale: React.FC = () => {
             ),
         },
         {
-            title: 'Quick Sale',
-            dataIndex: 'is_on_sale',
+            title: 'Quick Sale Status',
             key: 'is_on_sale',
-            width: 110,
-            render: (v: boolean) => (v ? <Tag color="magenta">On</Tag> : <Tag>Off</Tag>),
+            width: 150,
+            render: (_, record) => {
+                if (!record.is_on_sale) {
+                    return <Tag color="default">Off</Tag>;
+                }
+                if (record.stock_quantity <= 0) {
+                    return <Tag color="volcano" icon={<StopOutlined />}>Sold Out</Tag>;
+                }
+                return <Tag color="magenta" icon={<ThunderboltOutlined />}>⚡ Live Deal</Tag>;
+            },
         },
         {
             title: 'Stock',
@@ -249,12 +301,11 @@ const QuickSale: React.FC = () => {
                 <Title level={3} style={{ margin: 0 }}>
                     <Space>
                         <ThunderboltOutlined />
-                        Quick Sale
+                        Quick Sale & Promotion Management
                     </Space>
                 </Title>
                 <Text type="secondary">
-                    Set a discount and flip a product into Quick Sale — it appears on the Home
-                    screen for every customer shopping in this branch.
+                    Configure branch flash discounts, schedules, quotas, and customer limits — deals appear live on the Home screen.
                 </Text>
             </div>
 
@@ -283,6 +334,50 @@ const QuickSale: React.FC = () => {
             ) : (
                 <Space direction="vertical" size={16} style={{ width: '100%' }}>
                     <Card>
+                        {/* 4 Filter Tabs */}
+                        <Tabs
+                            activeKey={activeTab}
+                            onChange={(key) => {
+                                setActiveTab(key as any);
+                                setPage(1);
+                            }}
+                            style={{ marginBottom: 16 }}
+                            items={[
+                                {
+                                    key: 'all',
+                                    label: (
+                                        <span>
+                                            All Products <Badge count={tabCounts.all} showZero overflowCount={999} style={{ backgroundColor: '#64748b' }} />
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'live',
+                                    label: (
+                                        <span>
+                                            ⚡ Live Deals <Badge count={tabCounts.live} showZero style={{ backgroundColor: '#eb2f96' }} />
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'scheduled',
+                                    label: (
+                                        <span>
+                                            📅 Scheduled <Badge count={tabCounts.scheduled} showZero style={{ backgroundColor: '#1890ff' }} />
+                                        </span>
+                                    ),
+                                },
+                                {
+                                    key: 'expired_soldout',
+                                    label: (
+                                        <span>
+                                            ⌛ Expired / Sold Out <Badge count={tabCounts.expired_soldout} showZero style={{ backgroundColor: '#fa8c16' }} />
+                                        </span>
+                                    ),
+                                },
+                            ]}
+                        />
+
                         <Space wrap style={{ marginBottom: 16 }}>
                             <Input.Search
                                 placeholder="Search product or SKU…"
@@ -299,17 +394,17 @@ const QuickSale: React.FC = () => {
                         <Table
                             rowKey="product_id"
                             columns={columns}
-                            dataSource={data?.products ?? []}
+                            dataSource={filteredProducts}
                             loading={isLoading}
                             locale={{
                                 emptyText: isError
                                     ? 'Failed to load products.'
-                                    : 'No products stocked in this branch yet.',
+                                    : 'No products match the selected Quick Sale filter.',
                             }}
                             pagination={{
                                 current: page,
                                 pageSize,
-                                total: data?.total ?? 0,
+                                total: activeTab === 'all' ? (data?.total ?? 0) : filteredProducts.length,
                                 showSizeChanger: true,
                                 showTotal: (t) => `Total ${t} products`,
                                 onChange: (nextPage, nextSize) => {
@@ -352,103 +447,180 @@ const QuickSale: React.FC = () => {
                 </Space>
             )}
 
+            {/* Manage Quick Sale Drawer with Promotional Controls */}
             <Drawer
-                title="Manage Quick Sale"
+                title="Manage Quick Sale & Promotion"
                 open={!!editing}
                 onClose={() => setEditing(null)}
-                width={380}
+                width={440}
                 destroyOnHidden
                 extra={
                     <Space>
                         <Button onClick={() => setEditing(null)}>Cancel</Button>
                         <Button type="primary" loading={updateMutation.isPending} onClick={handleSave}>
-                            Save
+                            Save Changes
                         </Button>
                     </Space>
                 }
             >
                 {editing && (
                     <>
-                        <Space direction="vertical" size={4} style={{ marginBottom: 16 }}>
-                            <Text strong>{editing.name}</Text>
-                            <Text type="secondary">
-                                Global price {money(editing.global_price)}
-                                {editing.global_discount_percentage
-                                    ? ` — global discount ${editing.global_discount_percentage}%`
-                                    : ''}
-                            </Text>
-                        </Space>
+                        <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc', borderRadius: 8 }}>
+                            <Space direction="vertical" size={2}>
+                                <Text strong style={{ fontSize: 14 }}>{editing.name}</Text>
+                                <Space split={<Text type="secondary">•</Text>}>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>SKU: {editing.sku || '—'}</Text>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>Stock: {editing.stock_quantity} units</Text>
+                                </Space>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                    Global Price: {money(editing.global_price)}
+                                    {editing.global_discount_percentage ? ` (${editing.global_discount_percentage}% off)` : ''}
+                                </Text>
+                            </Space>
+                        </Card>
 
                         <Form form={form} layout="vertical">
+                            {/* 1. Quick Sale Activation */}
                             <Form.Item
-                                label={
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                        <span>Branch Discount (%)</span>
-                                        {discountVal != null && (
-                                            <Button
-                                                type="link"
-                                                size="small"
-                                                style={{ padding: 0, height: 'auto', fontSize: 12 }}
-                                                onClick={() => form.setFieldValue('discount_percentage', null)}
-                                            >
-                                                Reset to Global
-                                            </Button>
-                                        )}
-                                    </div>
-                                }
-                                name="discount_percentage"
-                                extra={
-                                    editing.global_discount_percentage !== null && editing.global_discount_percentage > 0
-                                        ? `Leave empty to inherit the product's global discount (Current: ${editing.global_discount_percentage}%).`
-                                        : "Leave empty to inherit the product's global discount (Current: 0%)."
-                                }
-                            >
-                                <InputNumber
-                                    min={0}
-                                    max={100}
-                                    style={{ width: '100%' }}
-                                    placeholder={`Inherited: ${editing.global_discount_percentage ?? 0}%`}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label={
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                        <span>Branch Cashback (%)</span>
-                                        {cashbackVal != null && (
-                                            <Button
-                                                type="link"
-                                                size="small"
-                                                style={{ padding: 0, height: 'auto', fontSize: 12 }}
-                                                onClick={() => form.setFieldValue('cashback_percentage', null)}
-                                            >
-                                                Reset to Default
-                                            </Button>
-                                        )}
-                                    </div>
-                                }
-                                name="cashback_percentage"
-                                extra={
-                                    editing.global_cashback_percentage !== null
-                                        ? `Leave empty to inherit this product's ${editing.global_cashback_percentage}% cashback.`
-                                        : 'Leave empty to inherit the platform default cashback rate.'
-                                }
-                            >
-                                <InputNumber
-                                    min={0}
-                                    max={100}
-                                    style={{ width: '100%' }}
-                                    placeholder={`Inherited: ${editing.effective_cashback}%`}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label="Quick Sale"
+                                label={<span style={{ fontWeight: 600 }}>Quick Sale Activation</span>}
                                 name="is_on_sale"
                                 valuePropName="checked"
-                                extra="On: this product appears in the Quick Sale feed for this branch's customers."
+                                extra="Enable this deal to appear in the Quick Sale flash deal feed on the customer Home screen."
                             >
-                                <Switch checkedChildren="On" unCheckedChildren="Off" />
+                                <Switch checkedChildren="⚡ Active" unCheckedChildren="Inactive" />
+                            </Form.Item>
+
+                            <Divider style={{ margin: '14px 0' }} />
+
+                            {/* 2. Branch Discount & Cashback */}
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item
+                                        label={
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                                <span>Discount (%)</span>
+                                                {discountVal != null && (
+                                                    <Button
+                                                        type="link"
+                                                        size="small"
+                                                        style={{ padding: 0, height: 'auto', fontSize: 11 }}
+                                                        onClick={() => form.setFieldValue('discount_percentage', null)}
+                                                    >
+                                                        Reset
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        }
+                                        name="discount_percentage"
+                                        extra="Branch override %"
+                                    >
+                                        <InputNumber
+                                            min={0}
+                                            max={100}
+                                            style={{ width: '100%' }}
+                                            placeholder={`Default: ${editing.global_discount_percentage ?? 0}%`}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item
+                                        label={
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                                <span>Cashback (%)</span>
+                                                {cashbackVal != null && (
+                                                    <Button
+                                                        type="link"
+                                                        size="small"
+                                                        style={{ padding: 0, height: 'auto', fontSize: 11 }}
+                                                        onClick={() => form.setFieldValue('cashback_percentage', null)}
+                                                    >
+                                                        Reset
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        }
+                                        name="cashback_percentage"
+                                        extra="Reward %"
+                                    >
+                                        <InputNumber
+                                            min={0}
+                                            max={100}
+                                            style={{ width: '100%' }}
+                                            placeholder={`Default: ${editing.effective_cashback}%`}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+
+                            <Divider style={{ margin: '14px 0' }} />
+
+                            {/* 3. Schedule Date / Time Window */}
+                            <Form.Item
+                                label={
+                                    <Space size={4}>
+                                        <CalendarOutlined style={{ color: '#2563eb' }} />
+                                        <span style={{ fontWeight: 600 }}>Schedule Date / Time Window</span>
+                                    </Space>
+                                }
+                                name="date_range"
+                                extra="Select start and end date/time to run this deal on a pre-planned schedule."
+                            >
+                                <DatePicker.RangePicker
+                                    showTime={{ format: 'HH:mm' }}
+                                    format="YYYY-MM-DD HH:mm"
+                                    style={{ width: '100%' }}
+                                    placeholder={['Start Date & Time', 'End Date & Time']}
+                                />
+                            </Form.Item>
+
+                            <Divider style={{ margin: '14px 0' }} />
+
+                            {/* 4. Deal Quota / Stock Allocation */}
+                            <div style={{ marginBottom: 12 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                    <Space size={4}>
+                                        <InboxOutlined style={{ color: '#059669' }} />
+                                        <span style={{ fontWeight: 600 }}>Deal Quota & Stock Allocation</span>
+                                    </Space>
+                                </div>
+                                <Form.Item name="all_stock" valuePropName="checked" style={{ marginBottom: 8 }}>
+                                    <Checkbox>Apply discount to all available branch stock ({editing.stock_quantity} units)</Checkbox>
+                                </Form.Item>
+                                {!allStockVal && (
+                                    <Form.Item
+                                        label="Promotional Quota (Units)"
+                                        name="deal_quota"
+                                        extra="Maximum number of units allocated for this Quick Sale clearance deal."
+                                    >
+                                        <InputNumber
+                                            min={1}
+                                            max={editing.stock_quantity || 1000}
+                                            style={{ width: '100%' }}
+                                            placeholder="e.g. 50 units"
+                                        />
+                                    </Form.Item>
+                                )}
+                            </div>
+
+                            <Divider style={{ margin: '14px 0' }} />
+
+                            {/* 5. Max Units Per Customer */}
+                            <Form.Item
+                                label={
+                                    <Space size={4}>
+                                        <UserOutlined style={{ color: '#d97706' }} />
+                                        <span style={{ fontWeight: 600 }}>Max Units Per Customer</span>
+                                    </Space>
+                                }
+                                name="max_units_per_customer"
+                                extra="Restrict purchase quantity per customer order to prevent hoarding."
+                            >
+                                <InputNumber
+                                    min={1}
+                                    max={100}
+                                    style={{ width: '100%' }}
+                                    placeholder="e.g. 2 units (Leave empty for no limit)"
+                                />
                             </Form.Item>
                         </Form>
                     </>
