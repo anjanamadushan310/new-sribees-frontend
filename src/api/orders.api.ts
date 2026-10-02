@@ -377,6 +377,7 @@ export interface OrderTab {
     key: string;
     label: string;
     statuses: OrderStatus[]; // empty = "all orders"
+    badgeStatuses?: OrderStatus[]; // if specified, badge counts only these statuses
     subPills: OrderSubPill[];
 }
 
@@ -414,11 +415,13 @@ export const ORDER_TABS: OrderTab[] = [
     { key: 'delivered', label: 'Delivered', statuses: ['delivered'], subPills: [] },
     {
         key: 'returns',
-        label: 'Returns & Refunds',
-        statuses: ['return_requested', 'return_approved', 'refunded'],
+        label: 'Return Requests',
+        statuses: ['return_requested', 'return_approved', 'return_rejected', 'refunded'],
+        badgeStatuses: ['return_requested', 'return_approved'],
         subPills: [
             { key: 'requested', label: 'Return Requested', statuses: ['return_requested'] },
             { key: 'qc', label: 'QC Pending', statuses: ['return_approved'] },
+            { key: 'rejected', label: 'Rejected', statuses: ['return_rejected'] },
             { key: 'refunded', label: 'Refunded', statuses: ['refunded'] },
         ],
     },

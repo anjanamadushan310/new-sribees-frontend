@@ -10,8 +10,8 @@
  * Branch isolation is server-side (inject_branch_filter); the tab/pill counts
  * come from the same context-filtered `status_counts` map the list returns.
  */
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Alert,
     App,
@@ -70,17 +70,28 @@ const formatLKR = (value: number): string =>
 
 const OrderList: React.FC = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { message } = App.useApp();
     const { isSuperAdmin, isSupport, isBranchManager } = usePermissions();
     const isNetworkWide = isSuperAdmin || isSupport;
 
+    const initialTab = searchParams.get('tab') || 'all';
+    const initialPill = searchParams.get('pill') || undefined;
+
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
-    const [tabKey, setTabKey] = useState('all');
-    const [pillKey, setPillKey] = useState<string | undefined>(undefined);
+    const [tabKey, setTabKey] = useState(initialTab);
+    const [pillKey, setPillKey] = useState<string | undefined>(initialPill);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+
+    useEffect(() => {
+        const urlTab = searchParams.get('tab') || 'all';
+        const urlPill = searchParams.get('pill') || undefined;
+        if (urlTab !== tabKey) setTabKey(urlTab);
+        if (urlPill !== pillKey) setPillKey(urlPill);
+    }, [searchParams]);
 
     // Escalations state
     const [escalationBox, setEscalationBox] = useState<'inbox' | 'outbox' | 'resolved'>('inbox');
@@ -165,6 +176,17 @@ const OrderList: React.FC = () => {
         setPillKey(nextPill);
         setPage(1);
         setSelectedRowKeys([]);
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                if (nextTab === 'all') next.delete('tab');
+                else next.set('tab', nextTab);
+                if (!nextPill) next.delete('pill');
+                else next.set('pill', nextPill);
+                return next;
+            },
+            { replace: true },
+        );
     };
 
     const runExport = async (kind: 'csv' | 'pdf', useSelection: boolean) => {
@@ -451,20 +473,32 @@ const OrderList: React.FC = () => {
     ];
 
     const tabItems = [
-        ...ORDER_TABS.map((t) => ({
-            key: t.key,
-            label: (
-                <span>
-                    {t.label}{' '}
-                    <Badge
-                        count={sumCounts(counts, t.statuses)}
-                        showZero
-                        overflowCount={9999}
-                        style={{ backgroundColor: t.key === tabKey ? '#1677ff' : '#bfbfbf' }}
-                    />
-                </span>
-            ),
-        })),
+        ...ORDER_TABS.map((t) => {
+            const isReturnsTab = t.key === 'returns';
+            const badgeCount = sumCounts(counts, t.badgeStatuses ?? t.statuses);
+            const hasPendingAction = isReturnsTab && badgeCount > 0;
+
+            return {
+                key: t.key,
+                label: (
+                    <span>
+                        {t.label}{' '}
+                        <Badge
+                            count={badgeCount}
+                            showZero={!isReturnsTab}
+                            overflowCount={9999}
+                            style={{
+                                backgroundColor: hasPendingAction
+                                    ? '#ff4d4f'
+                                    : t.key === tabKey
+                                    ? '#1677ff'
+                                    : '#bfbfbf',
+                            }}
+                        />
+                    </span>
+                ),
+            };
+        }),
         {
             key: 'escalations',
             label: (
