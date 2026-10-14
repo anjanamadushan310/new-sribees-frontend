@@ -19,6 +19,8 @@ export interface Banner {
     banner_id: string;
     title: string;
     subtitle: string | null;
+    /** Longer copy for the web storefront's hero slide; the app ignores it. */
+    description: string | null;
     image_url: string | null;
     /**
      * Where a tap goes. 'quick_sale' opens a fixed screen and carries no
@@ -65,6 +67,7 @@ export interface BannerListResult {
 export interface BannerPayload {
     title: string;
     subtitle?: string | null;
+    description?: string | null;
     image_url?: string | null;
     link_type?: BannerLinkType | null;
     /** ISO. Omit both for a banner with no expiry. */
