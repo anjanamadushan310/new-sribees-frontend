@@ -55,6 +55,7 @@ const BANNERS_KEY = 'admin-banners';
 interface BannerFormValues {
     title: string;
     subtitle?: string;
+    description?: string;
     sort_order: number;
     is_active: boolean;
     branch_scope?: 'branch' | 'platform';
@@ -165,6 +166,7 @@ const BannerList: React.FC = () => {
         form.setFieldsValue({
             title: banner.title,
             subtitle: banner.subtitle ?? undefined,
+            description: banner.description ?? undefined,
             sort_order: banner.sort_order,
             is_active: banner.is_active,
             branch_scope: banner.is_platform_wide ? 'platform' : 'branch',
@@ -207,6 +209,7 @@ const BannerList: React.FC = () => {
         const payload: BannerPayload = {
             title: values.title,
             subtitle: values.subtitle || null,
+            description: values.description || null,
             image_url: imageUrl,
             sort_order: values.sort_order ?? 0,
             is_active: values.is_active,
@@ -603,6 +606,19 @@ const BannerList: React.FC = () => {
 
                     <Form.Item label="Subtitle" name="subtitle">
                         <Input placeholder="e.g. Delivered straight to you." maxLength={200} />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Description"
+                        name="description"
+                        extra="Optional. Shown on the website's banner only; the mobile app does not use it."
+                    >
+                        <Input.TextArea
+                            placeholder="e.g. Picked this morning from growers in Nuwara Eliya."
+                            maxLength={300}
+                            showCount
+                            autoSize={{ minRows: 2, maxRows: 4 }}
+                        />
                     </Form.Item>
 
                     <Form.Item

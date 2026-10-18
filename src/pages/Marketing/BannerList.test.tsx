@@ -19,7 +19,7 @@ const api = vi.mocked(bannersApi);
 
 function banner(over: Partial<Banner>): Banner {
     return {
-        banner_id: 'bn-1', title: 'Avurudu Sale', subtitle: null, image_url: null, link_type: null,
+        banner_id: 'bn-1', title: 'Avurudu Sale', subtitle: null, description: null, image_url: null, link_type: null,
         target_id: null, branch_id: 'b-1', is_platform_wide: false, sort_order: 1, is_active: true,
         starts_at: null, ends_at: null, is_always_active: true, status: 'live', impressions: 0,
         clicks: 0, ctr: null, performance_window_days: 7, created_at: '2026-09-01T00:00:00Z', ...over,
