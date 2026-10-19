@@ -109,6 +109,12 @@ export interface AdminProduct {
      * can still override this per branch from Quick Sale.
      */
     global_cashback_percentage?: number | null;
+    /**
+     * Admin detail only: the product's default referral commission %, or null
+     * when none is set (the product then earns 0 unless a branch sets one).
+     * Saved through referralCommissionApi.setProductRate, not update().
+     */
+    referral_commission_percentage?: number | null;
     category_id: string | null;
     subcategory_id: string | null;
     category: ProductCategoryRef | null;

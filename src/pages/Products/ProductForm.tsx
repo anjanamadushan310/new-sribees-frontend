@@ -29,6 +29,7 @@ import { ArrowLeftOutlined, ThunderboltOutlined, StarOutlined } from '@ant-desig
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
+import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import type { ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
@@ -54,6 +55,7 @@ interface ProductFormValues {
     sku?: string;
     price?: number | null;
     cashback_percentage?: number | null;
+    referral_commission_percentage?: number | null;
     category_id?: string;
     subcategory_id?: string;
     description?: string;
@@ -126,6 +128,11 @@ const ProductForm: React.FC = () => {
                 cashback_percentage:
                     product.global_cashback_percentage !== null && product.global_cashback_percentage !== undefined
                         ? Number(product.global_cashback_percentage)
+                        : undefined,
+                referral_commission_percentage:
+                    product.referral_commission_percentage !== null &&
+                    product.referral_commission_percentage !== undefined
+                        ? Number(product.referral_commission_percentage)
                         : undefined,
                 category_id: product.category_id ?? undefined,
                 subcategory_id: product.subcategory_id ?? undefined,
@@ -262,6 +269,13 @@ const ProductForm: React.FC = () => {
             if (isEdit && isSuperAdmin) {
                 await syncImages(saved.product_id);
             }
+            // The commission rate has its own endpoint (role-gated, audited).
+            // Sent only when it changed, so an untouched form writes no audit row.
+            const commission = values.referral_commission_percentage ?? null;
+            const before = isEdit ? product?.referral_commission_percentage ?? null : null;
+            if (isSuperAdmin && commission !== before) {
+                await referralCommissionApi.setProductRate(saved.product_id, commission);
+            }
             return saved;
         },
         onSuccess: () => {
@@ -278,8 +292,8 @@ const ProductForm: React.FC = () => {
             }
             navigate('/products');
         },
-        onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to save product.'),
+        onError: (err: unknown) =>
+            message.error(apiDetailMessage(err) ?? 'Failed to save product.'),
     });
 
     const suggestKeywordsMutation = useMutation({
@@ -734,6 +748,23 @@ const ProductForm: React.FC = () => {
                                     step={0.1}
                                     style={{ width: '100%' }}
                                     placeholder="Platform default"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Referral commission (%)"
+                                name="referral_commission_percentage"
+                                tooltip="Paid to whoever referred the customer (a partner, or a friend who invited them), on what the customer paid for this product after any coupon. Leave empty for no commission. Each branch can set its own rate in Branch Inventory. Orders already placed keep the rate they were placed at."
+                            >
+                                <InputNumber
+                                    disabled={catalogDisabled}
+                                    min={0}
+                                    max={100}
+                                    step={0.5}
+                                    precision={2}
+                                    style={{ width: '100%' }}
+                                    suffix="%"
+                                    placeholder="No commission"
                                 />
                             </Form.Item>
                         </Card>

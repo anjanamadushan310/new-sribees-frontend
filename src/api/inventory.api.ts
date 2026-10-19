@@ -25,6 +25,12 @@ export interface InventoryItem {
     cashback_percentage: number | null;
     global_cashback_percentage: number | null;
     effective_cashback: number;
+    // Referral commission: the branch override (null = inherit), the product
+    // default (null = none), and what an order placed now earns. Edited
+    // through referralCommissionApi, never through update().
+    referral_commission_percentage: number | null;
+    global_referral_commission_percentage: number | null;
+    effective_referral_commission: number;
     is_on_sale: boolean;
     stock_quantity: number;
     reserved_quantity: number;

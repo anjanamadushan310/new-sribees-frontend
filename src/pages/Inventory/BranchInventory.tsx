@@ -31,6 +31,7 @@ import {
     SearchOutlined,
     InboxOutlined,
     PlusOutlined,
+    InfoCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -41,6 +42,7 @@ import type {
     StockableProduct,
 } from '../../api/inventory.api';
 import { branchesApi } from '../../api/branches.api';
+import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const { Title, Text } = Typography;
@@ -83,11 +85,36 @@ const priceCell = (item: InventoryItem) => {
     );
 };
 
+/** What an order placed now earns, and whether the branch or the product set it. */
+const commissionCell = (item: InventoryItem) => {
+    const rate = item.effective_referral_commission;
+    if (rate <= 0) return <Text type="secondary">Off</Text>;
+    return (
+        <Space size={4}>
+            <Text strong>{rate}%</Text>
+            {item.referral_commission_percentage !== null ? (
+                <Tag color="gold" style={{ marginInlineEnd: 0 }}>
+                    Branch
+                </Tag>
+            ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                    Default
+                </Text>
+            )}
+        </Space>
+    );
+};
+
+type EditValues = InventoryUpdatePayload & { referral_commission_percentage?: number | null };
+
 const BranchInventory: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
-    const { isSuperAdmin } = usePermissions();
-    const [form] = Form.useForm<InventoryUpdatePayload>();
+    const { isSuperAdmin, isBranchManager } = usePermissions();
+    const [form] = Form.useForm<EditValues>();
+    // Commission is money: Super Admins and Branch Managers only, never
+    // inventory or staff accounts (the server enforces the same).
+    const canEditCommission = isSuperAdmin || isBranchManager;
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -113,6 +140,14 @@ const BranchInventory: React.FC = () => {
         enabled: isSuperAdmin,
     });
 
+    const { data: programme } = useQuery({
+        queryKey: ['admin', 'referral-commission', 'settings'],
+        queryFn: referralCommissionApi.settings,
+        enabled: canEditCommission,
+    });
+    // Super Admins are not capped; the cap catches a Branch Manager's typo.
+    const commissionMax = isSuperAdmin ? 100 : programme?.branch_max_percent ?? 0;
+
     const queryKey = ['admin', 'inventory', { page, pageSize, search, lowStockOnly, branchId }];
 
     const { data, isLoading, isError } = useQuery({
@@ -132,15 +167,30 @@ const BranchInventory: React.FC = () => {
     const showBranchColumn = data?.scope.is_super_admin ?? isSuperAdmin;
 
     const updateMutation = useMutation({
-        mutationFn: ({ id, payload }: { id: string; payload: InventoryUpdatePayload }) =>
-            inventoryApi.update(id, payload),
+        mutationFn: async ({
+            id,
+            payload,
+            commission,
+        }: {
+            id: string;
+            payload: InventoryUpdatePayload;
+            // undefined = unchanged; null = clear the branch override.
+            commission?: number | null;
+        }) => {
+            await inventoryApi.update(id, payload);
+            if (commission !== undefined) await referralCommissionApi.setBranchRate(id, commission);
+        },
         onSuccess: () => {
             message.success('Inventory updated.');
             setEditing(null);
             queryClient.invalidateQueries({ queryKey: ['admin', 'inventory'] });
         },
-        onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to update inventory.'),
+        onError: (err: unknown) => {
+            // A refused save reads the same whichever endpoint refused it.
+            message.error(apiDetailMessage(err) ?? 'Failed to update inventory.');
+            // The stock part may have saved before the commission was refused.
+            queryClient.invalidateQueries({ queryKey: ['admin', 'inventory'] });
+        },
     });
 
     // A Super Admin sees every branch at once, so "add a product" is ambiguous
@@ -181,6 +231,7 @@ const BranchInventory: React.FC = () => {
             low_stock_threshold: item.low_stock_threshold,
             discount_percentage: item.discount_percentage,
             cashback_percentage: item.cashback_percentage,
+            referral_commission_percentage: item.referral_commission_percentage,
             is_on_sale: item.is_on_sale,
             is_active: item.is_active,
         });
@@ -197,13 +248,21 @@ const BranchInventory: React.FC = () => {
         }
         // Empty number inputs come back as undefined; send an explicit null so
         // the server clears the override instead of ignoring the field.
+        const { referral_commission_percentage: rawCommission, ...rest } = values;
         const payload: InventoryUpdatePayload = {
-            ...values,
+            ...rest,
             branch_price: values.branch_price ?? null,
             discount_percentage: values.discount_percentage ?? null,
             cashback_percentage: values.cashback_percentage ?? null,
         };
-        updateMutation.mutate({ id: editing.inventory_id, payload });
+        const commission = rawCommission ?? null;
+        const commissionChanged =
+            canEditCommission && commission !== editing.referral_commission_percentage;
+        updateMutation.mutate({
+            id: editing.inventory_id,
+            payload,
+            commission: commissionChanged ? commission : undefined,
+        });
     };
 
     const handleStock = async () => {
@@ -248,6 +307,12 @@ const BranchInventory: React.FC = () => {
             key: 'price',
             width: 160,
             render: (_, record) => priceCell(record),
+        },
+        {
+            title: 'Commission',
+            key: 'commission',
+            width: 130,
+            render: (_, record) => commissionCell(record),
         },
         {
             title: 'Stock',
@@ -469,6 +534,48 @@ const BranchInventory: React.FC = () => {
                             <Form.Item label="Quick Sale" name="is_on_sale" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
+
+                            {canEditCommission && (
+                                <Form.Item
+                                    label={
+                                        <Space size={6}>
+                                            Referral commission (%)
+                                            <Tooltip
+                                                title={
+                                                    <>
+                                                        Paid to whoever referred the customer, on
+                                                        what they paid for this product. Leave empty
+                                                        to use the product default
+                                                        {editing.global_referral_commission_percentage !== null
+                                                            ? ` (${editing.global_referral_commission_percentage}%)`
+                                                            : ' (none, so 0%)'}
+                                                        . Orders already placed keep their rate.
+                                                        {!isSuperAdmin &&
+                                                            ` The most a branch can set is ${commissionMax}%.`}
+                                                    </>
+                                                }
+                                            >
+                                                <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+                                            </Tooltip>
+                                        </Space>
+                                    }
+                                    name="referral_commission_percentage"
+                                >
+                                    <InputNumber
+                                        min={0}
+                                        max={commissionMax}
+                                        step={0.5}
+                                        precision={2}
+                                        style={{ width: '100%' }}
+                                        suffix="%"
+                                        placeholder={
+                                            editing.global_referral_commission_percentage !== null
+                                                ? `${editing.global_referral_commission_percentage} (default)`
+                                                : '0 (no default)'
+                                        }
+                                    />
+                                </Form.Item>
+                            )}
 
                             <Divider style={{ margin: '8px 0 16px' }} />
 

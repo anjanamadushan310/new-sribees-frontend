@@ -22,6 +22,7 @@ import {
 import { SaveOutlined, DollarOutlined, MobileOutlined, CrownOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../../api/settings.api';
+import ReferralProgramCard from './ReferralProgramCard';
 import type { PlatformSettings as PlatformSettingsType } from '../../api/settings.api';
 
 const { Title, Text } = Typography;
@@ -182,6 +183,8 @@ const PlatformSettings: React.FC = () => {
                     </Button>
                 </Form>
             )}
+
+            <ReferralProgramCard />
         </div>
     );
 };
