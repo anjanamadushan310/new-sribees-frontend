@@ -18,7 +18,8 @@ export default defineConfig({
         setupFiles: ['./src/test/setup.ts'],
         include: ['src/**/*.test.{ts,tsx}'],
         // Page tests render real Ant Design screens in jsdom: seconds, not ms.
-        testTimeout: 30000,
+        // 60s timeout accommodates slower CI runners under coverage instrumentation.
+        testTimeout: 60000,
         // Sri Lanka time is the product's time; run the suite in a zone that is
         // NOT Colombo so a helper that leans on the machine's zone fails here.
         env: { TZ: 'America/New_York' },

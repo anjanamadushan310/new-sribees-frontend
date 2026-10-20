@@ -65,7 +65,7 @@ describe('BranchInventory commission', () => {
         expect(within(salt).getByText('Off')).toBeTruthy();
     });
 
-    it('saves a changed rate through the commission endpoint, and only then', async () => {
+    it('does not call commission endpoint when rate was not changed', async () => {
         signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
         renderPage(<BranchInventory />);
         const rice = (await screen.findByText('Samba Rice 5kg')).closest('tr')!;
@@ -74,6 +74,12 @@ describe('BranchInventory commission', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
         await waitFor(() => expect(inventory.update).toHaveBeenCalledTimes(1));
         expect(rates.setBranchRate).not.toHaveBeenCalled();
+    });
+
+    it('saves a changed rate through the commission endpoint, and only then', async () => {
+        signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
+        renderPage(<BranchInventory />);
+        const rice = (await screen.findByText('Samba Rice 5kg')).closest('tr')!;
 
         fireEvent.click(within(rice).getByText('Quick Edit'));
         const field = await screen.findByPlaceholderText('2 (default)');
