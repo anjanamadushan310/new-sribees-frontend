@@ -3,7 +3,7 @@
  * Global-catalog product table with search, category filter and row actions.
  * Data layer is TanStack Query against /api/v1/admin/products.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Card,
     Table,
@@ -129,6 +129,7 @@ const ProductList: React.FC = () => {
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
     const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
+    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined);
     const [isActive, setIsActive] = useState<boolean | undefined>(undefined);
     const [movementTab, setMovementTab] = useState<MovementTab>('all');
 
@@ -138,10 +139,20 @@ const ProductList: React.FC = () => {
         queryFn: categoriesApi.list,
     });
 
+    const rootCategories = useMemo(
+        () => categories.filter((c) => !c.parent_category_id),
+        [categories]
+    );
+
+    const subcategories = useMemo(
+        () => (categoryId ? categories.filter((c) => c.parent_category_id === categoryId) : []),
+        [categories, categoryId]
+    );
+
     const listKey = [
         'admin',
         'products',
-        { page, pageSize, search, categoryId, isActive, movementTab },
+        { page, pageSize, search, categoryId, subcategoryId, isActive, movementTab },
     ];
 
     const { data, isLoading, isError } = useQuery({
@@ -152,6 +163,7 @@ const ProductList: React.FC = () => {
                 limit: pageSize,
                 search: search || undefined,
                 category_id: categoryId,
+                subcategory_id: subcategoryId,
                 is_active: isActive,
                 ...tabToParams(movementTab),
             }),
@@ -220,7 +232,12 @@ const ProductList: React.FC = () => {
             key: 'category',
             render: (_, record) =>
                 record.category ? (
-                    <Tag color="geekblue">{record.category.name}</Tag>
+                    <Space direction="vertical" size={2}>
+                        <Tag color="geekblue">{record.category.name}</Tag>
+                        {record.subcategory && (
+                            <Tag color="purple">{record.subcategory.name}</Tag>
+                        )}
+                    </Space>
                 ) : (
                     <span style={{ color: '#bbb' }}>Uncategorized</span>
                 ),
@@ -492,8 +509,21 @@ const ProductList: React.FC = () => {
                         onChange={(value) => {
                             setPage(1);
                             setCategoryId(value);
+                            setSubcategoryId(undefined);
                         }}
-                        options={categories.map((c) => ({ label: c.name, value: c.category_id }))}
+                        options={rootCategories.map((c) => ({ label: c.name, value: c.category_id }))}
+                    />
+                    <Select
+                        placeholder={categoryId ? 'All subcategories' : 'Select category first'}
+                        style={{ width: 200 }}
+                        allowClear
+                        disabled={!categoryId}
+                        value={subcategoryId}
+                        onChange={(value) => {
+                            setPage(1);
+                            setSubcategoryId(value);
+                        }}
+                        options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
                     />
                     <Select
                         placeholder="All statuses"
