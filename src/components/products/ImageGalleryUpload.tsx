@@ -37,6 +37,13 @@ interface ImageGalleryUploadProps {
     onChange?: (images: GalleryImage[]) => void;
     maxImages?: number;
     maxFileSizeMB?: number;
+    /**
+     * Limit for a PNG/WebP, which may be a transparent product cutout: the
+     * server lays a cutout out on the standard white square and re-encodes it
+     * small, so it may arrive larger than an ordinary photo. The server makes
+     * the final call (an opaque PNG still has to fit maxFileSizeMB).
+     */
+    maxCutoutSizeMB?: number;
     disabled?: boolean;
     /**
      * When set (edit mode), changing the primary among already-saved images
@@ -51,6 +58,7 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
     onChange,
     maxImages = 5,
     maxFileSizeMB = 1,
+    maxCutoutSizeMB = 10,
     disabled = false,
     productId,
 }) => {
@@ -83,10 +91,12 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
             message.error('Only image files are allowed.');
             return false;
         }
-        if (file.size > maxFileSizeMB * 1024 * 1024) {
+        const limitMb =
+            file.type === 'image/png' || file.type === 'image/webp' ? maxCutoutSizeMB : maxFileSizeMB;
+        if (file.size > limitMb * 1024 * 1024) {
             const actualMb = (file.size / 1024 / 1024).toFixed(1);
             message.error(
-                `Image size (${actualMb}MB) exceeds the maximum limit of ${maxFileSizeMB}MB. Please upload an image under ${maxFileSizeMB}MB.`
+                `Image size (${actualMb}MB) exceeds the maximum limit of ${limitMb}MB. Please upload an image under ${limitMb}MB.`
             );
             return false;
         }
@@ -160,7 +170,7 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
                 <Space>
                     <Text strong>Product Images</Text>
                     <Text type="secondary">
-                        ({value.length}/{maxImages}) — Max {maxFileSizeMB}MB per image. The ★ image is the thumbnail
+                        ({value.length}/{maxImages}) — Best: a transparent PNG of just the product (up to {maxCutoutSizeMB}MB), laid out on white automatically. Other photos up to {maxFileSizeMB}MB. The ★ image is the thumbnail
                     </Text>
                 </Space>
             </div>
@@ -181,7 +191,8 @@ const ImageGalleryUpload: React.FC<ImageGalleryUploadProps> = ({
                         <img
                             src={img.image_url}
                             alt="product"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            // Shown as the app shows it: whole, on white.
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }}
                         />
                         {img.is_primary && (
                             <Tag
