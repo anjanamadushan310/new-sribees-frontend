@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Layout, Menu, Tag } from 'antd';
+import { Layout, Menu, Tag, Popconfirm } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
     DashboardOutlined,
@@ -337,6 +337,7 @@ const adminLayoutStyles = `
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     border-bottom: 1px solid #f0f2f5;
     height: 64px;
+    line-height: normal !important;
 }
 
 .admin-header-left {
@@ -388,19 +389,26 @@ const adminLayoutStyles = `
     display: flex;
     align-items: center;
     gap: 14px;
+    height: 100%;
+    line-height: normal !important;
 }
 
 .admin-role-pill {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     background: #ecfdf5;
     color: #059669;
     border: 1px solid #a7f3d0;
     border-radius: 20px;
-    padding: 4px 12px;
+    padding: 0 12px;
+    height: 28px;
+    line-height: 26px;
     font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .admin-role-pill-dot {
@@ -408,15 +416,17 @@ const adminLayoutStyles = `
     height: 6px;
     border-radius: 50%;
     background-color: #059669;
+    flex-shrink: 0;
 }
 
 .admin-user-welcome-chip {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: 13px;
     font-weight: 600;
     color: #374151;
+    line-height: normal;
 }
 
 .admin-user-welcome-avatar {
@@ -430,13 +440,16 @@ const adminLayoutStyles = `
     justify-content: center;
     font-size: 11px;
     font-weight: 700;
+    flex-shrink: 0;
 }
 
 .admin-logout-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
+    height: 32px;
+    line-height: 30px;
+    padding: 0 14px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     font-size: 13px;
@@ -445,6 +458,8 @@ const adminLayoutStyles = `
     background: #ffffff;
     cursor: pointer;
     transition: all 0.2s;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .admin-logout-btn:hover {
@@ -953,15 +968,24 @@ const AdminLayout: React.FC = () => {
                             <div className="admin-user-welcome-avatar">{userInitials}</div>
                             <span>Welcome, {user?.full_name || 'Super Admin'}</span>
                         </div>
-                        <button
-                            type="button"
-                            className="admin-logout-btn"
-                            onClick={handleLogout}
+                        <Popconfirm
                             title="Log Out"
+                            description="Are you sure you want to log out?"
+                            onConfirm={handleLogout}
+                            okText="Yes, Log Out"
+                            cancelText="Cancel"
+                            okButtonProps={{ danger: true }}
+                            placement="bottomRight"
                         >
-                            <LogoutOutlined style={{ fontSize: 13 }} />
-                            <span>Log Out</span>
-                        </button>
+                            <button
+                                type="button"
+                                className="admin-logout-btn"
+                                title="Log Out"
+                            >
+                                <LogoutOutlined style={{ fontSize: 13 }} />
+                                <span>Log Out</span>
+                            </button>
+                        </Popconfirm>
                     </div>
                 </Header>
 

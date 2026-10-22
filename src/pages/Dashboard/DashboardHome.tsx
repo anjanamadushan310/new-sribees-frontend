@@ -12,7 +12,7 @@
  * receives only their own branch's rows regardless of what this page asks for.
  */
 import React, { useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Row, Typography, Skeleton } from 'antd';
+import { Alert, Button, Card, Col, Row, Typography, Skeleton, Tooltip } from 'antd';
 import {
     ArrowRightOutlined,
     CalendarOutlined,
@@ -26,6 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 import { analyticsApi } from '../../api/analytics.api';
+import { customersApi } from '../../api/customers.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
     AnalyticsFilters,
@@ -61,8 +62,25 @@ const OPEN_STATUSES = new Set([
 /** The two terminal-but-not-delivered statuses — money given back or never taken. */
 const VOID_STATUSES = new Set(['cancelled', 'refunded']);
 
+const CUSTOMER_AVATAR_COLORS = ['#D81B60', '#7C3AED', '#2563EB', '#059669', '#D97706'];
+
+const getCustomerInitials = (name: string | null | undefined, email: string | null | undefined): string => {
+    if (name && name.trim()) {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return name.slice(0, 2).toUpperCase();
+    }
+    if (email && email.trim()) {
+        return email.slice(0, 2).toUpperCase();
+    }
+    return 'CU';
+};
+
 const DashboardHome: React.FC = () => {
-    const { isSuperAdmin } = usePermissions();
+    const { isSuperAdmin, can } = usePermissions();
+    const canManageCustomers = can('customers', 'read') || isSuperAdmin;
     const navigate = useNavigate();
     const [days, setDays] = useState(30);
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
@@ -85,6 +103,11 @@ const DashboardHome: React.FC = () => {
     const statusQuery = useQuery({
         queryKey: [...key, 'order-status'],
         queryFn: () => analyticsApi.orderStatus(query),
+    });
+    const customersQuery = useQuery({
+        queryKey: ['admin', 'customers', 'dashboard-preview'],
+        queryFn: () => customersApi.list({ limit: 5 }),
+        enabled: canManageCustomers,
     });
 
     const summary = summaryQuery.data;
@@ -420,31 +443,51 @@ const DashboardHome: React.FC = () => {
                                             {formatNumber(summary?.new_customers)} first-time
                                         </span>
                                     </div>
-                                    {/* Overlapping customer avatar initials */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 8 }}>
-                                        {['#7C3AED', '#D81B60', '#EC4899', '#F59E0B'].map((c, idx) => (
-                                            <div
-                                                key={idx}
-                                                style={{
-                                                    width: 22,
-                                                    height: 22,
-                                                    borderRadius: '50%',
-                                                    background: c,
-                                                    color: '#fff',
-                                                    fontSize: 10,
-                                                    fontWeight: 700,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    border: '2px solid #fff',
-                                                    marginLeft: idx > 0 ? -6 : 0,
-                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                                }}
-                                            >
-                                                C{idx + 1}
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {/* Overlapping actual customer avatar initials */}
+                                    {customersQuery.data?.customers && customersQuery.data.customers.length > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 8 }}>
+                                            {customersQuery.data.customers.slice(0, 4).map((cust, idx) => {
+                                                const initials = getCustomerInitials(cust.full_name, cust.email);
+                                                const displayName = cust.full_name || cust.email || cust.phone || `Customer ${idx + 1}`;
+                                                return (
+                                                    <Tooltip key={cust.user_id || idx} title={`${displayName} — Click to view profile`}>
+                                                        <div
+                                                            onClick={() => {
+                                                                if (cust.user_id) {
+                                                                    navigate(`/customers?customerId=${encodeURIComponent(cust.user_id)}`);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                width: 24,
+                                                                height: 24,
+                                                                borderRadius: '50%',
+                                                                background: CUSTOMER_AVATAR_COLORS[idx % CUSTOMER_AVATAR_COLORS.length],
+                                                                color: '#fff',
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                border: '2px solid #fff',
+                                                                marginLeft: idx > 0 ? -6 : 0,
+                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                                                                cursor: 'pointer',
+                                                                transition: 'transform 0.15s ease',
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.transform = 'scale(1.15)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.transform = 'scale(1)';
+                                                            }}
+                                                        >
+                                                            {initials}
+                                                        </div>
+                                                    </Tooltip>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, paddingTop: 10, borderTop: '1px solid #F5F4F7' }}>
                                     <DeltaTag value={customersDelta ?? null} caption={`vs prev ${days}d`} />
