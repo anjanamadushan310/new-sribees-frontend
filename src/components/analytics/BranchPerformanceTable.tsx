@@ -11,46 +11,14 @@
  */
 import React from 'react';
 import { Card, Col, Empty, Progress, Row, Skeleton, Table, Tag, Tooltip, Typography } from 'antd';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    ResponsiveContainer,
-    Tooltip as RTooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 import type { ColumnsType } from 'antd/es/table';
 import type { BranchPerformance } from '../../api/analytics.api';
 import { compactLKR, formatLKR, formatNumber, formatPercent } from '../../utils/format';
-import { CHROME, PRIMARY, STATUS, axisProps, gridProps } from '../../utils/chartTheme';
-import type { ChartTooltipProps } from '../../utils/analytics';
+import { CHROME, PRIMARY, STATUS } from '../../utils/chartTheme';
 import { DeltaTag } from './KpiCard';
 
 const { Text } = Typography;
 
-const ChartTooltip: React.FC<ChartTooltipProps<BranchPerformance>> = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const row = payload[0].payload;
-    return (
-        <div
-            style={{
-                background: 'rgba(0,0,0,0.82)',
-                color: '#fff',
-                padding: '8px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                lineHeight: 1.6,
-            }}
-        >
-            <div style={{ fontWeight: 600 }}>{row.name}</div>
-            <div>Revenue: {formatLKR(row.revenue)}</div>
-            <div>Orders: {formatNumber(row.orders)}</div>
-            <div>Share: {formatPercent(row.revenue_share)}</div>
-        </div>
-    );
-};
 
 interface Props {
     data: BranchPerformance[];
@@ -224,72 +192,237 @@ export const BranchPerformanceTable: React.FC<Props> = ({
         );
     }
 
-    const hasRevenue = data.some((b) => b.revenue > 0);
+    const sortedByRevenue = [...data].sort((a, b) => b.revenue - a.revenue);
+    const topBranch = sortedByRevenue[0] ?? null;
+    const maxRevenue = topBranch?.revenue ?? 1;
 
     return (
         <Card
             data-testid="branch-performance"
-            title="Branch performance"
+            style={{
+                borderRadius: 20,
+                border: '1px solid #ECEAF0',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+            }}
+            title={
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18, fontWeight: 800, color: '#1A1A22' }}>
+                            Branch Performance Intelligence Hub
+                        </span>
+                        <span
+                            style={{
+                                display: 'inline-block',
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: '#10B981',
+                            }}
+                        />
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
+                        Last {days} days · comparative revenue & fulfillment telemetry across all network locations
+                    </Text>
+                </div>
+            }
             extra={
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                    Last {days} days · every branch in the network
-                </Text>
+                <Tag
+                    bordered={false}
+                    style={{
+                        background: '#FCE4EC',
+                        color: '#D81B60',
+                        fontWeight: 700,
+                        borderRadius: 16,
+                        padding: '4px 12px',
+                        fontSize: 12,
+                    }}
+                >
+                    {data.length} Branches Configured
+                </Tag>
             }
         >
             {data.length === 0 ? (
                 <Empty description="No branches configured yet" />
             ) : (
-                <Row gutter={[16, 16]}>
-                    <Col xs={24} xl={6}>
-                        {hasRevenue ? (
-                            <ResponsiveContainer width="100%" height={Math.max(220, data.length * 46)}>
-                                <BarChart
-                                    data={data}
-                                    layout="vertical"
-                                    margin={{ top: 4, right: 56, left: 4, bottom: 4 }}
-                                    barCategoryGap="28%"
+                <Row gutter={[20, 20]}>
+                    <Col xs={24} xl={7}>
+                        <div style={{ paddingRight: 6 }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        letterSpacing: '0.06em',
+                                        color: '#8c8c8c',
+                                    }}
                                 >
-                                    <CartesianGrid {...gridProps} horizontal={false} vertical />
-                                    <XAxis
-                                        type="number"
-                                        {...axisProps}
-                                        tickFormatter={(v) => compactLKR(Number(v))}
-                                    />
-                                    <YAxis
-                                        type="category"
-                                        dataKey="code"
-                                        width={52}
-                                        {...axisProps}
-                                    />
-                                    <RTooltip
-                                        content={<ChartTooltip />}
-                                        cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                                    />
-                                    <Bar dataKey="revenue" radius={[0, 4, 4, 0]} maxBarSize={22}>
-                                        {data.map((b) => (
-                                            <Cell
-                                                key={b.branch_id}
-                                                fill={PRIMARY}
-                                                // Emphasis, not identity: dimming
-                                                // the rest keeps the filtered
-                                                // branch in context instead of
-                                                // hiding its peers.
-                                                fillOpacity={
-                                                    !highlightBranchId ||
-                                                    highlightBranchId === b.branch_id
-                                                        ? 1
-                                                        : 0.28
-                                                }
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <Empty description="No revenue in this period" />
-                        )}
+                                    VOLUME DISTRIBUTION
+                                </Text>
+                                <span
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: '#D81B60',
+                                        background: '#FCE4EC',
+                                        borderRadius: 12,
+                                        padding: '2px 8px',
+                                    }}
+                                >
+                                    All {data.length} Branches
+                                </span>
+                            </div>
+
+                            {topBranch && topBranch.revenue > 0 && (
+                                <div
+                                    style={{
+                                        borderRadius: 14,
+                                        border: '1.5px solid #F8BBD0',
+                                        background: '#FFF8FA',
+                                        padding: '12px 14px',
+                                        marginBottom: 14,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'flex-start',
+                                        }}
+                                    >
+                                        <div>
+                                            <div
+                                                style={{
+                                                    fontSize: 10,
+                                                    fontWeight: 700,
+                                                    color: '#D81B60',
+                                                    letterSpacing: '0.05em',
+                                                }}
+                                            >
+                                                TOP CONTRIBUTING BRANCH
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 15,
+                                                    fontWeight: 800,
+                                                    color: '#1A1A22',
+                                                    marginTop: 2,
+                                                }}
+                                            >
+                                                {topBranch.name} ({topBranch.code})
+                                            </div>
+                                            <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 1 }}>
+                                                {topBranch.district
+                                                    ? `${topBranch.district} District`
+                                                    : 'Network Hub'}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontSize: 14, fontWeight: 800, color: '#D81B60' }}>
+                                                {formatLKR(topBranch.revenue)}
+                                            </div>
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    fontWeight: 700,
+                                                    color: '#16a34a',
+                                                    background: '#dcfce7',
+                                                    padding: '1px 6px',
+                                                    borderRadius: 6,
+                                                    display: 'inline-block',
+                                                    marginTop: 2,
+                                                }}
+                                            >
+                                                {formatPercent(topBranch.revenue_share)} Volume
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* List of branches with mini progress bars */}
+                            <div style={{ maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+                                {sortedByRevenue.map((b) => {
+                                    const isTop = b.branch_id === topBranch?.branch_id;
+                                    const isSelected = highlightBranchId === b.branch_id;
+                                    const barPercent = maxRevenue > 0 ? (b.revenue / maxRevenue) * 100 : 0;
+                                    return (
+                                        <div
+                                            key={b.branch_id}
+                                            onClick={() => onSelectBranch?.(b.branch_id)}
+                                            style={{
+                                                padding: '8px 10px',
+                                                borderRadius: 10,
+                                                cursor: onSelectBranch ? 'pointer' : 'default',
+                                                background: isSelected ? '#FDF2F5' : 'transparent',
+                                                marginBottom: 4,
+                                                transition: 'background 0.2s',
+                                                border: isSelected ? '1px solid #FCE4EC' : '1px solid transparent',
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    fontSize: 12,
+                                                    marginBottom: 4,
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        fontWeight: isTop || isSelected ? 700 : 500,
+                                                        color: '#333',
+                                                    }}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            color: isTop ? '#D81B60' : '#8c8c8c',
+                                                            marginRight: 6,
+                                                        }}
+                                                    >
+                                                        ●
+                                                    </span>
+                                                    {b.code} ({b.name})
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        fontWeight: 600,
+                                                        color: isTop ? '#D81B60' : '#555',
+                                                    }}
+                                                >
+                                                    {compactLKR(b.revenue)}
+                                                </span>
+                                            </div>
+                                            <div
+                                                style={{
+                                                    height: 5,
+                                                    background: '#f0f0f2',
+                                                    borderRadius: 3,
+                                                    overflow: 'hidden',
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        height: '100%',
+                                                        width: `${Math.max(barPercent, b.revenue > 0 ? 3 : 0)}%`,
+                                                        background: isTop ? '#D81B60' : '#E0457E',
+                                                        borderRadius: 3,
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </Col>
-                    <Col xs={24} xl={18}>
+                    <Col xs={24} xl={17}>
                         <Table<BranchPerformance>
                             columns={columns}
                             dataSource={data}
@@ -317,14 +450,28 @@ export const BranchPerformanceTable: React.FC<Props> = ({
                                 </Text>
                             </div>
                         )}
-                        <div style={{ marginTop: 8 }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginTop: 12,
+                                flexWrap: 'wrap',
+                                gap: 8,
+                            }}
+                        >
                             <Text type="secondary" style={{ fontSize: 12 }}>
                                 Revenue counts paid orders only, excluding cancelled and refunded
-                                ones. Colour: {' '}
+                                ones. Colour:{' '}
                                 <span style={{ color: CHROME.textSecondary }}>
                                     all bars share one hue — length is the comparison.
                                 </span>
                             </Text>
+                            {onSelectBranch && (
+                                <span style={{ fontSize: 12, color: '#D81B60', fontWeight: 600 }}>
+                                    Click any branch row to scope this page to it.
+                                </span>
+                            )}
                         </div>
                     </Col>
                 </Row>

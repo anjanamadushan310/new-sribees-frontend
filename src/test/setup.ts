@@ -19,6 +19,16 @@ if (!window.matchMedia) {
     });
 }
 
+// jsdom throws "Not implemented: window.getComputedStyle(elt, pseudoElt)" when pseudoElt is passed.
+// Ant Design tables and scrollbar measurement call getComputedStyle(elt, '::-webkit-scrollbar').
+if (typeof window !== 'undefined' && window.getComputedStyle) {
+    const originalGetComputedStyle = window.getComputedStyle;
+    window.getComputedStyle = function (elt: Element, _pseudoElt?: string | null) {
+        return originalGetComputedStyle.call(this, elt);
+    };
+}
+
+
 // Nor ResizeObserver, which Ant Design's tables, modals and overflow menus use.
 if (!('ResizeObserver' in window)) {
     class ResizeObserverStub {

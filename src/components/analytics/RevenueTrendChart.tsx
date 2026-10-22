@@ -155,6 +155,7 @@ export const RevenueTrendChart: React.FC<Props> = ({
                             name="Previous period"
                             stroke={COMPARISON}
                             strokeWidth={2}
+                            strokeDasharray="4 4"
                             dot={false}
                             activeDot={false}
                         />

@@ -164,9 +164,12 @@ const OrderList: React.FC = () => {
         refetchInterval: 15000,
     });
 
-    if (isError) {
-        message.error((error as any)?.response?.data?.detail || 'Failed to load orders.');
-    }
+    useEffect(() => {
+        if (isError) {
+            message.error((error as any)?.response?.data?.detail || 'Failed to load orders.');
+        }
+    }, [isError, error, message]);
+
 
     const counts = data?.statusCounts ?? {};
     const showBranchColumn = isNetworkWide;
@@ -767,7 +770,11 @@ const OrderList: React.FC = () => {
                             dataSource={data?.orders ?? []}
                             loading={isLoading}
                             scroll={{ x: 'max-content' }}
-                            locale={{ emptyText: isError ? 'Failed to load orders.' : 'No orders found.' }}
+                            locale={{
+                                emptyText: isError
+                                    ? ((error as any)?.response?.data?.detail || 'Failed to load orders.')
+                                    : 'No orders found.',
+                            }}
                             pagination={{
                                 current: page,
                                 pageSize,
