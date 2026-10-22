@@ -36,15 +36,30 @@ export const AnalyticsFilters: React.FC<Props> = ({
         enabled: showBranchFilter,
     });
 
+    const branchCount = branches.length;
+
     return (
-        <Space wrap size={16} data-testid="analytics-filters">
+        <Space wrap size={12} data-testid="analytics-filters" align="center">
             {showBranchFilter && (
-                <Space size={8}>
-                    <Text type="secondary">Branch:</Text>
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 24,
+                        padding: '2px 10px 2px 14px',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                    }}
+                >
+                    <Text type="secondary" style={{ fontSize: 13, marginRight: 6, fontWeight: 500 }}>
+                        Branch:
+                    </Text>
                     <Select
-                        placeholder="All branches"
+                        placeholder={branchCount > 0 ? `All branches (${branchCount} Configured)` : 'All branches'}
                         data-testid="branch-filter"
-                        style={{ width: 220 }}
+                        variant="borderless"
+                        style={{ minWidth: 230 }}
                         allowClear
                         loading={isLoading}
                         value={branchId}
@@ -54,14 +69,28 @@ export const AnalyticsFilters: React.FC<Props> = ({
                             value: b.branch_id,
                         }))}
                     />
-                </Space>
+                </div>
             )}
-            <Segmented
-                data-testid="period-filter"
-                options={PERIOD_OPTIONS}
-                value={days}
-                onChange={(v) => onDaysChange(Number(v))}
-            />
+            <div
+                style={{
+                    background: '#F0EEF2',
+                    borderRadius: 24,
+                    padding: 3,
+                }}
+            >
+                <Segmented
+                    data-testid="period-filter"
+                    options={PERIOD_OPTIONS}
+                    value={days}
+                    onChange={(v) => onDaysChange(Number(v))}
+                    style={{
+                        borderRadius: 20,
+                        backgroundColor: '#F0EEF2',
+                        fontWeight: 600,
+                        fontSize: 13,
+                    }}
+                />
+            </div>
         </Space>
     );
 };

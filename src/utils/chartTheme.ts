@@ -13,21 +13,20 @@
  * "threshold" when they are only a grid), muted tick labels, no axis clutter.
  */
 
-/** Fixed categorical order. Index by position, never by rank or by hash. */
 export const SERIES = [
-    '#2a78d6', // 1 blue
-    '#eb6834', // 2 orange
-    '#1baf7a', // 3 aqua
-    '#eda100', // 4 yellow
-    '#e87ba4', // 5 magenta
-    '#008300', // 6 green
+    '#D81B60', // 1 Sribees Magenta
+    '#D39E4A', // 2 Warm Gold
+    '#1baf7a', // 3 Aqua
+    '#2a78d6', // 4 Blue
+    '#e0457e', // 5 Magenta Light
+    '#008300', // 6 Green
 ] as const;
 
 export const MAX_SERIES = SERIES.length;
 
-/** Primary series colour — one series on a chart always uses this. */
+/** Primary series colour — one series on a chart always uses this (Sribees Magenta). */
 export const PRIMARY = SERIES[0];
-/** The comparison series (previous period) — never a lighter shade of PRIMARY. */
+/** The comparison series (previous period) — warm golden amber. */
 export const COMPARISON = SERIES[1];
 
 /** Reserved state colours. Never reused as a "next series". */
