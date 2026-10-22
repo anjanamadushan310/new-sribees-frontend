@@ -11,46 +11,14 @@
  */
 import React from 'react';
 import { Card, Col, Empty, Progress, Row, Skeleton, Table, Tag, Tooltip, Typography } from 'antd';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    ResponsiveContainer,
-    Tooltip as RTooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 import type { ColumnsType } from 'antd/es/table';
 import type { BranchPerformance } from '../../api/analytics.api';
 import { compactLKR, formatLKR, formatNumber, formatPercent } from '../../utils/format';
-import { CHROME, PRIMARY, STATUS, axisProps, gridProps } from '../../utils/chartTheme';
-import type { ChartTooltipProps } from '../../utils/analytics';
+import { CHROME, PRIMARY, STATUS } from '../../utils/chartTheme';
 import { DeltaTag } from './KpiCard';
 
 const { Text } = Typography;
 
-const ChartTooltip: React.FC<ChartTooltipProps<BranchPerformance>> = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const row = payload[0].payload;
-    return (
-        <div
-            style={{
-                background: 'rgba(0,0,0,0.82)',
-                color: '#fff',
-                padding: '8px 12px',
-                borderRadius: 6,
-                fontSize: 12,
-                lineHeight: 1.6,
-            }}
-        >
-            <div style={{ fontWeight: 600 }}>{row.name}</div>
-            <div>Revenue: {formatLKR(row.revenue)}</div>
-            <div>Orders: {formatNumber(row.orders)}</div>
-            <div>Share: {formatPercent(row.revenue_share)}</div>
-        </div>
-    );
-};
 
 interface Props {
     data: BranchPerformance[];

@@ -12,17 +12,15 @@
  * receives only their own branch's rows regardless of what this page asks for.
  */
 import React, { useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Row, Space, Typography, Skeleton, Tooltip } from 'antd';
+import { Alert, Button, Card, Col, Row, Typography, Skeleton } from 'antd';
 import {
     ArrowRightOutlined,
     CalendarOutlined,
-    DollarOutlined,
     ShoppingCartOutlined,
     TeamOutlined,
     SafetyCertificateOutlined,
     ArrowUpOutlined,
     ArrowDownOutlined,
-    MinusOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
