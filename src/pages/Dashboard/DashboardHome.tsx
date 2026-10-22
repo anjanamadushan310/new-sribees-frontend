@@ -32,6 +32,7 @@ import {
     BranchPerformanceTable,
     RevenueTrendChart,
 } from '../../components/analytics';
+import { DeltaTag } from '../../components/analytics/KpiCard';
 import { apiErrorMessage, mergeSeries } from '../../utils/analytics';
 import { formatLKR, formatNumber, formatPercent } from '../../utils/format';
 import { slt } from '../../utils/datetime';
@@ -205,6 +206,7 @@ const DashboardHome: React.FC = () => {
                 {/* 1. Total Revenue Card */}
                 <Col xs={24} sm={12} xl={6}>
                     <div
+                        data-testid="kpi-revenue"
                         style={{
                             background: '#ffffff',
                             borderRadius: 20,
@@ -249,7 +251,7 @@ const DashboardHome: React.FC = () => {
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                                        <span style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22', letterSpacing: '-0.02em' }}>
+                                        <span className="ant-statistic-content-value" style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22', letterSpacing: '-0.02em' }}>
                                             {formatLKR(current?.revenue)}
                                         </span>
                                         <span
@@ -270,11 +272,7 @@ const DashboardHome: React.FC = () => {
                                     </Text>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 18, paddingTop: 10, borderTop: '1px solid #F5F4F7' }}>
-                                    <Text type="secondary" style={{ fontSize: 11 }}>
-                                        {revenueDelta !== undefined && revenueDelta !== null
-                                            ? `vs previous ${days} days`
-                                            : '— No prior period to compare'}
-                                    </Text>
+                                    <DeltaTag value={revenueDelta ?? null} caption={`vs prev ${days}d`} />
                                     {/* Mini decorative sparkline in Magenta */}
                                     <svg width="60" height="20" viewBox="0 0 60 20">
                                         <path
@@ -294,6 +292,7 @@ const DashboardHome: React.FC = () => {
                 {/* 2. Orders Card */}
                 <Col xs={24} sm={12} xl={6}>
                     <div
+                        data-testid="kpi-orders"
                         style={{
                             background: '#ffffff',
                             borderRadius: 20,
@@ -330,7 +329,7 @@ const DashboardHome: React.FC = () => {
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                                        <span style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
+                                        <span className="ant-statistic-content-value" style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
                                             {formatNumber(current?.orders)}
                                         </span>
                                         <span
@@ -357,11 +356,7 @@ const DashboardHome: React.FC = () => {
                                         <div style={{ width: '25%', background: '#2563EB' }} />
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTop: '1px solid #F5F4F7' }}>
-                                        <Text type="secondary" style={{ fontSize: 11 }}>
-                                            {ordersDelta !== undefined && ordersDelta !== null
-                                                ? `${ordersDelta >= 0 ? '+' : ''}${ordersDelta.toFixed(1)}% vs prev ${days}d`
-                                                : '— No prior period to compare'}
-                                        </Text>
+                                        <DeltaTag value={ordersDelta ?? null} caption={`vs prev ${days}d`} />
                                     </div>
                                 </div>
                             </>
@@ -372,6 +367,7 @@ const DashboardHome: React.FC = () => {
                 {/* 3. Active Customers Card */}
                 <Col xs={24} sm={12} xl={6}>
                     <div
+                        data-testid="kpi-active-customers"
                         style={{
                             background: '#ffffff',
                             borderRadius: 20,
@@ -408,7 +404,7 @@ const DashboardHome: React.FC = () => {
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                                        <span style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
+                                        <span className="ant-statistic-content-value" style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
                                             {formatNumber(current?.customers)}
                                         </span>
                                         <span
@@ -451,11 +447,7 @@ const DashboardHome: React.FC = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, paddingTop: 10, borderTop: '1px solid #F5F4F7' }}>
-                                    <Text type="secondary" style={{ fontSize: 11 }}>
-                                        {customersDelta !== undefined && customersDelta !== null
-                                            ? `${customersDelta >= 0 ? '+' : ''}${customersDelta.toFixed(1)}% vs prev ${days}d`
-                                            : '— No prior period to compare'}
-                                    </Text>
+                                    <DeltaTag value={customersDelta ?? null} caption={`vs prev ${days}d`} />
                                 </div>
                             </>
                         )}
@@ -465,6 +457,7 @@ const DashboardHome: React.FC = () => {
                 {/* 4. Low Stock Alerts Card */}
                 <Col xs={24} sm={12} xl={6}>
                     <div
+                        data-testid="kpi-low-stock-alerts"
                         style={{
                             background: '#ffffff',
                             borderRadius: 20,
@@ -501,7 +494,7 @@ const DashboardHome: React.FC = () => {
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                                        <span style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
+                                        <span className="ant-statistic-content-value" style={{ fontSize: 28, fontWeight: 800, color: '#1A1A22' }}>
                                             {formatNumber(summary?.low_stock_alerts ?? 0)}
                                         </span>
                                         <span
@@ -521,8 +514,8 @@ const DashboardHome: React.FC = () => {
                                         Products at or below their reorder threshold
                                     </Text>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 18, paddingTop: 10, borderTop: '1px solid #F5F4F7' }}>
-                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: (summary?.low_stock_alerts ?? 0) === 0 ? '#10B981' : '#F59E0B' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingTop: 10, borderTop: '1px solid #F5F4F7' }}>
+                                    <DeltaTag value={null} caption="No prior period" />
                                     <span style={{ fontSize: 11, fontWeight: 600, color: (summary?.low_stock_alerts ?? 0) === 0 ? '#10B981' : '#D97706' }}>
                                         {(summary?.low_stock_alerts ?? 0) === 0 ? 'Zero inventory deficit' : `${summary?.low_stock_alerts} item(s) deficit`}
                                     </span>
