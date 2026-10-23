@@ -43,7 +43,7 @@ import type { BannerLinkType, BannerStatus } from '../../api/banners.api';
 import { categoriesApi } from '../../api/categories.api';
 import { marketingApi } from '../../api/marketing.api';
 import { bannersApi } from '../../api/banners.api';
-import type { Banner, BannerPayload } from '../../api/banners.api';
+import type { Banner, BannerListResult, BannerPayload } from '../../api/banners.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { slt } from '../../utils/datetime';
@@ -138,8 +138,18 @@ const BannerList: React.FC = () => {
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => bannersApi.remove(id),
-        onSuccess: () => {
+        onSuccess: (_, deletedId) => {
             message.success('Banner deleted.');
+            queryClient.setQueriesData<BannerListResult>(
+                { queryKey: [BANNERS_KEY] },
+                (old?: BannerListResult) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        banners: old.banners.filter((b: Banner) => b.banner_id !== deletedId),
+                    };
+                }
+            );
             invalidate();
         },
         onError: (err: any) =>
@@ -475,22 +485,29 @@ const BannerList: React.FC = () => {
                                 Edit
                             </Button>
                         </Tooltip>
-                        <Popconfirm
-                            title="Delete this banner?"
-                            description="It disappears from the app immediately."
-                            okText="Delete"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => deleteMutation.mutate(record.banner_id)}
-                            disabled={!allowed}
-                        >
-                            <Tooltip
-                                title={allowed ? undefined : 'Only a Super Admin can delete this.'}
+                        {allowed ? (
+                            <Popconfirm
+                                title="Delete this banner?"
+                                description="It disappears from the app immediately."
+                                okText="Delete"
+                                okButtonProps={{
+                                    danger: true,
+                                    loading:
+                                        deleteMutation.isPending &&
+                                        deleteMutation.variables === record.banner_id,
+                                }}
+                                onConfirm={async () => {
+                                    try {
+                                        await deleteMutation.mutateAsync(record.banner_id);
+                                    } catch {
+                                        // Handled in onError
+                                    }
+                                }}
                             >
                                 <Button
                                     type="link"
                                     danger
                                     icon={<DeleteOutlined />}
-                                    disabled={!allowed}
                                     loading={
                                         deleteMutation.isPending &&
                                         deleteMutation.variables === record.banner_id
@@ -498,8 +515,19 @@ const BannerList: React.FC = () => {
                                 >
                                     Delete
                                 </Button>
+                            </Popconfirm>
+                        ) : (
+                            <Tooltip title="Only a Super Admin can delete this.">
+                                <Button
+                                    type="link"
+                                    danger
+                                    disabled
+                                    icon={<DeleteOutlined />}
+                                >
+                                    Delete
+                                </Button>
                             </Tooltip>
-                        </Popconfirm>
+                        )}
                     </Space>
                 );
             },
@@ -583,12 +611,18 @@ const BannerList: React.FC = () => {
                                 title="Delete this banner?"
                                 description="It disappears from the app immediately."
                                 okText="Delete"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() =>
-                                    deleteMutation.mutate(editing.banner_id, {
-                                        onSuccess: closeModal,
-                                    })
-                                }
+                                okButtonProps={{
+                                    danger: true,
+                                    loading: deleteMutation.isPending,
+                                }}
+                                onConfirm={async () => {
+                                    try {
+                                        await deleteMutation.mutateAsync(editing.banner_id);
+                                        closeModal();
+                                    } catch {
+                                        // Handled in onError
+                                    }
+                                }}
                             >
                                 <Button
                                     danger
