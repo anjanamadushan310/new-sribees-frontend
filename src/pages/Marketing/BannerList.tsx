@@ -43,7 +43,7 @@ import type { BannerLinkType, BannerStatus } from '../../api/banners.api';
 import { categoriesApi } from '../../api/categories.api';
 import { marketingApi } from '../../api/marketing.api';
 import { bannersApi } from '../../api/banners.api';
-import type { Banner, BannerPayload } from '../../api/banners.api';
+import type { Banner, BannerListResult, BannerPayload } from '../../api/banners.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { slt } from '../../utils/datetime';
@@ -138,8 +138,18 @@ const BannerList: React.FC = () => {
 
     const deleteMutation = useMutation({
         mutationFn: (id: string) => bannersApi.remove(id),
-        onSuccess: () => {
+        onSuccess: (_, deletedId) => {
             message.success('Banner deleted.');
+            queryClient.setQueriesData<BannerListResult>(
+                { queryKey: [BANNERS_KEY] },
+                (old?: BannerListResult) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        banners: old.banners.filter((b: Banner) => b.banner_id !== deletedId),
+                    };
+                }
+            );
             invalidate();
         },
         onError: (err: any) =>
@@ -164,7 +174,7 @@ const BannerList: React.FC = () => {
         setEditing(banner);
         setImageUrl(banner.image_url);
         form.setFieldsValue({
-            title: banner.title,
+            title: banner.title ?? undefined,
             subtitle: banner.subtitle ?? undefined,
             description: banner.description ?? undefined,
             sort_order: banner.sort_order,
@@ -205,9 +215,13 @@ const BannerList: React.FC = () => {
 
     const handleSave = async () => {
         const values = await form.validateFields();
+        if (!values.title?.trim() && !imageUrl) {
+            message.error('Please enter a title or upload a banner image.');
+            return;
+        }
         const linkType = values.link_type === 'none' ? null : values.link_type;
         const payload: BannerPayload = {
-            title: values.title,
+            title: values.title?.trim() || null,
             subtitle: values.subtitle || null,
             description: values.description || null,
             image_url: imageUrl,
@@ -276,7 +290,7 @@ const BannerList: React.FC = () => {
                 record.image_url ? (
                     <Image
                         src={record.image_url}
-                        alt={record.title}
+                        alt={record.title ?? 'Banner'}
                         width={84}
                         height={48}
                         style={{ objectFit: 'cover', borderRadius: 6 }}
@@ -304,7 +318,13 @@ const BannerList: React.FC = () => {
             width: 260,
             render: (_, record) => (
                 <div style={{ minWidth: 220, maxWidth: 350 }}>
-                    <Text strong style={{ display: 'block' }}>{record.title}</Text>
+                    {record.title ? (
+                        <Text strong style={{ display: 'block' }}>{record.title}</Text>
+                    ) : (
+                        <Text italic type="secondary" style={{ display: 'block' }}>
+                            (Artwork only banner)
+                        </Text>
+                    )}
                     {record.subtitle && (
                         <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
                             {record.subtitle}
@@ -465,22 +485,29 @@ const BannerList: React.FC = () => {
                                 Edit
                             </Button>
                         </Tooltip>
-                        <Popconfirm
-                            title="Delete this banner?"
-                            description="It disappears from the app immediately."
-                            okText="Delete"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => deleteMutation.mutate(record.banner_id)}
-                            disabled={!allowed}
-                        >
-                            <Tooltip
-                                title={allowed ? undefined : 'Only a Super Admin can delete this.'}
+                        {allowed ? (
+                            <Popconfirm
+                                title="Delete this banner?"
+                                description="It disappears from the app immediately."
+                                okText="Delete"
+                                okButtonProps={{
+                                    danger: true,
+                                    loading:
+                                        deleteMutation.isPending &&
+                                        deleteMutation.variables === record.banner_id,
+                                }}
+                                onConfirm={async () => {
+                                    try {
+                                        await deleteMutation.mutateAsync(record.banner_id);
+                                    } catch {
+                                        // Handled in onError
+                                    }
+                                }}
                             >
                                 <Button
                                     type="link"
                                     danger
                                     icon={<DeleteOutlined />}
-                                    disabled={!allowed}
                                     loading={
                                         deleteMutation.isPending &&
                                         deleteMutation.variables === record.banner_id
@@ -488,8 +515,19 @@ const BannerList: React.FC = () => {
                                 >
                                     Delete
                                 </Button>
+                            </Popconfirm>
+                        ) : (
+                            <Tooltip title="Only a Super Admin can delete this.">
+                                <Button
+                                    type="link"
+                                    danger
+                                    disabled
+                                    icon={<DeleteOutlined />}
+                                >
+                                    Delete
+                                </Button>
                             </Tooltip>
-                        </Popconfirm>
+                        )}
                     </Space>
                 );
             },
@@ -573,12 +611,18 @@ const BannerList: React.FC = () => {
                                 title="Delete this banner?"
                                 description="It disappears from the app immediately."
                                 okText="Delete"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() =>
-                                    deleteMutation.mutate(editing.banner_id, {
-                                        onSuccess: closeModal,
-                                    })
-                                }
+                                okButtonProps={{
+                                    danger: true,
+                                    loading: deleteMutation.isPending,
+                                }}
+                                onConfirm={async () => {
+                                    try {
+                                        await deleteMutation.mutateAsync(editing.banner_id);
+                                        closeModal();
+                                    } catch {
+                                        // Handled in onError
+                                    }
+                                }}
                             >
                                 <Button
                                     danger
@@ -599,9 +643,10 @@ const BannerList: React.FC = () => {
                     <Form.Item
                         label="Title"
                         name="title"
-                        rules={[{ required: true, message: 'Enter a title' }]}
+                        extra="Optional. Leave empty if your banner image already contains text."
+                        rules={[{ max: 120, message: 'Max 120 characters' }]}
                     >
-                        <Input placeholder="e.g. Fresh Farm Produce" maxLength={120} />
+                        <Input placeholder="e.g. Fresh Farm Produce (optional)" maxLength={120} />
                     </Form.Item>
 
                     <Form.Item label="Subtitle" name="subtitle">
@@ -611,7 +656,6 @@ const BannerList: React.FC = () => {
                     <Form.Item
                         label="Description"
                         name="description"
-                        extra="Optional. Shown on the website's banner only; the mobile app does not use it."
                     >
                         <Input.TextArea
                             placeholder="e.g. Picked this morning from growers in Nuwara Eliya."
@@ -619,6 +663,9 @@ const BannerList: React.FC = () => {
                             showCount
                             autoSize={{ minRows: 2, maxRows: 4 }}
                         />
+                        <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
+                            Optional. Shown on the website's banner only; the mobile app does not use it.
+                        </div>
                     </Form.Item>
 
                     <Form.Item
