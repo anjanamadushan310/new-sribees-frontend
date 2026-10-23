@@ -17,7 +17,7 @@ export type BannerStatus = 'live' | 'scheduled' | 'expired' | 'inactive';
 
 export interface Banner {
     banner_id: string;
-    title: string;
+    title: string | null;
     subtitle: string | null;
     /** Longer copy for the web storefront's hero slide; the app ignores it. */
     description: string | null;
@@ -65,7 +65,7 @@ export interface BannerListResult {
 }
 
 export interface BannerPayload {
-    title: string;
+    title?: string | null;
     subtitle?: string | null;
     description?: string | null;
     image_url?: string | null;

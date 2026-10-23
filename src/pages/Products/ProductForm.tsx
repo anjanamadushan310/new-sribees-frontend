@@ -13,7 +13,6 @@ import {
     Select,
     Switch,
     Button,
-    Card,
     Row,
     Col,
     Spin,
@@ -22,10 +21,27 @@ import {
     Space,
     Tabs,
     Tooltip,
-    Alert,
     InputNumber,
+    Tag,
 } from 'antd';
-import { ArrowLeftOutlined, ThunderboltOutlined, StarOutlined } from '@ant-design/icons';
+import {
+    ArrowLeftOutlined,
+    ThunderboltOutlined,
+    StarFilled,
+    StarOutlined,
+    ShoppingOutlined,
+    EyeOutlined,
+    RollbackOutlined,
+    SaveOutlined,
+    GlobalOutlined,
+    PictureOutlined,
+    DollarOutlined,
+    AppstoreOutlined,
+    InboxOutlined,
+    CompassOutlined,
+    MobileOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
@@ -38,7 +54,6 @@ import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
 
 const { TextArea } = Input;
-const { Title } = Typography;
 
 const slugify = (text: string): string =>
     text
@@ -74,6 +89,244 @@ interface ProductFormValues {
     images?: GalleryImage[];
 }
 
+const productFormStyles = `
+.product-form-container {
+    padding-bottom: 90px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.pf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+.pf-back-btn {
+    border-radius: 10px;
+    font-weight: 600;
+    color: #475569;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    transition: all 0.2s ease;
+    height: 38px;
+    padding: 0 14px;
+}
+.pf-back-btn:hover {
+    color: #D81B60 !important;
+    border-color: #D81B60 !important;
+    transform: translateX(-2px);
+}
+.pf-card {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #ECEAF0;
+    box-shadow: 0 2px 14px rgba(15, 23, 42, 0.03);
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.pf-card:hover {
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+}
+.pf-card-head {
+    padding: 16px 22px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fafbfc;
+}
+.pf-card-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pf-card-body {
+    padding: 22px;
+}
+.pf-hero-banner {
+    background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+    border: 1px solid #dbeafe;
+    border-left: 4px solid #2563eb;
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+.pf-floating-dock {
+    position: sticky;
+    bottom: 16px;
+    z-index: 99;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 18px;
+    padding: 12px 24px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 24px;
+}
+.pf-ai-btn {
+    background: linear-gradient(135deg, #7c3aed 0%, #D81B60 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    transition: all 0.2s ease !important;
+}
+.pf-ai-btn:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35) !important;
+}
+.pf-save-btn {
+    background: linear-gradient(135deg, #D81B60 0%, #b7154f 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+    height: 42px !important;
+    padding: 0 24px !important;
+    box-shadow: 0 4px 14px rgba(216, 27, 96, 0.28) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    transition: all 0.2s ease !important;
+}
+.pf-save-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(216, 27, 96, 0.35) !important;
+}
+.pf-lang-tabs .ant-tabs-nav {
+    margin-bottom: 20px;
+}
+`;
+
+interface FeatureTileProps {
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    checked?: boolean;
+    disabled?: boolean;
+    activeColor?: string;
+    activeBg?: string;
+    onChange?: (checked: boolean) => void;
+    activeLabel?: string;
+    inactiveLabel?: string;
+}
+
+const FeatureTile: React.FC<FeatureTileProps> = ({
+    icon,
+    title,
+    description,
+    checked = false,
+    disabled = false,
+    activeColor = '#059669',
+    activeBg = '#f0fdf4',
+    onChange,
+    activeLabel = 'Active',
+    inactiveLabel = 'Inactive',
+}) => {
+    return (
+        <div
+            onClick={() => !disabled && onChange?.(!checked)}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderRadius: 14,
+                border: `1.5px solid ${checked ? activeColor : '#e2e8f0'}`,
+                background: checked ? activeBg : '#ffffff',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.65 : 1,
+                transition: 'all 0.18s ease',
+                marginBottom: 10,
+                boxShadow: checked ? `0 2px 8px ${activeColor}15` : 'none',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                <div
+                    style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: checked ? `${activeColor}20` : '#f1f5f9',
+                        color: checked ? activeColor : '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease',
+                    }}
+                >
+                    {icon}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                            {title}
+                        </span>
+                        <Tag
+                            bordered={false}
+                            style={{
+                                margin: 0,
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                borderRadius: 6,
+                                padding: '0 6px',
+                                background: checked ? activeColor : '#e2e8f0',
+                                color: checked ? '#ffffff' : '#475569',
+                            }}
+                        >
+                            {checked ? activeLabel : inactiveLabel}
+                        </Tag>
+                    </div>
+                    <div
+                        style={{
+                            fontSize: 11.5,
+                            color: '#64748b',
+                            marginTop: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {description}
+                    </div>
+                </div>
+            </div>
+            <div style={{ marginLeft: 8 }} onClick={(e) => e.stopPropagation()}>
+                <Switch
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={(val) => onChange?.(val)}
+                    style={{
+                        backgroundColor: checked ? activeColor : undefined,
+                    }}
+                />
+            </div>
+        </div>
+    );
+};
+
 const ProductForm: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -107,6 +360,20 @@ const ProductForm: React.FC = () => {
     const subcategories = categories.filter(
         (c) => c.parent_category_id && c.parent_category_id === selectedCategoryId
     );
+
+    // Watchers for real-time mobile preview & translation indicators
+    const watchedName = Form.useWatch('name', form);
+    const watchedNameSi = Form.useWatch('name_si', form);
+    const watchedNameTa = Form.useWatch('name_ta', form);
+    const watchedPrice = Form.useWatch('price', form);
+    const watchedWeight = Form.useWatch('weight', form);
+    const watchedWeightUnit = Form.useWatch('weight_unit', form);
+    const watchedCashback = Form.useWatch('cashback_percentage', form);
+    const watchedFeatured = Form.useWatch('is_featured', form);
+    const watchedPerishable = Form.useWatch('is_perishable', form);
+
+    const primaryThumb = gallery.find((g) => g.is_primary)?.image_url || gallery[0]?.image_url;
+    const categoryObj = rootCategories.find((c) => c.category_id === selectedCategoryId);
 
     const { data: product, isLoading: loadingProduct } = useQuery({
         queryKey: ['admin', 'product', id],
@@ -173,6 +440,20 @@ const ProductForm: React.FC = () => {
         }
     }, [product, form]);
 
+    // Keyboard shortcut for quick save (Ctrl + S / Cmd + S)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (!readOnly && !saveMutation.isPending) {
+                    form.submit();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [form, readOnly]);
+
     // Link newly-added gallery images and unlink removed ones.
     const syncImages = async (productId: string) => {
         const currentIds = new Set(gallery.filter((g) => g.image_id).map((g) => g.image_id));
@@ -194,10 +475,7 @@ const ProductForm: React.FC = () => {
             }
         }
 
-        // Reconcile the primary thumbnail for already-saved images. New primary
-        // images were linked with is_primary above; this covers a saved image
-        // becoming primary (e.g. auto-promoted after the old thumbnail was
-        // removed) that differs from what the server had.
+        // Reconcile the primary thumbnail for already-saved images.
         const desiredPrimary = gallery.find((g) => g.is_primary);
         const originalPrimaryId = originalImages.find((o) => o.is_primary)?.image_id;
         if (desiredPrimary?.image_id && desiredPrimary.image_id !== originalPrimaryId) {
@@ -235,9 +513,6 @@ const ProductForm: React.FC = () => {
 
             const payload: ProductPayload = {
                 name: values.name.trim(),
-                // Blank translations are sent as null, not "", so the backend
-                // treats them as absent and the customer app falls back to the
-                // English copy instead of rendering an empty name.
                 name_si: values.name_si?.trim() || null,
                 name_ta: values.name_ta?.trim() || null,
                 slug: (values.slug || slugify(values.name)).trim(),
@@ -269,8 +544,6 @@ const ProductForm: React.FC = () => {
             if (isEdit && isSuperAdmin) {
                 await syncImages(saved.product_id);
             }
-            // The commission rate has its own endpoint (role-gated, audited).
-            // Sent only when it changed, so an untouched form writes no audit row.
             const commission = values.referral_commission_percentage ?? null;
             const before = isEdit ? product?.referral_commission_percentage ?? null : null;
             if (isSuperAdmin && commission !== before) {
@@ -313,8 +586,6 @@ const ProductForm: React.FC = () => {
             });
         },
         onSuccess: ({ keywords, cached, remainingToday }) => {
-            // Merge rather than append: a second click, or a suggestion that
-            // repeats what the admin already typed, must not pile up copies.
             const existing: string = form.getFieldValue('search_keywords') || '';
             const seen = new Set<string>();
             const merged = [...existing.split(','), ...keywords.split(',')]
@@ -366,57 +637,105 @@ const ProductForm: React.FC = () => {
 
     if (isEdit && loadingProduct) {
         return (
-            <div style={{ textAlign: 'center', padding: 80 }}>
+            <div style={{ textAlign: 'center', padding: '100px 0' }}>
                 <Spin size="large" />
+                <div style={{ marginTop: 16, color: '#64748b', fontWeight: 600 }}>Loading product details...</div>
             </div>
         );
     }
 
     return (
-        <div>
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/products')}
-                style={{ marginBottom: 16 }}
-            >
-                Back to Products
-            </Button>
+        <div className="product-form-container">
+            <style>{productFormStyles}</style>
 
-            <Title level={3}>
-                {isBranchScoped
-                    ? 'Product Details & Branch Visibility'
-                    : readOnly
-                        ? 'Product Details'
-                        : isEdit
-                            ? 'Edit Product'
-                            : 'New Product'}
-            </Title>
+            {/* Header Row */}
+            <div className="pf-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <Button
+                        icon={<ArrowLeftOutlined />}
+                        onClick={() => navigate('/products')}
+                        className="pf-back-btn"
+                    >
+                        Back to Products
+                    </Button>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <h1
+                                style={{
+                                    margin: 0,
+                                    fontSize: 24,
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    letterSpacing: '-0.02em',
+                                }}
+                            >
+                                {isBranchScoped
+                                    ? 'Product Details & Branch Visibility'
+                                    : readOnly
+                                        ? 'Product Details'
+                                        : isEdit
+                                            ? `Edit Product`
+                                            : 'New Product'}
+                            </h1>
+                            <Tag
+                                color={isBranchScoped ? 'gold' : isEdit ? 'blue' : 'magenta'}
+                                style={{ fontWeight: 700, borderRadius: 10, padding: '2px 10px', fontSize: 12 }}
+                            >
+                                {isBranchScoped ? 'Branch Scoped' : isEdit ? 'Catalog Item' : 'New Master Item'}
+                            </Tag>
+                        </div>
+                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 3, fontWeight: 500 }}>
+                            {isBranchScoped
+                                ? 'Review central catalog details and manage branch availability'
+                                : isEdit
+                                    ? 'Update specifications, media, translations, and base pricing'
+                                    : 'Add a new product to the central Sribees catalog'}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            {isBranchScoped ? (
-                <Alert
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                    message="Branch Product View"
-                    description="Global catalog details (name, descriptions, images, weight, category, SKU, base price) are managed by Super Admin and are view-only. You can manage whether this product is Active (Visible) or Inactive (Hidden) for your branch below."
-                />
-            ) : readOnly ? (
-                <Alert
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                    message="View only"
-                    description="You can inspect this product's catalog details but not change them."
-                />
-            ) : (
-                <Alert
-                    type="info"
-                    showIcon
-                    style={{ marginBottom: 16 }}
-                    message="Global Catalog Product"
-                    description="Set the shared catalog details and default Base Price here. Branch stock quantities and branch-specific price overrides are managed per branch from Inventory."
-                />
-            )}
+            {/* Hero Role Banner */}
+            <div className="pf-hero-banner">
+                <div
+                    style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 12,
+                        background: isBranchScoped ? '#fef3c7' : readOnly ? '#f1f5f9' : '#eff6ff',
+                        color: isBranchScoped ? '#d97706' : readOnly ? '#475569' : '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 20,
+                        flexShrink: 0,
+                    }}
+                >
+                    {isBranchScoped ? <CompassOutlined /> : readOnly ? <EyeOutlined /> : <GlobalOutlined />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14.5, color: '#0f172a', marginBottom: 2 }}>
+                        {isBranchScoped
+                            ? 'Branch Product View'
+                            : readOnly
+                                ? 'View-Only Catalog Inspection'
+                                : 'Global Catalog Master Product'}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.45 }}>
+                        {isBranchScoped
+                            ? 'Global catalog details (name, descriptions, images, weight, category, SKU, base price) are managed by Super Admin. You can manage whether this product is Active (Visible) or Inactive (Hidden) for your branch below.'
+                            : readOnly
+                                ? "You can inspect this product's catalog details. Editing permissions are restricted to Super Admins."
+                                : 'Set the shared catalog details, multi-language descriptions, images, and default Base Price here. Branch stock quantities and branch-specific price overrides are managed per branch from Inventory.'}
+                    </div>
+                </div>
+                <Tag
+                    color={isBranchScoped ? 'warning' : readOnly ? 'default' : 'processing'}
+                    style={{ fontWeight: 700, borderRadius: 8, padding: '3px 12px', fontSize: 11.5 }}
+                >
+                    {isBranchScoped ? 'Branch Manager' : readOnly ? 'Read Only' : 'Super Admin'}
+                </Tag>
+            </div>
 
             <Form
                 form={form}
@@ -424,496 +743,850 @@ const ProductForm: React.FC = () => {
                 onFinish={(values) => saveMutation.mutate(values)}
                 initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg' }}
             >
-                <Row gutter={16}>
-                    <Col xs={24} lg={16}>
-                        <Card title="Details" style={{ marginBottom: 16 }}>
-                            {/* One tab per language. English is the fallback
-                                every other language degrades to, so it is the
-                                only one that is required; Sinhala and Tamil can
-                                be filled in later without blocking the save.
-                                Panes stay mounted (destroyInactiveTabPane is
-                                off by default) so a validation error on a tab
-                                the admin isn't looking at still blocks submit
-                                instead of failing silently. */}
-                            <Tabs
-                                defaultActiveKey="en"
-                                tabBarExtraContent={
-                                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                        Sinhala/Tamil optional — blank falls back to English
-                                    </Typography.Text>
-                                }
-                                items={[
-                                    {
-                                        key: 'en',
-                                        label: 'English',
-                                        children: (
-                                            <>
-                                                <Form.Item
-                                                    label="Name"
-                                                    name="name"
-                                                    rules={[{ required: true, message: 'Name is required' }]}
-                                                >
-                                                    <Input
-                                                        disabled={catalogDisabled}
-                                                        placeholder="e.g. Organic Whole Milk 1L"
-                                                        onChange={(e) => {
-                                                            if (!slugTouched) {
-                                                                form.setFieldValue(
-                                                                    'slug',
-                                                                    slugify(e.target.value)
-                                                                );
-                                                            }
-                                                        }}
-                                                    />
-                                                </Form.Item>
-                                                <Form.Item
-                                                    label="Short Description"
-                                                    name="short_description"
-                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
-                                                >
-                                                    <TextArea
-                                                        disabled={catalogDisabled}
-                                                        rows={2}
-                                                        placeholder="One-line summary shown in listings"
-                                                    />
-                                                </Form.Item>
-                                                <Form.Item label="Description" name="description">
-                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="Full product description" />
-                                                </Form.Item>
-                                            </>
-                                        ),
-                                    },
-                                    {
-                                        key: 'si',
-                                        label: 'සිංහල',
-                                        children: (
-                                            <>
-                                                <Form.Item
-                                                    label="Name (Sinhala)"
-                                                    name="name_si"
-                                                    rules={[{ max: 255, message: 'Max 255 characters' }]}
-                                                >
-                                                    <Input disabled={catalogDisabled} placeholder="උදා. නැවුම් කිරි (ලීටර් 1)" />
-                                                </Form.Item>
-                                                <Form.Item
-                                                    label="Short Description (Sinhala)"
-                                                    name="short_description_si"
-                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
-                                                >
-                                                    <TextArea
-                                                        disabled={catalogDisabled}
-                                                        rows={2}
-                                                        placeholder="ලැයිස්තුවේ පෙන්වන එක් පේළියක සාරාංශය"
-                                                    />
-                                                </Form.Item>
-                                                <Form.Item
-                                                    label="Description (Sinhala)"
-                                                    name="description_si"
-                                                >
-                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය" />
-                                                </Form.Item>
-                                            </>
-                                        ),
-                                    },
-                                    {
-                                        key: 'ta',
-                                        label: 'தமிழ்',
-                                        children: (
-                                            <>
-                                                <Form.Item
-                                                    label="Name (Tamil)"
-                                                    name="name_ta"
-                                                    rules={[{ max: 255, message: 'Max 255 characters' }]}
-                                                >
-                                                    <Input disabled={catalogDisabled} placeholder="எ.கா. புதிய பால் (1 லி)" />
-                                                </Form.Item>
-                                                <Form.Item
-                                                    label="Short Description (Tamil)"
-                                                    name="short_description_ta"
-                                                    rules={[{ max: 500, message: 'Max 500 characters' }]}
-                                                >
-                                                    <TextArea
-                                                        disabled={catalogDisabled}
-                                                        rows={2}
-                                                        placeholder="பட்டியலில் காட்டப்படும் ஒரு வரி சுருக்கம்"
-                                                    />
-                                                </Form.Item>
-                                                <Form.Item
-                                                    label="Description (Tamil)"
-                                                    name="description_ta"
-                                                >
-                                                    <TextArea disabled={catalogDisabled} rows={5} placeholder="முழு தயாரிப்பு விவரம்" />
-                                                </Form.Item>
-                                            </>
-                                        ),
-                                    },
-                                ]}
-                            />
-
-                            <Form.Item
-                                label="Slug"
-                                name="slug"
-                                rules={[
-                                    { required: true, message: 'Slug is required' },
-                                    {
-                                        pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-                                        message: 'Lowercase letters, numbers and hyphens only',
-                                    },
-                                ]}
-                            >
-                                <Input
-                                    disabled={catalogDisabled}
-                                    placeholder="organic-whole-milk-1l"
-                                    onChange={() => setSlugTouched(true)}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label={
-                                    <Space>
-                                        Search Keywords
-                                        <Button
-                                            size="small"
-                                            disabled={catalogDisabled}
-                                            icon={<ThunderboltOutlined />}
-                                            loading={suggestKeywordsMutation.isPending}
-                                            onClick={() => suggestKeywordsMutation.mutate()}
-                                        >
-                                            Suggest with AI
-                                        </Button>
-                                    </Space>
-                                }
-                                name="search_keywords"
-                                extra="Other words shoppers use for this product: Sinhala, Tamil, Singlish, Tamilish, English. Spelling variants (thakkali / thakali) and typos are handled automatically, so add different words, not different spellings. Never shown to customers."
-                            >
-                                <TextArea
-                                    disabled={catalogDisabled}
-                                    rows={2}
-                                    placeholder="e.g. kesel, කෙසෙල්, வாழைப்பழம், ambul kesel"
-                                />
-                            </Form.Item>
-                        </Card>
-
-                        <Card
-                            title={
-                                <Space>
-                                    <span>Product Images</span>
-                                    <span style={{ color: '#ff4d4f', fontSize: 16 }}>*</span>
-                                </Space>
-                            }
-                        >
-                            <Form.Item
-                                name="images"
-                                rules={[
-                                    {
-                                        validator: async () => {
-                                            if (!gallery || gallery.length === 0) {
-                                                return Promise.reject(
-                                                    new Error('Please upload at least one product image (thumbnail).')
-                                                );
-                                            }
-                                            return Promise.resolve();
+                <Row gutter={24}>
+                    {/* Left Column: Core Details, Multi-Language Copy, Media */}
+                    <Col xs={24} lg={15}>
+                        {/* 1. Details & Translations Card */}
+                        <div className="pf-card">
+                            <div className="pf-card-head">
+                                <div className="pf-card-title">
+                                    <ShoppingOutlined style={{ color: '#D81B60', fontSize: 17 }} />
+                                    <span>Product Information & Descriptions</span>
+                                </div>
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                    Sinhala/Tamil optional — blank falls back to English
+                                </Typography.Text>
+                            </div>
+                            <div className="pf-card-body">
+                                <Tabs
+                                    defaultActiveKey="en"
+                                    className="pf-lang-tabs"
+                                    items={[
+                                        {
+                                            key: 'en',
+                                            label: (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                                    🇬🇧 English
+                                                    <Tag color="magenta" style={{ margin: 0, fontSize: 10, borderRadius: 6, padding: '0 6px' }}>
+                                                        Primary
+                                                    </Tag>
+                                                </span>
+                                            ),
+                                            children: (
+                                                <>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>Product Name (English)</span>}
+                                                        name="name"
+                                                        rules={[{ required: true, message: 'Name is required' }]}
+                                                    >
+                                                        <Input
+                                                            disabled={catalogDisabled}
+                                                            placeholder="e.g. Organic Whole Milk 1L"
+                                                            style={{ borderRadius: 10, height: 40 }}
+                                                            onChange={(e) => {
+                                                                if (!slugTouched) {
+                                                                    form.setFieldValue('slug', slugify(e.target.value));
+                                                                }
+                                                            }}
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>Short Description</span>}
+                                                        name="short_description"
+                                                        rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={2}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="One-line summary shown in mobile listings and search snippets"
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>Full Description</span>}
+                                                        name="description"
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={4}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="Detailed product specifications, nutritional information, ingredients, or usage guidelines"
+                                                        />
+                                                    </Form.Item>
+                                                </>
+                                            ),
                                         },
-                                    },
-                                ]}
-                            >
-                                <ImageGalleryUpload
-                                    value={gallery}
-                                    onChange={(newGallery) => {
-                                        setGallery(newGallery);
-                                        form.setFieldValue('images', newGallery);
-                                        form.validateFields(['images']).catch(() => { });
-                                    }}
-                                    maxImages={5}
-                                    maxFileSizeMB={1}
-                                    disabled={catalogDisabled}
-                                    productId={isEdit ? id : undefined}
+                                        {
+                                            key: 'si',
+                                            label: (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                                    🇱🇰 සිංහල
+                                                    {watchedNameSi?.trim() ? (
+                                                        <Tag color="success" style={{ margin: 0, fontSize: 10, borderRadius: 6, padding: '0 6px' }}>
+                                                            ✓ Added
+                                                        </Tag>
+                                                    ) : (
+                                                        <Tag style={{ margin: 0, fontSize: 10, borderRadius: 6, padding: '0 6px', color: '#94a3b8' }}>
+                                                            Optional
+                                                        </Tag>
+                                                    )}
+                                                </span>
+                                            ),
+                                            children: (
+                                                <>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>නිෂ්පාදනයේ නම (Name in Sinhala)</span>}
+                                                        name="name_si"
+                                                        rules={[{ max: 255, message: 'Max 255 characters' }]}
+                                                    >
+                                                        <Input
+                                                            disabled={catalogDisabled}
+                                                            placeholder="උදා: කාබනික නැවුම් කිරි (1 ලීටර්)"
+                                                            style={{ borderRadius: 10, height: 40 }}
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>කෙටි සාරාංශය (Short Description)</span>}
+                                                        name="short_description_si"
+                                                        rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={2}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="ලැයිස්තුවේ පෙන්වන එක් පේළියක සාරාංශය"
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>සම්පූර්ණ විස්තරය (Full Description)</span>}
+                                                        name="description_si"
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={4}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය"
+                                                        />
+                                                    </Form.Item>
+                                                </>
+                                            ),
+                                        },
+                                        {
+                                            key: 'ta',
+                                            label: (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                                    🇮🇳 தமிழ்
+                                                    {watchedNameTa?.trim() ? (
+                                                        <Tag color="success" style={{ margin: 0, fontSize: 10, borderRadius: 6, padding: '0 6px' }}>
+                                                            ✓ Added
+                                                        </Tag>
+                                                    ) : (
+                                                        <Tag style={{ margin: 0, fontSize: 10, borderRadius: 6, padding: '0 6px', color: '#94a3b8' }}>
+                                                            Optional
+                                                        </Tag>
+                                                    )}
+                                                </span>
+                                            ),
+                                            children: (
+                                                <>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>தயாரிப்பு பெயர் (Name in Tamil)</span>}
+                                                        name="name_ta"
+                                                        rules={[{ max: 255, message: 'Max 255 characters' }]}
+                                                    >
+                                                        <Input
+                                                            disabled={catalogDisabled}
+                                                            placeholder="எ.கா. புதிய பால் (1 லி)"
+                                                            style={{ borderRadius: 10, height: 40 }}
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>குறுகிய விளக்கம் (Short Description)</span>}
+                                                        name="short_description_ta"
+                                                        rules={[{ max: 500, message: 'Max 500 characters' }]}
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={2}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="பட்டியலில் காட்டப்படும் ஒரு வரி சுருக்கம்"
+                                                        />
+                                                    </Form.Item>
+                                                    <Form.Item
+                                                        label={<span style={{ fontWeight: 600 }}>முழு விவரம் (Full Description)</span>}
+                                                        name="description_ta"
+                                                    >
+                                                        <TextArea
+                                                            disabled={catalogDisabled}
+                                                            rows={4}
+                                                            style={{ borderRadius: 10 }}
+                                                            placeholder="முழு தயாரிப்பு விவரம்"
+                                                        />
+                                                    </Form.Item>
+                                                </>
+                                            ),
+                                        },
+                                    ]}
                                 />
-                            </Form.Item>
-                        </Card>
+
+                                <Row gutter={16}>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            label={<span style={{ fontWeight: 600 }}>URL Slug</span>}
+                                            name="slug"
+                                            rules={[
+                                                { required: true, message: 'Slug is required' },
+                                                {
+                                                    pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+                                                    message: 'Lowercase letters, numbers and hyphens only',
+                                                },
+                                            ]}
+                                        >
+                                            <Input
+                                                disabled={catalogDisabled}
+                                                placeholder="organic-whole-milk-1l"
+                                                style={{ borderRadius: 10, height: 40 }}
+                                                onChange={() => setSlugTouched(true)}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item
+                                            label={
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                    <span style={{ fontWeight: 600 }}>Search Keywords</span>
+                                                    <Button
+                                                        size="small"
+                                                        disabled={catalogDisabled}
+                                                        icon={<ThunderboltOutlined />}
+                                                        loading={suggestKeywordsMutation.isPending}
+                                                        onClick={() => suggestKeywordsMutation.mutate()}
+                                                        className="pf-ai-btn"
+                                                    >
+                                                        ✨ Suggest with AI
+                                                    </Button>
+                                                </div>
+                                            }
+                                            name="search_keywords"
+                                            extra="Sinhala, Tamil, Singlish, English keywords shoppers use. Spelling variants are handled automatically."
+                                        >
+                                            <TextArea
+                                                disabled={catalogDisabled}
+                                                rows={2}
+                                                style={{ borderRadius: 10 }}
+                                                placeholder="e.g. kesel, කෙසෙල්, வாழைப்பழம், ambul kesel"
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </div>
+                        </div>
+
+                        {/* 2. Product Images Card */}
+                        <div className="pf-card">
+                            <div className="pf-card-head">
+                                <div className="pf-card-title">
+                                    <PictureOutlined style={{ color: '#D81B60', fontSize: 17 }} />
+                                    <span>Product Gallery & Thumbnail</span>
+                                    <span style={{ color: '#ff4d4f', fontSize: 16 }}>*</span>
+                                </div>
+                                <Tag color="blue" style={{ borderRadius: 6, fontWeight: 600 }}>
+                                    Up to 5 images • Max 1MB
+                                </Tag>
+                            </div>
+                            <div className="pf-card-body">
+                                <Form.Item
+                                    name="images"
+                                    rules={[
+                                        {
+                                            validator: async () => {
+                                                if (!gallery || gallery.length === 0) {
+                                                    return Promise.reject(
+                                                        new Error('Please upload at least one product image (thumbnail).')
+                                                    );
+                                                }
+                                                return Promise.resolve();
+                                            },
+                                        },
+                                    ]}
+                                >
+                                    <ImageGalleryUpload
+                                        value={gallery}
+                                        onChange={(newGallery) => {
+                                            setGallery(newGallery);
+                                            form.setFieldValue('images', newGallery);
+                                            form.validateFields(['images']).catch(() => { });
+                                        }}
+                                        maxImages={5}
+                                        maxFileSizeMB={1}
+                                        disabled={catalogDisabled}
+                                        productId={isEdit ? id : undefined}
+                                    />
+                                </Form.Item>
+                            </div>
+                        </div>
                     </Col>
 
-                    <Col xs={24} lg={8}>
-                        <Card
-                            title={
-                                <Space>
+                    {/* Right Column: Pricing, Weight, Organization & Live Mobile Preview */}
+                    <Col xs={24} lg={9}>
+                        {/* 1. Live Customer Mobile App Preview */}
+                        <div className="pf-card" style={{ background: '#fafbfc', border: '1.5px dashed #cbd5e1' }}>
+                            <div className="pf-card-head" style={{ background: '#ffffff' }}>
+                                <div className="pf-card-title">
+                                    <MobileOutlined style={{ color: '#D81B60', fontSize: 17 }} />
+                                    <span>Live Customer App Preview</span>
+                                </div>
+                                <Tag color="magenta" style={{ fontWeight: 700, borderRadius: 6, margin: 0 }}>
+                                    Real-time
+                                </Tag>
+                            </div>
+                            <div className="pf-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        maxWidth: 260,
+                                        background: '#ffffff',
+                                        borderRadius: 16,
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
+                                        overflow: 'hidden',
+                                        position: 'relative',
+                                    }}
+                                >
+                                    {/* Top Badges */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: 8,
+                                            left: 8,
+                                            right: 8,
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            zIndex: 2,
+                                        }}
+                                    >
+                                        {watchedCashback ? (
+                                            <span
+                                                style={{
+                                                    background: '#059669',
+                                                    color: '#ffffff',
+                                                    fontSize: 10,
+                                                    fontWeight: 800,
+                                                    padding: '2px 7px',
+                                                    borderRadius: 6,
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                                                }}
+                                            >
+                                                ⚡ {watchedCashback}% CASHBACK
+                                            </span>
+                                        ) : <span />}
+                                        {watchedFeatured && (
+                                            <span
+                                                style={{
+                                                    background: '#f59e0b',
+                                                    color: '#ffffff',
+                                                    fontSize: 10,
+                                                    fontWeight: 800,
+                                                    padding: '2px 7px',
+                                                    borderRadius: 6,
+                                                }}
+                                            >
+                                                ★ Featured
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Thumbnail Preview */}
+                                    <div
+                                        style={{
+                                            width: '100%',
+                                            height: 160,
+                                            background: '#f8fafc',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            overflow: 'hidden',
+                                            borderBottom: '1px solid #f1f5f9',
+                                        }}
+                                    >
+                                        {primaryThumb ? (
+                                            <img
+                                                src={primaryThumb}
+                                                alt="Preview"
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 8 }}
+                                            />
+                                        ) : (
+                                            <div style={{ textAlign: 'center', color: '#94a3b8' }}>
+                                                <PictureOutlined style={{ fontSize: 32 }} />
+                                                <div style={{ fontSize: 11, marginTop: 4, fontWeight: 500 }}>No image uploaded</div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Content Info */}
+                                    <div style={{ padding: 12 }}>
+                                        <div
+                                            style={{
+                                                fontSize: 10.5,
+                                                color: '#64748b',
+                                                fontWeight: 700,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.04em',
+                                            }}
+                                        >
+                                            {categoryObj?.name || 'Category'}
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontWeight: 700,
+                                                fontSize: 13,
+                                                color: '#0f172a',
+                                                marginTop: 2,
+                                                minHeight: 32,
+                                                lineHeight: 1.25,
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            {watchedName || 'Organic Whole Milk 1L'}
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                            <span
+                                                style={{
+                                                    fontSize: 10.5,
+                                                    fontWeight: 700,
+                                                    background: '#f1f5f9',
+                                                    color: '#475569',
+                                                    padding: '1px 6px',
+                                                    borderRadius: 4,
+                                                }}
+                                            >
+                                                {watchedWeight ? `${watchedWeight} ${watchedWeightUnit || 'kg'}` : '1 kg'}
+                                            </span>
+                                            {watchedPerishable && (
+                                                <span
+                                                    style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 700,
+                                                        background: '#fff7ed',
+                                                        color: '#c2410c',
+                                                        padding: '1px 6px',
+                                                        borderRadius: 4,
+                                                    }}
+                                                >
+                                                    Fresh
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                marginTop: 10,
+                                                paddingTop: 8,
+                                                borderTop: '1px solid #f1f5f9',
+                                            }}
+                                        >
+                                            <div>
+                                                <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>PRICE</div>
+                                                <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>
+                                                    LKR {(Number(watchedPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
+                                            <div
+                                                style={{
+                                                    width: 30,
+                                                    height: 30,
+                                                    borderRadius: 8,
+                                                    background: '#D81B60',
+                                                    color: '#ffffff',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: 16,
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                +
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Typography.Text
+                                    type="secondary"
+                                    style={{ fontSize: 11.5, textAlign: 'center', marginTop: 12, display: 'block' }}
+                                >
+                                    Real-time mobile customer preview as shoppers will see it in the app.
+                                </Typography.Text>
+                            </div>
+                        </div>
+
+                        {/* 2. Weight & Measurement Card */}
+                        <div className="pf-card">
+                            <div className="pf-card-head">
+                                <div className="pf-card-title">
+                                    <InboxOutlined style={{ color: '#D81B60', fontSize: 17 }} />
                                     <span>Weight & Measurement</span>
                                     <span style={{ color: '#ff4d4f', fontSize: 16 }}>*</span>
-                                </Space>
-                            }
-                            style={{ marginBottom: 16 }}
-                        >
-                            <Row gutter={12}>
-                                <Col xs={14} sm={14}>
-                                    <Form.Item
-                                        label="Weight / Size"
-                                        name="weight"
-                                        tooltip="Used to calculate courier delivery charges and display product sizing"
-                                        rules={[
-                                            { required: true, message: 'Please enter product weight' },
-                                            {
-                                                type: 'number',
-                                                min: 0.001,
-                                                message: 'Weight must be greater than 0',
-                                            },
-                                        ]}
-                                    >
-                                        <InputNumber
-                                            disabled={catalogDisabled}
-                                            style={{ width: '100%' }}
-                                            placeholder="e.g. 500 or 1.5"
-                                            min={0.001}
-                                            step={0.01}
-                                            precision={3}
-                                            parser={(val) => (val ? (val.replace(/[^0-9.]/g, '') as any) : '')}
-                                            onKeyDown={(e) => {
-                                                if (
-                                                    [
-                                                        'Backspace',
-                                                        'Delete',
-                                                        'Tab',
-                                                        'Escape',
-                                                        'Enter',
-                                                        'ArrowLeft',
-                                                        'ArrowRight',
-                                                        'ArrowUp',
-                                                        'ArrowDown',
-                                                        'Home',
-                                                        'End',
-                                                    ].includes(e.key) ||
-                                                    e.ctrlKey ||
-                                                    e.metaKey
-                                                ) {
-                                                    return;
-                                                }
-                                                if (e.key === '.' && !(e.currentTarget as HTMLInputElement).value.includes('.')) {
-                                                    return;
-                                                }
-                                                if (!/^[0-9]$/.test(e.key)) {
-                                                    e.preventDefault();
-                                                }
-                                            }}
-                                        />
-                                    </Form.Item>
-                                </Col>
-                                <Col xs={10} sm={10}>
-                                    <Form.Item
-                                        label="Unit"
-                                        name="weight_unit"
-                                        rules={[{ required: true, message: 'Select unit' }]}
-                                    >
-                                        <Select
-                                            disabled={catalogDisabled}
-                                            options={[
-                                                { label: 'g (Grams)', value: 'g' },
-                                                { label: 'kg (Kilograms)', value: 'kg' },
+                                </div>
+                            </div>
+                            <div className="pf-card-body">
+                                <Row gutter={12}>
+                                    <Col xs={14}>
+                                        <Form.Item
+                                            label={<span style={{ fontWeight: 600 }}>Weight / Size</span>}
+                                            name="weight"
+                                            tooltip="Used for delivery fee calculation and product size display"
+                                            rules={[
+                                                { required: true, message: 'Please enter weight' },
+                                                {
+                                                    type: 'number',
+                                                    min: 0.001,
+                                                    message: 'Weight must be greater than 0',
+                                                },
                                             ]}
+                                        >
+                                            <InputNumber
+                                                disabled={catalogDisabled}
+                                                style={{ width: '100%', borderRadius: 10, height: 40 }}
+                                                placeholder="e.g. 500 or 1.5"
+                                                min={0.001}
+                                                step={0.01}
+                                                precision={3}
+                                                parser={(val) => (val ? (val.replace(/[^0-9.]/g, '') as any) : '')}
+                                                onKeyDown={(e) => {
+                                                    if (
+                                                        [
+                                                            'Backspace',
+                                                            'Delete',
+                                                            'Tab',
+                                                            'Escape',
+                                                            'Enter',
+                                                            'ArrowLeft',
+                                                            'ArrowRight',
+                                                            'ArrowUp',
+                                                            'ArrowDown',
+                                                            'Home',
+                                                            'End',
+                                                        ].includes(e.key) ||
+                                                        e.ctrlKey ||
+                                                        e.metaKey
+                                                    ) {
+                                                        return;
+                                                    }
+                                                    if (e.key === '.' && !(e.currentTarget as HTMLInputElement).value.includes('.')) {
+                                                        return;
+                                                    }
+                                                    if (!/^[0-9]$/.test(e.key)) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={10}>
+                                        <Form.Item
+                                            label={<span style={{ fontWeight: 600 }}>Unit</span>}
+                                            name="weight_unit"
+                                            rules={[{ required: true, message: 'Select unit' }]}
+                                        >
+                                            <Select
+                                                disabled={catalogDisabled}
+                                                style={{ height: 40 }}
+                                                options={[
+                                                    { label: 'g (Grams)', value: 'g' },
+                                                    { label: 'kg (Kilograms)', value: 'kg' },
+                                                ]}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                                <Typography.Text type="secondary" style={{ fontSize: 11.5, display: 'block', marginTop: -4 }}>
+                                    💡 1kg ට අඩු භාණ්ඩ සඳහා <strong>Grams (g)</strong> ද, 1kg හෝ ඊට වැඩි නම් <strong>Kilograms (kg)</strong> ද තෝරන්න.
+                                </Typography.Text>
+                            </div>
+                        </div>
+
+                        {/* 3. Pricing & Incentives Card */}
+                        <div className="pf-card">
+                            <div className="pf-card-head">
+                                <div className="pf-card-title">
+                                    <DollarOutlined style={{ color: '#D81B60', fontSize: 17 }} />
+                                    <span>Pricing & Commission</span>
+                                </div>
+                            </div>
+                            <div className="pf-card-body">
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Base Price (LKR)</span>}
+                                    name="price"
+                                    tooltip="Global catalog base price. Branches can override this with their local price in Inventory."
+                                    extra="Default master price displayed across branches."
+                                >
+                                    <InputNumber
+                                        disabled={catalogDisabled}
+                                        min={0}
+                                        step={0.01}
+                                        precision={2}
+                                        style={{ width: '100%', borderRadius: 10, height: 40 }}
+                                        prefix="LKR"
+                                        placeholder="0.00"
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Cashback (%)</span>}
+                                    name="cashback_percentage"
+                                    tooltip="Earned cashback % for this product. The app displays a Cash Back badge when set."
+                                    extra="Leave empty to use the platform default rate."
+                                >
+                                    <InputNumber
+                                        disabled={catalogDisabled}
+                                        min={0}
+                                        max={100}
+                                        step={0.1}
+                                        style={{ width: '100%', borderRadius: 10, height: 40 }}
+                                        placeholder="Platform default"
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Referral Commission (%)</span>}
+                                    name="referral_commission_percentage"
+                                    tooltip="Paid to whoever referred the customer on this product. Leave empty for no commission."
+                                >
+                                    <InputNumber
+                                        disabled={catalogDisabled}
+                                        min={0}
+                                        max={100}
+                                        step={0.5}
+                                        precision={2}
+                                        style={{ width: '100%', borderRadius: 10, height: 40 }}
+                                        suffix="%"
+                                        placeholder="No commission"
+                                    />
+                                </Form.Item>
+                            </div>
+                        </div>
+
+                        {/* 4. Categorization, SKU & Attributes Card */}
+                        <div className="pf-card">
+                            <div className="pf-card-head">
+                                <div className="pf-card-title">
+                                    <AppstoreOutlined style={{ color: '#D81B60', fontSize: 17 }} />
+                                    <span>Organization & Attributes</span>
+                                </div>
+                            </div>
+                            <div className="pf-card-body">
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Category</span>}
+                                    name="category_id"
+                                    rules={[{ required: true, message: 'Category is required' }]}
+                                >
+                                    <Select
+                                        disabled={catalogDisabled}
+                                        placeholder="Select a category"
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        style={{ height: 40 }}
+                                        onChange={() => form.setFieldValue('subcategory_id', undefined)}
+                                        options={rootCategories.map((c) => ({
+                                            label: c.name,
+                                            value: c.category_id,
+                                        }))}
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Sub-category</span>}
+                                    name="subcategory_id"
+                                    extra={
+                                        !selectedCategoryId
+                                            ? 'Select a category first.'
+                                            : subcategories.length === 0
+                                                ? 'This category has no sub-categories yet.'
+                                                : undefined
+                                    }
+                                >
+                                    <Select
+                                        disabled={catalogDisabled || !selectedCategoryId || subcategories.length === 0}
+                                        placeholder={
+                                            selectedCategoryId
+                                                ? 'Select a sub-category'
+                                                : 'Select a category first'
+                                        }
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        style={{ height: 40 }}
+                                        options={subcategories.map((c) => ({
+                                            label: c.name,
+                                            value: c.category_id,
+                                        }))}
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>SKU (Stock Keeping Unit)</span>}
+                                    name="sku"
+                                    rules={[{ required: true, whitespace: true, message: 'SKU is required' }]}
+                                >
+                                    <Input
+                                        disabled={catalogDisabled}
+                                        placeholder="e.g. MILK-ORG-1L"
+                                        style={{ borderRadius: 10, height: 40 }}
+                                        suffix={
+                                            <Tooltip title="Generate unique SKU automatically using product name & category">
+                                                <Button
+                                                    type="primary"
+                                                    size="small"
+                                                    disabled={catalogDisabled}
+                                                    icon={<StarFilled style={{ color: '#ffffff' }} />}
+                                                    loading={suggestSkuMutation.isPending}
+                                                    onClick={() => suggestSkuMutation.mutate()}
+                                                    style={{
+                                                        height: 26,
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        borderRadius: 6,
+                                                        background: '#f59e0b',
+                                                        borderColor: '#f59e0b',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                    }}
+                                                >
+                                                    Auto SKU
+                                                </Button>
+                                            </Tooltip>
+                                        }
+                                    />
+                                </Form.Item>
+
+                                {/* Interactive Feature Switch Tiles */}
+                                <div style={{ marginTop: 20 }}>
+                                    <div
+                                        style={{
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: '#334155',
+                                            marginBottom: 12,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                        }}
+                                    >
+                                        <SettingOutlined />
+                                        <span>Product Visibility & Policies</span>
+                                    </div>
+
+                                    {/* 1. Active / Visibility */}
+                                    <Form.Item name="is_active" valuePropName="checked" noStyle>
+                                        <FeatureTile
+                                            icon={<EyeOutlined />}
+                                            title={isBranchScoped ? 'Branch Visibility' : 'Catalog Status'}
+                                            description={
+                                                isBranchScoped
+                                                    ? "Visible in this branch's mobile app catalog"
+                                                    : "Active and available across the platform"
+                                            }
+                                            activeLabel={isBranchScoped ? 'Visible' : 'Active'}
+                                            inactiveLabel={isBranchScoped ? 'Hidden' : 'Inactive'}
+                                            activeColor="#059669"
+                                            activeBg="#f0fdf4"
+                                            disabled={readOnly}
                                         />
                                     </Form.Item>
-                                </Col>
-                            </Row>
-                            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: -8 }}>
-                                💡 1kg ට අඩු භාණ්ඩ සඳහා <strong>Grams (g)</strong> ද (උදා: 250g, 500g), 1kg හෝ ඊට වැඩි භාණ්ඩ සඳහා <strong>Kilograms (kg)</strong> ද (උදා: 1kg, 2.5kg) තෝරන්න.
-                            </Typography.Text>
-                        </Card>
 
-                        <Card title="Pricing" style={{ marginBottom: 16 }}>
-                            <Form.Item
-                                label="Base Price (LKR)"
-                                name="price"
-                                tooltip="Global catalog base price. If left empty, defaults to 0.00. Branches can override this price with their own local price in Inventory."
-                                extra="Default base price. Branch managers will see this as the default price when adding the product to their branch."
-                            >
-                                <InputNumber
-                                    disabled={catalogDisabled}
-                                    min={0}
-                                    step={0.01}
-                                    precision={2}
-                                    style={{ width: '100%' }}
-                                    prefix="LKR"
-                                    placeholder="0.00"
-                                />
-                            </Form.Item>
+                                    {/* 2. Featured */}
+                                    <Form.Item name="is_featured" valuePropName="checked" noStyle>
+                                        <FeatureTile
+                                            icon={<StarOutlined />}
+                                            title="Featured Product"
+                                            description="Showcase on home screen banner and hero feed"
+                                            activeLabel="Featured"
+                                            inactiveLabel="Standard"
+                                            activeColor="#d97706"
+                                            activeBg="#fffbeb"
+                                            disabled={catalogDisabled}
+                                        />
+                                    </Form.Item>
 
-                            <Form.Item
-                                label="Cashback (%)"
-                                name="cashback_percentage"
-                                tooltip="The cashback % this product earns, used instead of the platform default rate. Set it higher than the default to make this a bonus product; the app shows a Cash Back badge only on products with a rate set here."
-                                extra="Leave empty to use the platform default rate. A branch can still override this from Quick Sale."
-                            >
-                                <InputNumber
-                                    disabled={catalogDisabled}
-                                    min={0}
-                                    max={100}
-                                    step={0.1}
-                                    style={{ width: '100%' }}
-                                    placeholder="Platform default"
-                                />
-                            </Form.Item>
+                                    {/* 3. Perishable */}
+                                    <Form.Item name="is_perishable" valuePropName="checked" noStyle>
+                                        <FeatureTile
+                                            icon={<ThunderboltOutlined />}
+                                            title="Perishable Stock"
+                                            description="Short shelf life — prioritized for Quick Sale deals"
+                                            activeLabel="Perishable"
+                                            inactiveLabel="Shelf-stable"
+                                            activeColor="#ea580c"
+                                            activeBg="#fff7ed"
+                                            disabled={catalogDisabled}
+                                        />
+                                    </Form.Item>
 
-                            <Form.Item
-                                label="Referral commission (%)"
-                                name="referral_commission_percentage"
-                                tooltip="Paid to whoever referred the customer (a partner, or a friend who invited them), on what the customer paid for this product after any coupon. Leave empty for no commission. Each branch can set its own rate in Branch Inventory. Orders already placed keep the rate they were placed at."
-                            >
-                                <InputNumber
-                                    disabled={catalogDisabled}
-                                    min={0}
-                                    max={100}
-                                    step={0.5}
-                                    precision={2}
-                                    style={{ width: '100%' }}
-                                    suffix="%"
-                                    placeholder="No commission"
-                                />
-                            </Form.Item>
-                        </Card>
-
-                        <Card title="Organization" style={{ marginBottom: 16 }}>
-                            <Form.Item
-                                label="Category"
-                                name="category_id"
-                                rules={[{ required: true, message: 'Category is required' }]}
-                            >
-                                <Select
-                                    disabled={catalogDisabled}
-                                    placeholder="Select a category"
-                                    allowClear
-                                    showSearch
-                                    optionFilterProp="label"
-                                    // Changing the parent invalidates any sub-category
-                                    // chosen under the old one — the backend rejects a
-                                    // mismatched pair, so clear it rather than submit it.
-                                    onChange={() => form.setFieldValue('subcategory_id', undefined)}
-                                    options={rootCategories.map((c) => ({
-                                        label: c.name,
-                                        value: c.category_id,
-                                    }))}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label="Sub-category"
-                                name="subcategory_id"
-                                extra={
-                                    !selectedCategoryId
-                                        ? 'Select a category first.'
-                                        : subcategories.length === 0
-                                            ? 'This category has no sub-categories yet.'
-                                            : undefined
-                                }
-                            >
-                                <Select
-                                    disabled={catalogDisabled || !selectedCategoryId || subcategories.length === 0}
-                                    placeholder={
-                                        selectedCategoryId
-                                            ? 'Select a sub-category'
-                                            : 'Select a category first'
-                                    }
-                                    allowClear
-                                    showSearch
-                                    optionFilterProp="label"
-                                    options={subcategories.map((c) => ({
-                                        label: c.name,
-                                        value: c.category_id,
-                                    }))}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label="SKU"
-                                name="sku"
-                                rules={[{ required: true, whitespace: true, message: 'SKU is required' }]}
-                            >
-                                <Input
-                                    disabled={catalogDisabled}
-                                    placeholder="e.g. MILK-ORG-1L"
-                                    suffix={
-                                        <Tooltip title="Generate Unique SKU automatically based on Name and Category">
-                                            <Button
-                                                type="text"
-                                                size="small"
-                                                disabled={catalogDisabled}
-                                                icon={<StarOutlined style={{ color: '#faad14', fontSize: 16 }} />}
-                                                loading={suggestSkuMutation.isPending}
-                                                onClick={() => suggestSkuMutation.mutate()}
-                                                style={{ padding: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                            />
-                                        </Tooltip>
-                                    }
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label={isBranchScoped ? 'Visible in this Branch' : 'Active'}
-                                name="is_active"
-                                valuePropName="checked"
-                                extra={
-                                    isBranchScoped
-                                        ? "Turn on to show this product to customers in your branch's mobile app; turn off to hide it."
-                                        : undefined
-                                }
-                            >
-                                <Switch
-                                    disabled={readOnly}
-                                    checkedChildren={isBranchScoped ? 'Visible' : 'Active'}
-                                    unCheckedChildren={isBranchScoped ? 'Hidden' : 'Inactive'}
-                                />
-                            </Form.Item>
-
-                            <Form.Item label="Featured" name="is_featured" valuePropName="checked">
-                                <Switch disabled={catalogDisabled} />
-                            </Form.Item>
-
-                            {/* A catalog-level fact (a carrot is perishable in every
-                                branch), so it lives on the global product rather than
-                                on per-branch inventory. Branch Marketing Managers use
-                                it to see at a glance which of their live Quick Sale
-                                deals are the ones that spoil if they do not move. */}
-                            <Form.Item
-                                label="Perishable"
-                                name="is_perishable"
-                                valuePropName="checked"
-                                tooltip="Short shelf life — prioritised for Quick Sale clearance"
-                            >
-                                <Switch disabled={catalogDisabled} checkedChildren="Perishable" unCheckedChildren="Shelf-stable" />
-                            </Form.Item>
-
-                            {/* Also catalog-level. The server copies it onto each
-                                order at checkout, so switching it off never takes
-                                a return away from an order already placed. */}
-                            <Form.Item
-                                label="Returnable"
-                                name="is_returnable"
-                                valuePropName="checked"
-                                tooltip="Off = final sale. Customers cannot select it in a return request. Applies to orders placed after you save."
-                            >
-                                <Switch disabled={catalogDisabled} checkedChildren="Returnable" unCheckedChildren="No returns" />
-                            </Form.Item>
-                        </Card>
+                                    {/* 4. Returnable */}
+                                    <Form.Item name="is_returnable" valuePropName="checked" noStyle>
+                                        <FeatureTile
+                                            icon={<RollbackOutlined />}
+                                            title="Customer Returns"
+                                            description="Allow customers to request returns within policy"
+                                            activeLabel="Returnable"
+                                            inactiveLabel="Final Sale"
+                                            activeColor="#2563eb"
+                                            activeBg="#eff6ff"
+                                            disabled={catalogDisabled}
+                                        />
+                                    </Form.Item>
+                                </div>
+                            </div>
+                        </div>
                     </Col>
                 </Row>
 
-                <div style={{ marginTop: 8 }} hidden={readOnly}>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        loading={saveMutation.isPending}
-                    >
-                        {isBranchScoped
-                            ? 'Update Branch Visibility'
-                            : isEdit
-                                ? 'Update Product'
-                                : 'Create Product'}
-                    </Button>
-                    <Button
-                        size="large"
-                        style={{ marginLeft: 8 }}
-                        onClick={() => navigate('/products')}
-                    >
-                        Cancel
-                    </Button>
+                {/* Floating Bottom Sticky Action Dock */}
+                <div className="pf-floating-dock" hidden={readOnly}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Tag
+                            color={isEdit ? 'blue' : 'green'}
+                            style={{ margin: 0, fontWeight: 700, fontSize: 12, borderRadius: 8, padding: '2px 10px' }}
+                        >
+                            {isEdit ? 'Edit Mode' : 'New Product'}
+                        </Tag>
+                        <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 500 }}>
+                            Tip: Press <kbd style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, padding: '2px 6px', fontSize: 11, fontWeight: 700 }}>Ctrl + S</kbd> to quick save
+                        </span>
+                    </div>
+                    <Space size={12}>
+                        <Button
+                            size="large"
+                            style={{ borderRadius: 10, fontWeight: 600, height: 42, color: '#475569' }}
+                            onClick={() => navigate('/products')}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            size="large"
+                            className="pf-save-btn"
+                            loading={saveMutation.isPending}
+                            icon={<SaveOutlined />}
+                        >
+                            {isBranchScoped
+                                ? 'Update Branch Visibility'
+                                : isEdit
+                                    ? 'Save Changes'
+                                    : 'Publish Product'}
+                        </Button>
+                    </Space>
                 </div>
             </Form>
         </div>
