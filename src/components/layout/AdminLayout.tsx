@@ -948,8 +948,6 @@ const AdminLayout: React.FC = () => {
                         <div className="admin-breadcrumb-nav">
                             <span className="admin-breadcrumb-part">{roleDisplayName}</span>
                             <span className="admin-breadcrumb-sep">/</span>
-                            <span className="admin-breadcrumb-part">Console</span>
-                            <span className="admin-breadcrumb-sep">/</span>
                             <span className="admin-breadcrumb-active">{headerTitle}</span>
                         </div>
                     </div>
