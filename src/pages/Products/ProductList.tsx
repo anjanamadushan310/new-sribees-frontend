@@ -1,11 +1,11 @@
 /**
  * Product List (Admin Module 7.2)
- * Global-catalog product table with search, category filter and row actions.
+ * Global-catalog product table with search, category filter, velocity analysis, and row actions.
  * Data layer is TanStack Query against /api/v1/admin/products.
+ * Redesigned to executive modern SaaS standard (Shopify / Stripe aesthetics).
  */
 import React, { useState, useMemo } from 'react';
 import {
-    Card,
     Table,
     Button,
     Select,
@@ -14,9 +14,10 @@ import {
     Image,
     Popconfirm,
     App,
-    Typography,
     Segmented,
     Tooltip,
+    Row,
+    Col,
 } from 'antd';
 import {
     PlusOutlined,
@@ -25,6 +26,11 @@ import {
     EyeOutlined,
     PictureOutlined,
     ThunderboltOutlined,
+    ReloadOutlined,
+    ShoppingOutlined,
+    CheckCircleOutlined,
+    AlertOutlined,
+    FireOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
@@ -37,48 +43,36 @@ import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
-const { Title } = Typography;
-
 const formatLKR = (value: number): string =>
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value ?? 0);
 
 const primaryImage = (p: AdminProduct): string | undefined =>
-    (p.images.find((img) => img.is_primary) ?? p.images[0])?.image_url;
+    (p.images?.find((img) => img.is_primary) ?? p.images?.[0])?.image_url;
 
 /**
  * What to show in the price column.
- *
  * Price moved from the global catalog to per-branch inventory, so a product
- * added after that change carries no `price` on its catalog row at all. Read
- * the branch price first and only then fall back, or every such product reads
- * LKR 0.00 here while the branch is in fact selling it.
- *
- * The server already resolves `price` for a branch-scoped viewer; this
- * fallback is the client-side belt to that braces, and also covers an
- * unscoped viewer looking at a catalog row with no global price.
+ * added after that change carries no `price` on its catalog row at all.
  */
 const displayPrice = (p: AdminProduct): number => p.branch_price ?? p.price ?? 0;
 
-/**
- * Sales velocity bands. The thresholds themselves live server-side
- * (sales_velocity_service) — only the labels are here, so the badge and the
- * filter can never disagree about what "slow" means.
- */
-const MOVEMENT_META: Record<ProductMovement, { label: string; color: string; hint: string }> = {
-    fast: { label: '🚀 Fast-Moving', color: 'green', hint: 'High demand over the last 30 days' },
-    steady: { label: '● Steady', color: 'blue', hint: 'Selling at a healthy, unremarkable rate' },
+/** Sales velocity badges configuration */
+const MOVEMENT_META: Record<ProductMovement, { label: string; color: string; bg: string; hint: string }> = {
+    fast: { label: '🚀 Fast-Moving', color: '#059669', bg: '#ecfdf5', hint: 'High customer demand over the last 30 days' },
+    steady: { label: '● Steady', color: '#2563eb', bg: '#eff6ff', hint: 'Selling at a healthy, consistent pace' },
     slow: {
         label: '❄️ Slow-Moving',
-        color: 'default',
-        hint: 'Barely moving. If it is also perishable, clear it before it spoils.',
+        color: '#d97706',
+        bg: '#fffbeb',
+        hint: 'Barely moving. If also perishable, consider a Quick Sale deal.',
     },
-    none: { label: '0 Orders', color: 'red', hint: 'Nothing sold from this branch in 30 days' },
+    none: { label: '0 Orders', color: '#dc2626', bg: '#fef2f2', hint: 'No units sold from this branch in the last 30 days' },
 };
 
-const STOCK_META: Record<StockState, { color: string; label: (q: number) => string }> = {
-    in: { color: '#16a34a', label: (q) => `In Stock (${q})` },
-    low: { color: '#d97706', label: (q) => `Low Stock (${q})` },
-    out: { color: '#dc2626', label: () => 'Out of Stock (0)' },
+const STOCK_META: Record<StockState, { color: string; bg: string; label: (q: number) => string }> = {
+    in: { color: '#059669', bg: '#ecfdf5', label: (q) => `In Stock (${q})` },
+    low: { color: '#d97706', bg: '#fffbeb', label: (q) => `Low Stock (${q})` },
+    out: { color: '#dc2626', bg: '#fef2f2', label: () => 'Out of Stock (0)' },
 };
 
 type MovementTab = 'all' | ProductMovement | StockState | 'quick_sale' | 'perishable';
@@ -94,7 +88,7 @@ const MOVEMENT_TABS: { label: string; value: MovementTab }[] = [
     { label: 'Perishable', value: 'perishable' },
 ];
 
-/** Translate one tab into the query params the server understands. */
+/** Translate movement tab into query params */
 const tabToParams = (tab: MovementTab) => {
     if (tab === 'fast' || tab === 'slow' || tab === 'steady' || tab === 'none')
         return { movement: tab as ProductMovement };
@@ -105,16 +99,167 @@ const tabToParams = (tab: MovementTab) => {
     return {};
 };
 
+const productListStyles = `
+.product-page-container {
+    padding-bottom: 32px;
+}
+.product-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.product-header-titles h2 {
+    margin: 0;
+    font-weight: 800;
+    font-size: 26px;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+.product-header-sub {
+    font-size: 13.5px;
+    color: #64748b;
+    margin-top: 4px;
+    font-weight: 500;
+}
+.product-kpi-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 16px 20px;
+    border: 1px solid #ECEAF0;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.03);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.product-kpi-card:hover {
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    transform: translateY(-1px);
+}
+.product-kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.product-kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+}
+.product-kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 2px;
+}
+.product-table-card {
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #ECEAF0;
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+}
+.product-filter-bar {
+    padding: 20px 24px;
+    border-bottom: 1px solid #F1F5F9;
+    background: #ffffff;
+}
+.product-table-custom .ant-table-thead > tr > th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 14px 16px !important;
+}
+.product-table-custom .ant-table-tbody > tr > td {
+    padding: 14px 16px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    vertical-align: middle !important;
+}
+.product-table-custom .ant-table-tbody > tr:hover > td {
+    background: #fcfdfe !important;
+}
+.product-name-link {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f172a;
+    transition: color 0.15s ease;
+    display: block;
+    line-height: 1.35;
+}
+.product-name-link:hover {
+    color: #D81B60;
+}
+.product-sku-pill {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 11px;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-top: 3px;
+}
+.product-thumb-container {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    flex-shrink: 0;
+}
+.product-stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.product-price-main {
+    font-weight: 800;
+    font-size: 14.5px;
+    color: #0f172a;
+}
+.product-price-strike {
+    font-size: 11.5px;
+    color: #94a3b8;
+    text-decoration: line-through;
+    font-weight: 500;
+    margin-top: 1px;
+}
+.product-action-btn {
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 4px 10px;
+}
+`;
+
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { message } = App.useApp();
     const queryClient = useQueryClient();
-    // Support staff (and any role without products write) get a read-only
-    // catalog: no Add / Edit / Delete, only View Details (B5).
+
     const { canCreate, canUpdate, canDelete } = usePermissions();
-    // A branch-level viewer is looking at what THEIR branch sells, so the
-    // column is their selling price, not the network's base price. Super
-    // Admin and Customer Support have no single branch and do see the base.
     const role = useAuthStore((state) => state.user?.role);
     const isBranchScoped =
         role !== undefined &&
@@ -133,7 +278,7 @@ const ProductList: React.FC = () => {
     const [isActive, setIsActive] = useState<boolean | undefined>(undefined);
     const [movementTab, setMovementTab] = useState<MovementTab>('all');
 
-    // Category options for the filter dropdown
+    // Category options for filter
     const { data: categories = [] } = useQuery({
         queryKey: ['admin', 'categories'],
         queryFn: categoriesApi.list,
@@ -176,70 +321,123 @@ const ProductList: React.FC = () => {
             message.success('Product deleted.');
             queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
         },
-        onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to delete product.'),
+        onError: (err: unknown) => {
+            const apiErr = err as { response?: { data?: { detail?: string } } };
+            message.error(apiErr.response?.data?.detail || 'Failed to delete product.');
+        },
     });
+
+    // KPI Metrics derived from current results
+    const totalCount = data?.total ?? 0;
+    const activeCount = useMemo(
+        () => (data?.products ?? []).filter((p) => p.is_active).length,
+        [data?.products]
+    );
+    const stockAlertCount = useMemo(
+        () => (data?.products ?? []).filter((p) => p.stock_quantity <= 0 || p.stock_state === 'low' || p.stock_state === 'out').length,
+        [data?.products]
+    );
+    const dealsCount = useMemo(
+        () => (data?.products ?? []).filter((p) => p.is_on_quick_sale || p.movement === 'fast').length,
+        [data?.products]
+    );
+
+    const hasActiveFilters = Boolean(
+        search || categoryId || subcategoryId || isActive !== undefined || movementTab !== 'all'
+    );
+
+    const handleResetFilters = () => {
+        setPage(1);
+        setSearch('');
+        setCategoryId(undefined);
+        setSubcategoryId(undefined);
+        setIsActive(undefined);
+        setMovementTab('all');
+    };
 
     const columns: ColumnsType<AdminProduct> = [
         {
-            title: 'Image',
-            key: 'image',
-            width: 72,
+            title: 'Product',
+            key: 'product_info',
+            width: 280,
             render: (_, record) => {
                 const url = primaryImage(record);
-                return url ? (
-                    <Image
-                        src={url}
-                        width={48}
-                        height={48}
-                        style={{ objectFit: 'cover', borderRadius: 4 }}
-                        preview={{ mask: null }}
-                    />
-                ) : (
-                    <div
-                        style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 4,
-                            background: '#f0f0f0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#bbb',
-                        }}
-                    >
-                        <PictureOutlined />
+                return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="product-thumb-container">
+                            {url ? (
+                                <Image
+                                    src={url}
+                                    width={48}
+                                    height={48}
+                                    style={{ objectFit: 'cover', borderRadius: 8 }}
+                                    preview={{ mask: null }}
+                                />
+                            ) : (
+                                <PictureOutlined style={{ fontSize: 20, color: '#94a3b8' }} />
+                            )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <a
+                                className="product-name-link"
+                                onClick={() => navigate(`/products/${record.product_id}/edit`)}
+                                title={record.name}
+                            >
+                                {record.name}
+                            </a>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                {record.sku ? (
+                                    <span className="product-sku-pill">{record.sku}</span>
+                                ) : (
+                                    <span style={{ fontSize: 11, color: '#cbd5e1' }}>No SKU</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 );
             },
         },
         {
-            title: 'Name',
-            dataIndex: 'name',
-            key: 'name',
-            render: (name: string, record) => (
-                <a onClick={() => navigate(`/products/${record.product_id}/edit`)}>{name}</a>
-            ),
-        },
-        {
-            title: 'SKU',
-            dataIndex: 'sku',
-            key: 'sku',
-            render: (sku: string | null) => sku || <span style={{ color: '#bbb' }}>—</span>,
-        },
-        {
             title: 'Category',
             key: 'category',
+            width: 170,
             render: (_, record) =>
                 record.category ? (
-                    <Space direction="vertical" size={2}>
-                        <Tag color="geekblue">{record.category.name}</Tag>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <Tag
+                            color="blue"
+                            style={{
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                margin: 0,
+                                background: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe',
+                                alignSelf: 'flex-start',
+                            }}
+                        >
+                            {record.category.name}
+                        </Tag>
                         {record.subcategory && (
-                            <Tag color="purple">{record.subcategory.name}</Tag>
+                            <Tag
+                                color="purple"
+                                style={{
+                                    borderRadius: 8,
+                                    fontWeight: 500,
+                                    margin: 0,
+                                    background: '#faf5ff',
+                                    color: '#7e22ce',
+                                    border: '1px solid #e9d5ff',
+                                    fontSize: 11,
+                                    alignSelf: 'flex-start',
+                                }}
+                            >
+                                {record.subcategory.name}
+                            </Tag>
                         )}
-                    </Space>
+                    </div>
                 ) : (
-                    <span style={{ color: '#bbb' }}>Uncategorized</span>
+                    <span style={{ color: '#94a3b8', fontSize: 12 }}>Uncategorized</span>
                 ),
         },
         {
@@ -250,12 +448,22 @@ const ProductList: React.FC = () => {
                 if (record.weight !== null && record.weight !== undefined) {
                     const unit = record.weight_unit || 'kg';
                     return (
-                        <Tag color="cyan" style={{ fontWeight: 500 }}>
+                        <span
+                            style={{
+                                background: '#f0fdfa',
+                                color: '#0f766e',
+                                border: '1px solid #ccfbf1',
+                                padding: '3px 8px',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                fontSize: 12,
+                            }}
+                        >
                             {record.weight} {unit}
-                        </Tag>
+                        </span>
                     );
                 }
-                return <span style={{ color: '#bbb' }}>—</span>;
+                return <span style={{ color: '#cbd5e1' }}>—</span>;
             },
         },
         ...(isBranchScoped
@@ -263,20 +471,14 @@ const ProductList: React.FC = () => {
                   {
                       title: 'Branch Stock',
                       key: 'stock',
-                      width: 140,
+                      width: 145,
                       render: (_: unknown, record: AdminProduct) => {
                           const state = record.stock_state ?? 'in';
                           const meta = STOCK_META[state];
                           return (
-                              <span
-                                  style={{
-                                      color: meta.color,
-                                      fontWeight: 600,
-                                      fontSize: 12.5,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                  }}
+                              <div
+                                  className="product-stock-badge"
+                                  style={{ background: meta.bg, color: meta.color }}
                               >
                                   <span
                                       style={{
@@ -286,8 +488,8 @@ const ProductList: React.FC = () => {
                                           background: meta.color,
                                       }}
                                   />
-                                  {meta.label(record.stock_quantity)}
-                              </span>
+                                  <span>{meta.label(record.stock_quantity)}</span>
+                              </div>
                           );
                       },
                       sorter: (a: AdminProduct, b: AdminProduct) =>
@@ -295,23 +497,34 @@ const ProductList: React.FC = () => {
                   },
                   {
                       title: (
-                          <Tooltip title="Units delivered from your branch in the last 30 days. Cancelled orders do not count — they moved nothing off a shelf.">
+                          <Tooltip title="Units delivered from your branch in the last 30 days. Cancelled orders do not count.">
                               <span>Sales (30 Days)</span>
                           </Tooltip>
                       ),
                       key: 'velocity',
-                      width: 160,
+                      width: 165,
                       render: (_: unknown, record: AdminProduct) => {
                           const meta = MOVEMENT_META[record.movement ?? 'none'];
                           return (
                               <div>
-                                  <div style={{ fontWeight: 700 }}>
+                                  <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
                                       {record.units_sold_30d ?? 0} sold
                                   </div>
                                   <Tooltip title={meta.hint}>
-                                      <Tag color={meta.color} style={{ marginInlineEnd: 0 }}>
+                                      <span
+                                          style={{
+                                              display: 'inline-block',
+                                              fontSize: 11,
+                                              fontWeight: 600,
+                                              color: meta.color,
+                                              background: meta.bg,
+                                              padding: '1px 8px',
+                                              borderRadius: 12,
+                                              marginTop: 2,
+                                          }}
+                                      >
                                           {meta.label}
-                                      </Tag>
+                                      </span>
                                   </Tooltip>
                               </div>
                           );
@@ -324,20 +537,17 @@ const ProductList: React.FC = () => {
         {
             title: isBranchScoped ? 'Selling Price' : 'Base Price',
             key: 'price',
+            width: 140,
             render: (_, record) => (
                 <div>
-                    <div style={{ fontWeight: 600 }}>{formatLKR(displayPrice(record))}</div>
+                    <div className="product-price-main">{formatLKR(displayPrice(record))}</div>
                     {isBranchScoped && record.branch_price == null ? (
-                        <div style={{ fontSize: 12, color: '#999' }}>Catalog price</div>
+                        <span style={{ fontSize: 10.5, color: '#64748b', background: '#f8fafc', padding: '1px 5px', borderRadius: 4 }}>
+                            Catalog price
+                        </span>
                     ) : null}
                     {record.compare_at_price ? (
-                        <div
-                            style={{
-                                fontSize: 12,
-                                color: '#999',
-                                textDecoration: 'line-through',
-                            }}
-                        >
+                        <div className="product-price-strike">
                             {formatLKR(record.compare_at_price)}
                         </div>
                     ) : null}
@@ -345,32 +555,59 @@ const ProductList: React.FC = () => {
             ),
         },
         {
-            // Read-only badge, never a toggle. A Marketing Manager holds
-            // products:read and nothing more — rendering a switch they cannot
-            // action would be a button that fails, which is worse than no button.
             title: 'Status',
             dataIndex: 'is_active',
             key: 'is_active',
-            width: 110,
+            width: 120,
             render: (active: boolean, record) => (
-                <Space direction="vertical" size={2}>
-                    <Tag color={active ? 'green' : 'default'}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            padding: '3px 8px',
+                            borderRadius: 16,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            background: active ? '#ecfdf5' : '#f1f5f9',
+                            color: active ? '#059669' : '#64748b',
+                            alignSelf: 'flex-start',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: 5,
+                                height: 5,
+                                borderRadius: '50%',
+                                background: active ? '#10b981' : '#94a3b8',
+                            }}
+                        />
                         {active ? 'Active' : 'Inactive'}
-                    </Tag>
-                    {record.is_perishable && <Tag color="orange">Perishable</Tag>}
-                </Space>
+                    </span>
+                    {record.is_perishable && (
+                        <Tag
+                            color="orange"
+                            style={{
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                fontSize: 10.5,
+                                margin: 0,
+                                alignSelf: 'flex-start',
+                            }}
+                        >
+                            Perishable
+                        </Tag>
+                    )}
+                </div>
             ),
         },
         {
             title: 'Actions',
             key: 'actions',
-            width: isBranchScoped ? 280 : 180,
+            width: isBranchScoped ? 260 : 160,
             render: (_, record) => (
-                <Space>
-                    {/* The whole point of the velocity column: having spotted
-                        slow-moving or perishable stock, act on it here rather
-                        than memorising a SKU and hunting for it on another
-                        page. */}
+                <Space size={6}>
                     {isBranchScoped &&
                         (record.is_on_quick_sale ? (
                             <Tooltip title="Already discounted in your Quick Sale feed.">
@@ -378,7 +615,13 @@ const ProductList: React.FC = () => {
                                     type="text"
                                     size="small"
                                     icon={<ThunderboltOutlined />}
-                                    style={{ color: '#16a34a' }}
+                                    style={{
+                                        color: '#059669',
+                                        background: '#ecfdf5',
+                                        fontWeight: 700,
+                                        borderRadius: 8,
+                                        fontSize: 12,
+                                    }}
                                     onClick={() => navigate('/quick-sale')}
                                 >
                                     In Deal
@@ -391,6 +634,7 @@ const ProductList: React.FC = () => {
                                     size="small"
                                     disabled
                                     icon={<ThunderboltOutlined />}
+                                    style={{ borderRadius: 8, fontSize: 12 }}
                                 >
                                     Add Deal
                                 </Button>
@@ -400,7 +644,13 @@ const ProductList: React.FC = () => {
                                 type="text"
                                 size="small"
                                 icon={<ThunderboltOutlined />}
-                                style={{ color: '#7c3aed' }}
+                                style={{
+                                    color: '#7c3aed',
+                                    background: '#f5f3ff',
+                                    fontWeight: 700,
+                                    borderRadius: 8,
+                                    fontSize: 12,
+                                }}
                                 onClick={() =>
                                     navigate(
                                         `/quick-sale?action=new_deal&sku=${encodeURIComponent(
@@ -414,24 +664,30 @@ const ProductList: React.FC = () => {
                         ))}
                     {isBranchScoped ? (
                         <Button
-                            type="link"
+                            type="text"
+                            size="small"
                             icon={<EyeOutlined />}
+                            style={{ color: '#2563eb', background: '#eff6ff', borderRadius: 8, fontWeight: 600 }}
                             onClick={() => navigate(`/products/${record.product_id}/edit`)}
                         >
-                            View / Visibility
+                            View
                         </Button>
                     ) : canEditProduct ? (
                         <Button
-                            type="link"
+                            type="text"
+                            size="small"
                             icon={<EditOutlined />}
+                            style={{ color: '#2563eb', background: '#eff6ff', borderRadius: 8, fontWeight: 600 }}
                             onClick={() => navigate(`/products/${record.product_id}/edit`)}
                         >
                             Edit
                         </Button>
                     ) : (
                         <Button
-                            type="link"
+                            type="text"
+                            size="small"
                             icon={<EyeOutlined />}
+                            style={{ color: '#475569', background: '#f1f5f9', borderRadius: 8, fontWeight: 600 }}
                             onClick={() => navigate(`/products/${record.product_id}/edit`)}
                         >
                             View
@@ -440,12 +696,18 @@ const ProductList: React.FC = () => {
                     {canDeleteProduct && (
                         <Popconfirm
                             title="Delete product"
-                            description="This permanently removes the product."
-                            okText="Delete"
+                            description="This permanently removes the product from the catalog."
+                            okText="Yes, Delete"
                             okButtonProps={{ danger: true }}
                             onConfirm={() => deleteMutation.mutate(record.product_id)}
                         >
-                            <Button type="link" danger icon={<DeleteOutlined />}>
+                            <Button
+                                type="text"
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                                style={{ borderRadius: 8, fontWeight: 600 }}
+                            >
                                 Delete
                             </Button>
                         </Popconfirm>
@@ -456,92 +718,192 @@ const ProductList: React.FC = () => {
     ];
 
     return (
-        <div>
-            <div
-                style={{
-                    marginBottom: 16,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                }}
-            >
-                <Title level={3} style={{ margin: 0 }}>
-                    Products
-                </Title>
+        <div className="product-page-container">
+            <style>{productListStyles}</style>
+
+            {/* Executive Header Row */}
+            <div className="product-header-row">
+                <div className="product-header-titles">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <h2>Product Catalog</h2>
+                        <span
+                            style={{
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                fontWeight: 700,
+                                fontSize: 12,
+                                padding: '3px 10px',
+                                borderRadius: 12,
+                            }}
+                        >
+                            {totalCount} Items
+                        </span>
+                    </div>
+                    <div className="product-header-sub">
+                        Manage global catalog inventory, branch selling prices, categories, and sales velocity.
+                    </div>
+                </div>
                 {canAddProduct && (
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/products/new')}>
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => navigate('/products/new')}
+                        style={{
+                            background: 'linear-gradient(135deg, #E11D48 0%, #D81B60 100%)',
+                            border: 'none',
+                            borderRadius: 12,
+                            height: 42,
+                            padding: '0 20px',
+                            fontWeight: 700,
+                            fontSize: 13.5,
+                            boxShadow: '0 4px 14px rgba(216, 27, 96, 0.25)',
+                        }}
+                    >
                         Add Product
                     </Button>
                 )}
             </div>
 
-            <Card>
-                {/* Branch-derived bands, so only a branch-scoped viewer gets
-                    them — a Super Admin is looking at the global catalog and
-                    has no single shelf to report on. */}
-                {isBranchScoped && (
-                    <Segmented
-                        value={movementTab}
-                        onChange={(value) => {
-                            setPage(1);
-                            setMovementTab(value as MovementTab);
-                        }}
-                        options={MOVEMENT_TABS}
-                        style={{ marginBottom: 16 }}
-                    />
-                )}
-                <Space wrap style={{ marginBottom: 16 }}>
-                    <DebouncedSearchInput
-                        placeholder="Search name, SKU…"
-                        value={search}
-                        onChange={(v) => {
-                            setPage(1);
-                            setSearch(v);
-                        }}
-                        urlParam="q"
-                        style={{ width: 300 }}
-                    />
-                    <Select
-                        placeholder="All categories"
-                        style={{ width: 200 }}
-                        allowClear
-                        value={categoryId}
-                        onChange={(value) => {
-                            setPage(1);
-                            setCategoryId(value);
-                            setSubcategoryId(undefined);
-                        }}
-                        options={rootCategories.map((c) => ({ label: c.name, value: c.category_id }))}
-                    />
-                    <Select
-                        placeholder={categoryId ? 'All subcategories' : 'Select category first'}
-                        style={{ width: 200 }}
-                        allowClear
-                        disabled={!categoryId}
-                        value={subcategoryId}
-                        onChange={(value) => {
-                            setPage(1);
-                            setSubcategoryId(value);
-                        }}
-                        options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
-                    />
-                    <Select
-                        placeholder="All statuses"
-                        style={{ width: 150 }}
-                        allowClear
-                        value={isActive}
-                        onChange={(value) => {
-                            setPage(1);
-                            setIsActive(value);
-                        }}
-                        options={[
-                            { label: 'Active', value: true },
-                            { label: 'Inactive', value: false },
-                        ]}
-                    />
-                </Space>
+            {/* Quick Overview Metric Cards (Shopify Style) */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                <Col xs={12} sm={6}>
+                    <div className="product-kpi-card">
+                        <div className="product-kpi-icon" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+                            <ShoppingOutlined style={{ fontSize: 20 }} />
+                        </div>
+                        <div>
+                            <div className="product-kpi-value">{totalCount.toLocaleString()}</div>
+                            <div className="product-kpi-label">Total Products</div>
+                        </div>
+                    </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <div className="product-kpi-card">
+                        <div className="product-kpi-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                            <CheckCircleOutlined style={{ fontSize: 20 }} />
+                        </div>
+                        <div>
+                            <div className="product-kpi-value">{activeCount}</div>
+                            <div className="product-kpi-label">Active / Live</div>
+                        </div>
+                    </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <div className="product-kpi-card">
+                        <div className="product-kpi-icon" style={{ background: '#FFFBEB', color: '#D97706' }}>
+                            <AlertOutlined style={{ fontSize: 20 }} />
+                        </div>
+                        <div>
+                            <div className="product-kpi-value">{stockAlertCount}</div>
+                            <div className="product-kpi-label">Low / Out of Stock</div>
+                        </div>
+                    </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <div className="product-kpi-card">
+                        <div className="product-kpi-icon" style={{ background: '#FAF5FF', color: '#7C3AED' }}>
+                            <FireOutlined style={{ fontSize: 20 }} />
+                        </div>
+                        <div>
+                            <div className="product-kpi-value">{dealsCount}</div>
+                            <div className="product-kpi-label">Fast / Deals</div>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
 
+            {/* Main Table Card with Filters */}
+            <div className="product-table-card">
+                {/* Branch-derived Velocity Tabs */}
+                {isBranchScoped && (
+                    <div style={{ padding: '16px 24px 0 24px', background: '#ffffff' }}>
+                        <Segmented
+                            value={movementTab}
+                            onChange={(value) => {
+                                setPage(1);
+                                setMovementTab(value as MovementTab);
+                            }}
+                            options={MOVEMENT_TABS}
+                            style={{
+                                background: '#f1f5f9',
+                                padding: 3,
+                                borderRadius: 12,
+                                fontWeight: 600,
+                            }}
+                        />
+                    </div>
+                )}
+
+                {/* Filter and Search Bar */}
+                <div className="product-filter-bar">
+                    <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Space wrap size={12}>
+                            <DebouncedSearchInput
+                                placeholder="Search by name, SKU or barcode…"
+                                value={search}
+                                onChange={(v) => {
+                                    setPage(1);
+                                    setSearch(v);
+                                }}
+                                urlParam="q"
+                                style={{ width: 280, borderRadius: 10 }}
+                            />
+                            <Select<string>
+                                placeholder="All categories"
+                                style={{ width: 190 }}
+                                allowClear
+                                value={categoryId}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setCategoryId(value);
+                                    setSubcategoryId(undefined);
+                                }}
+                                options={rootCategories.map((c) => ({ label: c.name, value: c.category_id }))}
+                            />
+                            <Select<string>
+                                placeholder={categoryId ? 'All subcategories' : 'Select category first'}
+                                style={{ width: 190 }}
+                                allowClear
+                                disabled={!categoryId}
+                                value={subcategoryId}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setSubcategoryId(value);
+                                }}
+                                options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
+                            />
+                            <Select<boolean>
+                                placeholder="All statuses"
+                                style={{ width: 140 }}
+                                allowClear
+                                value={isActive}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setIsActive(value);
+                                }}
+                                options={[
+                                    { label: 'Active', value: true },
+                                    { label: 'Inactive', value: false },
+                                ]}
+                            />
+                        </Space>
+
+                        {hasActiveFilters && (
+                            <Button
+                                type="text"
+                                icon={<ReloadOutlined />}
+                                onClick={handleResetFilters}
+                                style={{ color: '#64748b', fontWeight: 600 }}
+                            >
+                                Reset Filters
+                            </Button>
+                        )}
+                    </Space>
+                </div>
+
+                {/* Data Table */}
                 <Table
+                    className="product-table-custom"
                     rowKey="product_id"
                     columns={columns}
                     dataSource={data?.products ?? []}
@@ -554,16 +916,20 @@ const ProductList: React.FC = () => {
                     pagination={{
                         current: page,
                         pageSize,
-                        total: data?.total ?? 0,
+                        total: totalCount,
                         showSizeChanger: true,
-                        showTotal: (t) => `Total ${t} products`,
+                        showTotal: (total, range) => (
+                            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+                                Showing {range[0]}–{range[1]} of <strong>{total}</strong> products
+                            </span>
+                        ),
                         onChange: (nextPage, nextSize) => {
                             setPage(nextPage);
                             setPageSize(nextSize);
                         },
                     }}
                 />
-            </Card>
+            </div>
         </div>
     );
 };
