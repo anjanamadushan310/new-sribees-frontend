@@ -872,7 +872,7 @@ const ProductList: React.FC = () => {
                                 }}
                                 options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
                             />
-                            <Select<boolean>
+                            <Select<boolean, { label: string; value: boolean }>
                                 placeholder="All statuses"
                                 style={{ width: 140 }}
                                 allowClear
