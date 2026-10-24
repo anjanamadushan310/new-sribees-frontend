@@ -19,6 +19,15 @@ export type ProductMovement = 'fast' | 'steady' | 'slow' | 'none';
 
 export type StockState = 'in' | 'low' | 'out';
 
+export type PriceReviewLevel = 'daily' | 'weekly' | 'monthly' | 'long';
+
+export const PRICE_REVIEW_LEVELS: { value: PriceReviewLevel; label: string }[] = [
+    { value: 'daily', label: 'Daily — vegetables, fruit, fish, meat' },
+    { value: 'weekly', label: 'Weekly — rice, sugar, dhal, oil' },
+    { value: 'monthly', label: 'Monthly — packaged goods' },
+    { value: 'long', label: 'Long — barcoded, price rarely moves' },
+];
+
 export interface ProductImage {
     image_id: string;
     image_url: string;
@@ -87,6 +96,8 @@ export interface AdminProduct {
      * at checkout, so changing it only affects orders placed afterwards.
      */
     is_returnable?: boolean;
+    /** How often the price is re-checked (Sribees Price app tabs); long by default. */
+    price_review_level?: PriceReviewLevel;
 
     // ---- Branch operations. Present only for a branch-scoped viewer; a Super
     // Admin is looking at the global catalog and has no single branch's shelf
@@ -155,6 +166,7 @@ export interface ProductPayload {
     is_featured?: boolean;
     is_perishable?: boolean;
     is_returnable?: boolean;
+    price_review_level?: PriceReviewLevel;
     images?: ImageLinkPayload[];
 }
 
@@ -177,6 +189,7 @@ export interface ProductListParams {
     stock_state?: StockState;
     on_quick_sale?: boolean;
     perishable_only?: boolean;
+    price_review_level?: PriceReviewLevel;
 }
 
 export interface ProductListResult {

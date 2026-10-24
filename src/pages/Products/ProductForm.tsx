@@ -46,7 +46,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
 import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
-import type { ProductPayload } from '../../api/products.api';
+import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
+import type { PriceReviewLevel, ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
@@ -86,6 +87,7 @@ interface ProductFormValues {
     is_featured: boolean;
     is_perishable: boolean;
     is_returnable: boolean;
+    price_review_level?: PriceReviewLevel;
     images?: GalleryImage[];
 }
 
@@ -416,6 +418,7 @@ const ProductForm: React.FC = () => {
                 is_featured: product.is_featured,
                 is_perishable: product.is_perishable ?? false,
                 is_returnable: product.is_returnable ?? true,
+                price_review_level: product.price_review_level ?? 'long',
             });
             let primaryAssigned = false;
             const loaded: GalleryImage[] = (product.images || [])
@@ -534,6 +537,7 @@ const ProductForm: React.FC = () => {
                 is_featured: values.is_featured,
                 is_perishable: values.is_perishable ?? false,
                 is_returnable: values.is_returnable ?? true,
+                price_review_level: values.price_review_level ?? 'long',
                 images: imagesPayload,
             };
 
@@ -741,7 +745,7 @@ const ProductForm: React.FC = () => {
                 form={form}
                 layout="vertical"
                 onFinish={(values) => saveMutation.mutate(values)}
-                initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg' }}
+                initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg', price_review_level: 'long' }}
             >
                 <Row gutter={24}>
                     {/* Left Column: Core Details, Multi-Language Copy, Media */}
@@ -1466,6 +1470,21 @@ const ProductForm: React.FC = () => {
                                                 </Button>
                                             </Tooltip>
                                         }
+                                    />
+                                </Form.Item>
+
+                                {/* Groups the Sribees Price app's tabs. Every product has one;
+                                    a new product starts on Long. */}
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Price Review</span>}
+                                    name="price_review_level"
+                                    tooltip="How often this product's price is re-checked in the Sribees Price app"
+                                    rules={[{ required: true, message: 'Choose how often the price is reviewed' }]}
+                                >
+                                    <Select
+                                        disabled={catalogDisabled}
+                                                                                style={{ height: 40 }}
+                                        options={PRICE_REVIEW_LEVELS}
                                     />
                                 </Form.Item>
 
