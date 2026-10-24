@@ -44,6 +44,7 @@ import type {
 import { branchesApi } from '../../api/branches.api';
 import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import { usePermissions } from '../../hooks/usePermissions';
+import BranchWeightPrices from '../../components/products/BranchWeightPrices';
 
 const { Title, Text } = Typography;
 
@@ -625,6 +626,7 @@ const BranchInventory: React.FC = () => {
                                 <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                             </Form.Item>
                         </Form>
+                        <BranchWeightPrices productId={editing.product_id} branchId={editing.branch_id} />
                     </>
                 )}
             </Drawer>

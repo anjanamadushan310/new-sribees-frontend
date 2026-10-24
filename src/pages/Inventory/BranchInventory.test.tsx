@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InventoryItem } from '../../api/inventory.api';
 import { inventoryApi } from '../../api/inventory.api';
 import { referralCommissionApi } from '../../api/referralCommission.api';
+import { weightOptionsApi } from '../../api/weightOptions.api';
 import { renderPage } from '../../test/renderPage';
 import { signIn, signOut } from '../../test/users';
 import { AdminRole } from '../../types/admin.types';
@@ -12,6 +13,10 @@ vi.mock('../../api/inventory.api', () => ({
     inventoryApi: { list: vi.fn(), update: vi.fn(), stockable: vi.fn(), stockProduct: vi.fn() },
 }));
 vi.mock('../../api/branches.api', () => ({ branchesApi: { list: vi.fn().mockResolvedValue([]) } }));
+vi.mock('../../api/weightOptions.api', async (importOriginal) => {
+    const real = await importOriginal<typeof import('../../api/weightOptions.api')>();
+    return { ...real, weightOptionsApi: { get: vi.fn(), setBranchPrice: vi.fn() } };
+});
 vi.mock('../../api/referralCommission.api', async (importOriginal) => {
     const real = await importOriginal<typeof import('../../api/referralCommission.api')>();
     return {
@@ -21,6 +26,7 @@ vi.mock('../../api/referralCommission.api', async (importOriginal) => {
 });
 const inventory = vi.mocked(inventoryApi);
 const rates = vi.mocked(referralCommissionApi);
+const weights = vi.mocked(weightOptionsApi);
 
 function row(over: Partial<InventoryItem>): InventoryItem {
     return {
@@ -52,6 +58,9 @@ describe('BranchInventory commission', () => {
             product_id: 'p-1', referral_commission_percentage: 7, global_referral_commission_percentage: 2,
             effective_referral_commission: 7,
         });
+    });
+    beforeEach(() => {
+        weights.get.mockResolvedValue({ product_id: 'p-1', sold_by_weight: false, branch_id: 'b-1', options: [] });
     });
     afterEach(() => signOut());
 
@@ -98,5 +107,42 @@ describe('BranchInventory commission', () => {
         await screen.findByRole('button', { name: 'Save' });
         expect(screen.queryByText('Referral commission (%)')).toBeNull();
         expect(rates.settings).not.toHaveBeenCalled();
+    });
+});
+
+describe('BranchInventory weight prices', () => {
+    const option = (over: object) => ({
+        variant_id: 'v-500', weight_grams: 500, label: '500g', global_price: 500, branch_price: null,
+        original_price: 500, price: 500, ...over,
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        inventory.list.mockResolvedValue({
+            items: [row({ product_name: 'White Sugar 1kg' })],
+            total: 1, page: 1, limit: 10, total_pages: 1,
+            scope: { is_super_admin: false, branch_id: 'b-1' },
+        });
+        rates.settings.mockResolvedValue({ branch_max_percent: 10, level2_share: 0.5, highest_live_percent: 5 });
+        weights.get.mockResolvedValue({
+            product_id: 'p-1', sold_by_weight: true, branch_id: 'b-1',
+            options: [option({}), option({ variant_id: 'v-1k', weight_grams: 1000, label: '1kg', global_price: 1000, branch_price: 950 })],
+        });
+        weights.setBranchPrice.mockResolvedValue({ product_id: 'p-1', sold_by_weight: true, branch_id: 'b-1', options: [] });
+    });
+    afterEach(() => signOut());
+
+    it('lets a branch manager price each weight, sending only the ones changed', async () => {
+        signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
+        renderPage(<BranchInventory />);
+        const sugar = (await screen.findByText('White Sugar 1kg')).closest('tr')!;
+        fireEvent.click(within(sugar).getByText('Quick Edit'));
+
+        const half = await screen.findByLabelText('Branch price for 500g');
+        fireEvent.change(half, { target: { value: '520' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save weight prices' }));
+
+        await waitFor(() => expect(weights.setBranchPrice).toHaveBeenCalledTimes(1));
+        expect(weights.setBranchPrice).toHaveBeenCalledWith('p-1', 'v-500', 520, 'b-1');
     });
 });

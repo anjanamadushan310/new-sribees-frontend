@@ -7,6 +7,7 @@
  * object and an images array of objects; the types below match that wire shape.
  */
 import apiClient from './client';
+import type { WeightOption } from './weightOptions.api';
 
 /**
  * 30-day sales velocity for this branch. Thresholds live server-side
@@ -98,6 +99,10 @@ export interface AdminProduct {
     is_returnable?: boolean;
     /** How often the price is re-checked (Sribees Price app tabs); long by default. */
     price_review_level?: PriceReviewLevel;
+    /** Bought by weight: the customer picks one of `weight_options`. */
+    sold_by_weight?: boolean;
+    /** Present on the single-product read of a sold-by-weight product. */
+    weight_options?: WeightOption[];
 
     // ---- Branch operations. Present only for a branch-scoped viewer; a Super
     // Admin is looking at the global catalog and has no single branch's shelf
@@ -167,6 +172,7 @@ export interface ProductPayload {
     is_perishable?: boolean;
     is_returnable?: boolean;
     price_review_level?: PriceReviewLevel;
+    sold_by_weight?: boolean;
     images?: ImageLinkPayload[];
 }
 
