@@ -75,7 +75,7 @@ const STOCK_META: Record<StockState, { color: string; bg: string; label: (q: num
     out: { color: '#dc2626', bg: '#fef2f2', label: () => 'Out of Stock (0)' },
 };
 
-type MovementTab = 'all' | ProductMovement | StockState | 'quick_sale' | 'perishable' | 'review_unset';
+type MovementTab = 'all' | ProductMovement | StockState | 'quick_sale' | 'perishable';
 
 const MOVEMENT_TABS: { label: string; value: MovementTab }[] = [
     { label: 'All Products', value: 'all' },
@@ -86,7 +86,6 @@ const MOVEMENT_TABS: { label: string; value: MovementTab }[] = [
     { label: 'Out of Stock', value: 'out' },
     { label: '⚡ On Quick Sale', value: 'quick_sale' },
     { label: 'Perishable', value: 'perishable' },
-    { label: 'No Price Review', value: 'review_unset' },
 ];
 
 /** Translate movement tab into query params */
@@ -97,7 +96,6 @@ const tabToParams = (tab: MovementTab) => {
         return { stock_state: tab as StockState };
     if (tab === 'quick_sale') return { on_quick_sale: true };
     if (tab === 'perishable') return { perishable_only: true };
-    if (tab === 'review_unset') return { price_review_level: 'unset' as const };
     return {};
 };
 

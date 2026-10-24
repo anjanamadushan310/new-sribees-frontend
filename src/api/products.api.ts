@@ -96,8 +96,8 @@ export interface AdminProduct {
      * at checkout, so changing it only affects orders placed afterwards.
      */
     is_returnable?: boolean;
-    /** How often the price is re-checked (Sribees Price app tabs); null = not chosen yet. */
-    price_review_level?: PriceReviewLevel | null;
+    /** How often the price is re-checked (Sribees Price app tabs); long by default. */
+    price_review_level?: PriceReviewLevel;
 
     // ---- Branch operations. Present only for a branch-scoped viewer; a Super
     // Admin is looking at the global catalog and has no single branch's shelf
@@ -166,7 +166,7 @@ export interface ProductPayload {
     is_featured?: boolean;
     is_perishable?: boolean;
     is_returnable?: boolean;
-    price_review_level?: PriceReviewLevel | null;
+    price_review_level?: PriceReviewLevel;
     images?: ImageLinkPayload[];
 }
 
@@ -189,8 +189,7 @@ export interface ProductListParams {
     stock_state?: StockState;
     on_quick_sale?: boolean;
     perishable_only?: boolean;
-    /** 'unset' = products nobody has given a price review level yet. */
-    price_review_level?: PriceReviewLevel | 'unset';
+    price_review_level?: PriceReviewLevel;
 }
 
 export interface ProductListResult {

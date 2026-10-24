@@ -418,7 +418,7 @@ const ProductForm: React.FC = () => {
                 is_featured: product.is_featured,
                 is_perishable: product.is_perishable ?? false,
                 is_returnable: product.is_returnable ?? true,
-                price_review_level: product.price_review_level ?? undefined,
+                price_review_level: product.price_review_level ?? 'long',
             });
             let primaryAssigned = false;
             const loaded: GalleryImage[] = (product.images || [])
@@ -537,7 +537,7 @@ const ProductForm: React.FC = () => {
                 is_featured: values.is_featured,
                 is_perishable: values.is_perishable ?? false,
                 is_returnable: values.is_returnable ?? true,
-                price_review_level: values.price_review_level ?? null,
+                price_review_level: values.price_review_level ?? 'long',
                 images: imagesPayload,
             };
 
@@ -745,7 +745,7 @@ const ProductForm: React.FC = () => {
                 form={form}
                 layout="vertical"
                 onFinish={(values) => saveMutation.mutate(values)}
-                initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg' }}
+                initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg', price_review_level: 'long' }}
             >
                 <Row gutter={24}>
                     {/* Left Column: Core Details, Multi-Language Copy, Media */}
@@ -1473,18 +1473,17 @@ const ProductForm: React.FC = () => {
                                     />
                                 </Form.Item>
 
-                                {/* Groups the Sribees Price app's tabs. Only the Super Admin
-                                    sets it, so only they are made to choose. */}
+                                {/* Groups the Sribees Price app's tabs. Every product has one;
+                                    a new product starts on Long. */}
                                 <Form.Item
                                     label={<span style={{ fontWeight: 600 }}>Price Review</span>}
                                     name="price_review_level"
                                     tooltip="How often this product's price is re-checked in the Sribees Price app"
-                                    rules={[{ required: isSuperAdmin, message: 'Choose how often the price is reviewed' }]}
+                                    rules={[{ required: true, message: 'Choose how often the price is reviewed' }]}
                                 >
                                     <Select
                                         disabled={catalogDisabled}
-                                        placeholder="Select how often the price changes"
-                                        style={{ height: 40 }}
+                                                                                style={{ height: 40 }}
                                         options={PRICE_REVIEW_LEVELS}
                                     />
                                 </Form.Item>
