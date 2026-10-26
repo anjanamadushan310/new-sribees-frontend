@@ -37,6 +37,7 @@ const QuickSale = lazy(() => import('./pages/Marketing/QuickSale'));
 const BannerList = lazy(() => import('./pages/Marketing/BannerList'));
 const PushCampaigns = lazy(() => import('./pages/Marketing/PushCampaigns'));
 const AssistantBriefings = lazy(() => import('./pages/Assistant/AssistantBriefings'));
+const AssistantInsights = lazy(() => import('./pages/Assistant/AssistantInsights'));
 
 // Orders
 const OrderList = lazy(() => import('./pages/Orders/OrderList'));
@@ -309,6 +310,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'briefings', action: 'read' }}>
                                     <AssistantBriefings />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* AI Assistant — free share, model cost, what was learned */}
+                        <Route
+                            path="assistant-insights"
+                            element={
+                                <RoleGuard requiredPermission={{ resource: 'analytics', action: 'read' }}>
+                                    <AssistantInsights />
                                 </RoleGuard>
                             }
                         />

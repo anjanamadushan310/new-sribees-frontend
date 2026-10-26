@@ -41,6 +41,7 @@ import {
     CompassOutlined,
     MobileOutlined,
     SettingOutlined,
+    DashboardOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +52,9 @@ import type { PriceReviewLevel, ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
+import WeightOptionsEditor from '../../components/products/WeightOptionsEditor';
+import { DEFAULT_WEIGHTS, proRata, weightOptionsApi } from '../../api/weightOptions.api';
+import type { WeightOptionInput } from '../../api/weightOptions.api';
 import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
 
@@ -87,6 +91,7 @@ interface ProductFormValues {
     is_featured: boolean;
     is_perishable: boolean;
     is_returnable: boolean;
+    sold_by_weight?: boolean;
     price_review_level?: PriceReviewLevel;
     images?: GalleryImage[];
 }
@@ -345,6 +350,8 @@ const ProductForm: React.FC = () => {
     const readOnly = isReadOnlyUser || (!isSuperAdmin && !isBranchScoped);
 
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
+    // Weight options of a sold-by-weight product, saved after the product.
+    const [weightRows, setWeightRows] = useState<WeightOptionInput[]>([]);
     // Snapshot of server-side images at load time, to diff removals on save.
     const [originalImages, setOriginalImages] = useState<GalleryImage[]>([]);
     const [slugTouched, setSlugTouched] = useState(false);
@@ -373,6 +380,7 @@ const ProductForm: React.FC = () => {
     const watchedCashback = Form.useWatch('cashback_percentage', form);
     const watchedFeatured = Form.useWatch('is_featured', form);
     const watchedPerishable = Form.useWatch('is_perishable', form);
+    const watchedSoldByWeight = Form.useWatch('sold_by_weight', form);
 
     const primaryThumb = gallery.find((g) => g.is_primary)?.image_url || gallery[0]?.image_url;
     const categoryObj = rootCategories.find((c) => c.category_id === selectedCategoryId);
@@ -419,7 +427,14 @@ const ProductForm: React.FC = () => {
                 is_perishable: product.is_perishable ?? false,
                 is_returnable: product.is_returnable ?? true,
                 price_review_level: product.price_review_level ?? 'long',
+                sold_by_weight: product.sold_by_weight ?? false,
             });
+            setWeightRows(
+                (product.weight_options ?? []).map((o) => ({
+                    weight_grams: o.weight_grams,
+                    price: o.global_price,
+                }))
+            );
             let primaryAssigned = false;
             const loaded: GalleryImage[] = (product.images || [])
                 .slice()
@@ -538,6 +553,7 @@ const ProductForm: React.FC = () => {
                 is_perishable: values.is_perishable ?? false,
                 is_returnable: values.is_returnable ?? true,
                 price_review_level: values.price_review_level ?? 'long',
+                sold_by_weight: values.sold_by_weight ?? false,
                 images: imagesPayload,
             };
 
@@ -547,6 +563,9 @@ const ProductForm: React.FC = () => {
 
             if (isEdit && isSuperAdmin) {
                 await syncImages(saved.product_id);
+            }
+            if (isSuperAdmin && values.sold_by_weight && weightRows.length > 0) {
+                await weightOptionsApi.replace(saved.product_id, weightRows);
             }
             const commission = values.referral_commission_percentage ?? null;
             const before = isEdit ? product?.referral_commission_percentage ?? null : null;
@@ -745,6 +764,16 @@ const ProductForm: React.FC = () => {
                 form={form}
                 layout="vertical"
                 onFinish={(values) => saveMutation.mutate(values)}
+                onValuesChange={(changed: Partial<ProductFormValues>) => {
+                    // Switched to sold-by-weight with no options yet: start from
+                    // the defaults, priced from the base price per kg.
+                    if (changed.sold_by_weight && weightRows.length === 0) {
+                        const perKg = Number(form.getFieldValue('price')) || 0;
+                        setWeightRows(
+                            DEFAULT_WEIGHTS.map((g) => ({ weight_grams: g, price: proRata(perKg, g) }))
+                        );
+                    }
+                }}
                 initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg', price_review_level: 'long' }}
             >
                 <Row gutter={24}>
@@ -1330,7 +1359,11 @@ const ProductForm: React.FC = () => {
                                     label={<span style={{ fontWeight: 600 }}>Base Price (LKR)</span>}
                                     name="price"
                                     tooltip="Global catalog base price. Branches can override this with their local price in Inventory."
-                                    extra="Default master price displayed across branches."
+                                    extra={
+                                        watchedSoldByWeight
+                                            ? 'Price per 1 kg. Each weight below has its own price.'
+                                            : 'Default master price displayed across branches.'
+                                    }
                                 >
                                     <InputNumber
                                         disabled={catalogDisabled}
@@ -1342,6 +1375,25 @@ const ProductForm: React.FC = () => {
                                         placeholder="0.00"
                                     />
                                 </Form.Item>
+
+                                {watchedSoldByWeight && (
+                                    <div
+                                        style={{
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: 12,
+                                            padding: 14,
+                                            marginBottom: 20,
+                                            background: '#fafbfc',
+                                        }}
+                                    >
+                                        <WeightOptionsEditor
+                                            value={weightRows}
+                                            onChange={setWeightRows}
+                                            pricePerKg={Number(watchedPrice) || 0}
+                                            disabled={catalogDisabled}
+                                        />
+                                    </div>
+                                )}
 
                                 <Form.Item
                                     label={<span style={{ fontWeight: 600 }}>Cashback (%)</span>}
@@ -1547,6 +1599,20 @@ const ProductForm: React.FC = () => {
                                             inactiveLabel="Shelf-stable"
                                             activeColor="#ea580c"
                                             activeBg="#fff7ed"
+                                            disabled={catalogDisabled}
+                                        />
+                                    </Form.Item>
+
+                                    {/* Sold by weight */}
+                                    <Form.Item name="sold_by_weight" valuePropName="checked" noStyle>
+                                        <FeatureTile
+                                            icon={<DashboardOutlined />}
+                                            title="Sold by Weight"
+                                            description="Customers pick 250 g, 1 kg, 5 kg ... each with its own price"
+                                            activeLabel="By weight"
+                                            inactiveLabel="By piece"
+                                            activeColor="#0d9488"
+                                            activeBg="#f0fdfa"
                                             disabled={catalogDisabled}
                                         />
                                     </Form.Item>

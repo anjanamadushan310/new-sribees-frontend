@@ -633,6 +633,11 @@ const AdminLayout: React.FC = () => {
         // 3. INTELLIGENCE & MARKETING (Clean AI Briefings without "NEW" badge)
         const intelligenceItems = [
             {
+                key: '/assistant-insights',
+                icon: <ThunderboltOutlined />,
+                label: 'AI Assistant',
+            },
+            {
                 key: '/assistant-briefings',
                 icon: <RobotOutlined />,
                 label: 'AI Briefings',
@@ -790,6 +795,7 @@ const AdminLayout: React.FC = () => {
         if (path.startsWith('/sms')) return '/sms';
         if (path.startsWith('/support-tickets')) return '/support-tickets';
         if (path.startsWith('/assistant-briefings')) return '/assistant-briefings';
+        if (path.startsWith('/assistant-insights')) return '/assistant-insights';
         if (path.startsWith('/search-misses')) return '/search-misses';
         if (path.startsWith('/analytics')) return '/analytics';
         if (path.startsWith('/coupons')) return '/coupons';
@@ -829,6 +835,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname.startsWith('/quick-sale')) return 'Quick Sale';
         if (location.pathname.startsWith('/push-campaigns')) return 'Push Campaigns';
         if (location.pathname.startsWith('/assistant-briefings')) return 'AI Briefings';
+        if (location.pathname.startsWith('/assistant-insights')) return 'AI Assistant';
         if (location.pathname.startsWith('/banners')) return 'Home Banners';
         if (location.pathname.startsWith('/branches')) return 'Branches';
         if (location.pathname.startsWith('/users')) return 'Admin Users';
