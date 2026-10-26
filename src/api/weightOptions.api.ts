@@ -48,6 +48,32 @@ export const weightLabel = (grams: number): string =>
 export const proRata = (pricePerKg: number, grams: number): number =>
     Math.round(pricePerKg * grams / 10) / 100;
 
+/**
+ * Each weight's price over its pro rata price (1 = plain pro rata, 1.08 = an
+ * 8 % markup on that weight), read from the rows as the admin left them.
+ */
+export const markups = (rows: WeightOptionInput[], pricePerKg: number): Map<number, number> =>
+    new Map(
+        rows.map((r) => {
+            const plain = (pricePerKg * r.weight_grams) / 1000;
+            return [r.weight_grams, pricePerKg > 0 && plain > 0 ? r.price / plain : 1];
+        })
+    );
+
+/**
+ * The rows repriced from a new price per kg, each keeping its markup — the
+ * same rule the backend applies when the product's price changes.
+ */
+export const followPricePerKg = (
+    rows: WeightOptionInput[],
+    pricePerKg: number,
+    marks: Map<number, number>
+): WeightOptionInput[] =>
+    rows.map((r) => ({
+        ...r,
+        price: Math.round(((pricePerKg * r.weight_grams) / 10) * (marks.get(r.weight_grams) ?? 1)) / 100,
+    }));
+
 const base = (productId: string) => `/admin/products/${productId}/weight-options`;
 
 export const weightOptionsApi = {

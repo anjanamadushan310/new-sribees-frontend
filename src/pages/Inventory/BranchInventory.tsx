@@ -6,13 +6,12 @@
  * branches for Super Admins; the response's `scope` tells us whether to show
  * the Branch column.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Card,
     Table,
     Tag,
     Space,
-    Input,
     Button,
     Drawer,
     Divider,
@@ -28,10 +27,10 @@ import {
 } from 'antd';
 import {
     EditOutlined,
-    SearchOutlined,
     InboxOutlined,
     PlusOutlined,
     InfoCircleOutlined,
+    ReloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -40,11 +39,17 @@ import type {
     InventoryItem,
     InventoryUpdatePayload,
     StockableProduct,
+    InventoryStockState,
 } from '../../api/inventory.api';
 import { branchesApi } from '../../api/branches.api';
+import { categoriesApi } from '../../api/categories.api';
+import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
+import type { PriceReviewLevel } from '../../api/products.api';
 import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import { usePermissions } from '../../hooks/usePermissions';
-import BranchWeightPrices from '../../components/products/BranchWeightPrices';
+import { BranchWeightRows } from '../../components/products/BranchWeightPrices';
+import { saveBranchWeightPrices, useBranchWeightRows } from '../../components/products/branchWeightRows';
+import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
 
@@ -120,7 +125,10 @@ const BranchInventory: React.FC = () => {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [search, setSearch] = useState('');
-    const [lowStockOnly, setLowStockOnly] = useState(false);
+    const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
+    const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined);
+    const [priceReviewLevel, setPriceReviewLevel] = useState<PriceReviewLevel | undefined>(undefined);
+    const [stockState, setStockState] = useState<InventoryStockState>('all');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [editing, setEditing] = useState<InventoryItem | null>(null);
     const [addOpen, setAddOpen] = useState(false);
@@ -134,12 +142,32 @@ const BranchInventory: React.FC = () => {
         is_active: boolean;
     }>();
 
+    // The global price of the product picked in "Add Product to Branch" (the
+    // picker's list changes with the search, so it is kept on pick).
+    const [addGlobalPrice, setAddGlobalPrice] = useState(0);
+
     // Branch options for the Super Admin branch filter (branches API is now live).
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'branches'],
         queryFn: branchesApi.list,
         enabled: isSuperAdmin,
     });
+
+    // Categories and subcategories for filter toolbar
+    const { data: categories = [] } = useQuery({
+        queryKey: ['admin', 'categories'],
+        queryFn: categoriesApi.list,
+    });
+
+    const rootCategories = useMemo(
+        () => categories.filter((c) => !c.parent_category_id),
+        [categories]
+    );
+
+    const subcategories = useMemo(
+        () => (categoryId ? categories.filter((c) => c.parent_category_id === categoryId) : []),
+        [categories, categoryId]
+    );
 
     const { data: programme } = useQuery({
         queryKey: ['admin', 'referral-commission', 'settings'],
@@ -149,7 +177,11 @@ const BranchInventory: React.FC = () => {
     // Super Admins are not capped; the cap catches a Branch Manager's typo.
     const commissionMax = isSuperAdmin ? 100 : programme?.branch_max_percent ?? 0;
 
-    const queryKey = ['admin', 'inventory', { page, pageSize, search, lowStockOnly, branchId }];
+    const queryKey = [
+        'admin',
+        'inventory',
+        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, stockState, branchId },
+    ];
 
     const { data, isLoading, isError } = useQuery({
         queryKey,
@@ -158,11 +190,29 @@ const BranchInventory: React.FC = () => {
                 page,
                 limit: pageSize,
                 search: search || undefined,
-                low_stock_only: lowStockOnly || undefined,
+                category_id: categoryId,
+                subcategory_id: subcategoryId,
+                price_review_level: priceReviewLevel,
+                stock_state: stockState !== 'all' ? stockState : undefined,
+                low_stock_only: stockState === 'low' ? true : undefined,
                 branch_id: branchId, // ignored by the server for non-super admins
             }),
         placeholderData: keepPreviousData,
     });
+
+    const hasActiveFilters = Boolean(
+        search || categoryId || subcategoryId || priceReviewLevel !== undefined || stockState !== 'all' || branchId !== undefined
+    );
+
+    const handleResetFilters = () => {
+        setPage(1);
+        setSearch('');
+        setCategoryId(undefined);
+        setSubcategoryId(undefined);
+        setPriceReviewLevel(undefined);
+        setStockState('all');
+        setBranchId(undefined);
+    };
 
     // Prefer the server's scope; fall back to the local role before data loads.
     const showBranchColumn = data?.scope.is_super_admin ?? isSuperAdmin;
@@ -180,6 +230,9 @@ const BranchInventory: React.FC = () => {
         }) => {
             await inventoryApi.update(id, payload);
             if (commission !== undefined) await referralCommissionApi.setBranchRate(id, commission);
+            if (editing) {
+                await saveBranchWeightPrices(editing.product_id, editing.branch_id, editWeights.rows);
+            }
         },
         onSuccess: () => {
             message.success('Inventory updated.');
@@ -210,17 +263,39 @@ const BranchInventory: React.FC = () => {
         enabled: addOpen && canAdd,
     });
 
+    // Weight prices follow the branch price as it is typed, in both the Add
+    // modal and the quick-edit drawer.
+    const addProductId = Form.useWatch('product_id', addForm);
+    const addBranchPrice = Form.useWatch('branch_price', addForm);
+    const addWeights = useBranchWeightRows(
+        addProductId,
+        targetBranchId,
+        Number(addBranchPrice) || addGlobalPrice,
+        addGlobalPrice,
+    );
+    const editBranchPrice = Form.useWatch('branch_price', form);
+    const editGlobalPrice = Number(editing?.global_price) || 0;
+    const editWeights = useBranchWeightRows(
+        editing?.product_id,
+        editing?.branch_id,
+        Number(editBranchPrice) || editGlobalPrice,
+        editGlobalPrice,
+        Number(editing?.branch_price) || editGlobalPrice,
+    );
+
     const stockMutation = useMutation({
-        mutationFn: (payload: Parameters<typeof inventoryApi.stockProduct>[0]) =>
-            inventoryApi.stockProduct(payload),
+        mutationFn: async (payload: Parameters<typeof inventoryApi.stockProduct>[0]) => {
+            await inventoryApi.stockProduct(payload);
+            await saveBranchWeightPrices(payload.product_id, payload.branch_id, addWeights.rows);
+        },
         onSuccess: () => {
             message.success('Product stocked in branch.');
             setAddOpen(false);
             addForm.resetFields();
             queryClient.invalidateQueries({ queryKey: ['admin', 'inventory'] });
         },
-        onError: (err: any) =>
-            message.error(err.response?.data?.detail || 'Failed to stock product.'),
+        onError: (err: unknown) =>
+            message.error(apiDetailMessage(err) || 'Failed to stock product.'),
     });
 
     const openEdit = (item: InventoryItem) => {
@@ -401,43 +476,109 @@ const BranchInventory: React.FC = () => {
                 </Tooltip>
             </div>
 
-            <Card>
-                <Space wrap style={{ marginBottom: 16 }}>
-                    <Input.Search
-                        placeholder="Search product or SKU…"
-                        allowClear
-                        enterButton={<SearchOutlined />}
-                        style={{ width: 300 }}
-                        onSearch={(value) => {
-                            setPage(1);
-                            setSearch(value);
-                        }}
-                    />
-                    {showBranchColumn && (
-                        <Select
-                            placeholder="All branches"
-                            style={{ width: 220 }}
+            {/* Unified Executive Modern Filter Bar (Shopify Standard) */}
+            <div
+                style={{
+                    background: '#ffffff',
+                    padding: '16px 20px',
+                    borderRadius: 14,
+                    border: '1px solid #e2e8f0',
+                    marginBottom: 20,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+            >
+                <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Space wrap size={12}>
+                        <DebouncedSearchInput
+                            placeholder="Search by name, SKU or barcode…"
+                            value={search}
+                            onChange={(v) => {
+                                setPage(1);
+                                setSearch(v);
+                            }}
+                            urlParam="q"
+                            style={{ width: 280, borderRadius: 10 }}
+                        />
+                        <Select<string>
+                            placeholder="All categories"
+                            style={{ width: 180 }}
                             allowClear
-                            value={branchId}
+                            value={categoryId}
                             onChange={(value) => {
                                 setPage(1);
-                                setBranchId(value);
+                                setCategoryId(value);
+                                setSubcategoryId(undefined);
                             }}
-                            options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                            options={rootCategories.map((c) => ({ label: c.name, value: c.category_id }))}
                         />
-                    )}
-                    <Space>
-                        <Text type="secondary">Low stock only</Text>
-                        <Switch
-                            checked={lowStockOnly}
-                            onChange={(checked) => {
+                        <Select<string>
+                            placeholder={categoryId ? 'All subcategories' : 'Select category first'}
+                            style={{ width: 180 }}
+                            allowClear
+                            disabled={!categoryId}
+                            value={subcategoryId}
+                            onChange={(value) => {
                                 setPage(1);
-                                setLowStockOnly(checked);
+                                setSubcategoryId(value);
                             }}
+                            options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
                         />
+                        <Select<PriceReviewLevel>
+                            placeholder="All price reviews"
+                            style={{ width: 195 }}
+                            allowClear
+                            popupMatchSelectWidth={false}
+                            value={priceReviewLevel}
+                            onChange={(value) => {
+                                setPage(1);
+                                setPriceReviewLevel(value);
+                            }}
+                            options={PRICE_REVIEW_LEVELS}
+                        />
+                        <Select<InventoryStockState>
+                            placeholder="All stock levels"
+                            style={{ width: 160 }}
+                            value={stockState}
+                            onChange={(value) => {
+                                setPage(1);
+                                setStockState(value);
+                            }}
+                            options={[
+                                { label: 'All stock levels', value: 'all' },
+                                { label: '⚠️ Low stock only', value: 'low' },
+                                { label: '✅ In stock', value: 'in' },
+                                { label: '❌ Out of stock', value: 'out' },
+                            ]}
+                        />
+                        {showBranchColumn && (
+                            <Select
+                                placeholder="All branches"
+                                style={{ width: 200 }}
+                                allowClear
+                                value={branchId}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setBranchId(value);
+                                }}
+                                options={branches.map((b) => ({ label: b.name, value: b.branch_id }))}
+                            />
+                        )}
                     </Space>
-                </Space>
 
+                    {hasActiveFilters && (
+                        <Button
+                            type="text"
+                            icon={<ReloadOutlined />}
+                            onClick={handleResetFilters}
+                            style={{ color: '#64748b', fontWeight: 600 }}
+                        >
+                            Reset Filters
+                        </Button>
+                    )}
+                </Space>
+            </div>
+
+            <Card style={{ borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
                 <Table
                     rowKey="inventory_id"
                     columns={columns}
@@ -626,7 +767,11 @@ const BranchInventory: React.FC = () => {
                                 <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                             </Form.Item>
                         </Form>
-                        <BranchWeightPrices productId={editing.product_id} branchId={editing.branch_id} />
+                        <BranchWeightRows
+                            rows={editWeights.rows}
+                            onPrice={editWeights.setPrice}
+                            onKilo={(v) => form.setFieldValue('branch_price', v)}
+                        />
                     </>
                 )}
             </Drawer>
@@ -661,6 +806,7 @@ const BranchInventory: React.FC = () => {
                                 const selected = (stockable?.products ?? []).find(
                                     (p: StockableProduct) => p.product_id === productId
                                 );
+                                setAddGlobalPrice(Number(selected?.global_price) || 0);
                                 if (selected && selected.global_price !== undefined && selected.global_price !== null) {
                                     addForm.setFieldValue(
                                         'branch_price',
@@ -734,6 +880,11 @@ const BranchInventory: React.FC = () => {
                         <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                     </Form.Item>
                 </Form>
+                <BranchWeightRows
+                    rows={addWeights.rows}
+                    onPrice={addWeights.setPrice}
+                    onKilo={(v) => addForm.setFieldValue('branch_price', v ?? undefined)}
+                />
             </Modal>
         </div>
     );
