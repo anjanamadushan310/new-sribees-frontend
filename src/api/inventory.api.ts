@@ -6,6 +6,9 @@
  * Responses are snake_case (hand-built dicts), matching the types below.
  */
 import apiClient from './client';
+import type { PriceReviewLevel } from './products.api';
+
+export type InventoryStockState = 'all' | 'in' | 'low' | 'out';
 
 export interface InventoryItem {
     inventory_id: string;
@@ -49,6 +52,10 @@ export interface InventoryListParams {
     page?: number;
     limit?: number;
     search?: string;
+    category_id?: string;
+    subcategory_id?: string;
+    price_review_level?: PriceReviewLevel;
+    stock_state?: InventoryStockState;
     low_stock_only?: boolean;
     branch_id?: string; // super admin only
 }
