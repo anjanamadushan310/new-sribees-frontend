@@ -1355,6 +1355,21 @@ const ProductForm: React.FC = () => {
                                 </div>
                             </div>
                             <div className="pf-card-body">
+                                {/* Sold by weight sits with the price it changes: on, the base
+                                    price reads per 1 kg and the weight options appear below it. */}
+                                <Form.Item name="sold_by_weight" valuePropName="checked" noStyle>
+                                    <FeatureTile
+                                        icon={<DashboardOutlined />}
+                                        title="Sold by Weight"
+                                        description="Customers pick 250 g, 1 kg, 5 kg ... each with its own price"
+                                        activeLabel="By weight"
+                                        inactiveLabel="By piece"
+                                        activeColor="#0d9488"
+                                        activeBg="#f0fdfa"
+                                        disabled={catalogDisabled}
+                                    />
+                                </Form.Item>
+                                <div style={{ height: 10 }} />
                                 <Form.Item
                                     label={<span style={{ fontWeight: 600 }}>Base Price (LKR)</span>}
                                     name="price"
@@ -1599,20 +1614,6 @@ const ProductForm: React.FC = () => {
                                             inactiveLabel="Shelf-stable"
                                             activeColor="#ea580c"
                                             activeBg="#fff7ed"
-                                            disabled={catalogDisabled}
-                                        />
-                                    </Form.Item>
-
-                                    {/* Sold by weight */}
-                                    <Form.Item name="sold_by_weight" valuePropName="checked" noStyle>
-                                        <FeatureTile
-                                            icon={<DashboardOutlined />}
-                                            title="Sold by Weight"
-                                            description="Customers pick 250 g, 1 kg, 5 kg ... each with its own price"
-                                            activeLabel="By weight"
-                                            inactiveLabel="By piece"
-                                            activeColor="#0d9488"
-                                            activeBg="#f0fdfa"
                                             disabled={catalogDisabled}
                                         />
                                     </Form.Item>
