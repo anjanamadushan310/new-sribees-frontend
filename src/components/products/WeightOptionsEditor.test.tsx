@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import WeightOptionsEditor from './WeightOptionsEditor';
-import { proRata, weightLabel, type WeightOptionInput } from '../../api/weightOptions.api';
+import { followPricePerKg, markups, proRata, weightLabel, type WeightOptionInput } from '../../api/weightOptions.api';
 
 const Harness: React.FC<{ initial: WeightOptionInput[]; perKg: number; onRows?: (r: WeightOptionInput[]) => void }> = ({
     initial,
@@ -23,6 +23,21 @@ const Harness: React.FC<{ initial: WeightOptionInput[]; perKg: number; onRows?: 
 };
 
 describe('weight option helpers', () => {
+    it('reprices every weight from a new price per kg, keeping a hand-set markup', () => {
+        const rows = [
+            { weight_grams: 250, price: 270 },
+            { weight_grams: 1000, price: 1000 },
+        ];
+        const marks = markups(rows, 1000);
+        // Typed one character at a time: 1, 10, 105, 1050 -- no drift on the way.
+        let now = rows;
+        for (const typed of [1, 10, 105, 1050]) now = followPricePerKg(now, typed, marks);
+        expect(now).toEqual([
+            { weight_grams: 250, price: 283.5 },
+            { weight_grams: 1000, price: 1050 },
+        ]);
+    });
+
     it('labels grams and kilos the way the backend does', () => {
         expect([250, 1000, 1500, 10000].map(weightLabel)).toEqual(['250g', '1kg', '1.5kg', '10kg']);
     });
