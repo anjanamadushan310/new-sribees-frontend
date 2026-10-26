@@ -132,17 +132,87 @@ describe('BranchInventory weight prices', () => {
     });
     afterEach(() => signOut());
 
-    it('lets a branch manager price each weight, sending only the ones changed', async () => {
+    it('reprices the weights as the branch price is typed and saves only hand-set ones', async () => {
+        signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
+        weights.get.mockResolvedValue({
+            product_id: 'p-1', sold_by_weight: true, branch_id: 'b-1',
+            options: [
+                option({ variant_id: 'v-250', weight_grams: 250, label: '250g', global_price: 250 }),
+                option({}),
+                option({ variant_id: 'v-1k', weight_grams: 1000, label: '1kg', global_price: 1000 }),
+            ],
+        });
+        renderPage(<BranchInventory />);
+        const sugar = (await screen.findByText('White Sugar 1kg')).closest('tr')!;
+        fireEvent.click(within(sugar).getByText('Quick Edit'));
+
+        const quarter = await screen.findByLabelText('Branch price for 250g');
+        expect((quarter as HTMLInputElement).value).toBe('250.00');
+        // The branch price is the price per kg: every weight follows it live.
+        fireEvent.change(screen.getByPlaceholderText('1000'), { target: { value: '1750' } });
+        await waitFor(() => expect((quarter as HTMLInputElement).value).toBe('437.50'));
+        expect((screen.getByLabelText('Branch price for 1kg') as HTMLInputElement).value).toBe('1750.00');
+
+        // One weight priced by hand keeps its markup as the branch price moves.
+        fireEvent.change(screen.getByLabelText('Branch price for 500g'), { target: { value: '962.50' } });
+        fireEvent.change(screen.getByPlaceholderText('1000'), { target: { value: '2000' } });
+        await waitFor(() =>
+            expect((screen.getByLabelText('Branch price for 500g') as HTMLInputElement).value).toBe('1100.00')
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(weights.setBranchPrice).toHaveBeenCalledTimes(1));
+        expect(weights.setBranchPrice).toHaveBeenCalledWith('p-1', 'v-500', 1100, 'b-1');
+        expect(inventory.update.mock.calls.at(-1)![1]).toMatchObject({ branch_price: 2000 });
+    });
+
+    it('editing the 1 kg weight edits the branch price', async () => {
         signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
         renderPage(<BranchInventory />);
         const sugar = (await screen.findByText('White Sugar 1kg')).closest('tr')!;
         fireEvent.click(within(sugar).getByText('Quick Edit'));
 
-        const half = await screen.findByLabelText('Branch price for 500g');
-        fireEvent.change(half, { target: { value: '520' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save weight prices' }));
+        fireEvent.change(await screen.findByLabelText('Branch price for 1kg'), { target: { value: '1200' } });
+        await waitFor(() =>
+            expect((screen.getByPlaceholderText('1000') as HTMLInputElement).value).toBe('1200.00')
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(inventory.update).toHaveBeenCalledTimes(1));
+        expect(inventory.update.mock.calls[0][1]).toMatchObject({ branch_price: 1200 });
+        expect(weights.setBranchPrice).not.toHaveBeenCalled();
+    });
 
-        await waitFor(() => expect(weights.setBranchPrice).toHaveBeenCalledTimes(1));
-        expect(weights.setBranchPrice).toHaveBeenCalledWith('p-1', 'v-500', 520, 'b-1');
+    it('shows the weight prices when a sold-by-weight product is added to the branch', async () => {
+        signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
+        inventory.stockable.mockResolvedValue({
+            products: [{ product_id: 'p-1', name: 'Brown Sugar 1kg', sku: 'SB-BROWN', global_price: 1000,
+                         global_stock_quantity: 0, category_name: null }],
+            total: 1, page: 1, limit: 50, total_pages: 1,
+        });
+        inventory.stockProduct.mockResolvedValue(row({}));
+        weights.get.mockResolvedValue({
+            product_id: 'p-1', sold_by_weight: true, branch_id: 'b-1',
+            options: [
+                option({ variant_id: 'v-250', weight_grams: 250, label: '250g', global_price: 250 }),
+                option({ variant_id: 'v-1k', weight_grams: 1000, label: '1kg', global_price: 1000 }),
+            ],
+        });
+        renderPage(<BranchInventory />);
+        await screen.findByText('White Sugar 1kg'); // the branch is known once the list loads
+        fireEvent.click(screen.getByRole('button', { name: /Add Product to Branch/ }));
+
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.mouseDown(within(dialog).getAllByRole('combobox')[0]);
+        fireEvent.click(await screen.findByText('Brown Sugar 1kg (SB-BROWN)'));
+
+        const quarter = await screen.findByLabelText('Branch price for 250g');
+        expect((quarter as HTMLInputElement).value).toBe('250.00');
+        // Typed one character at a time: each keystroke reprices the weights.
+        const price = within(dialog).getByPlaceholderText('0.00');
+        for (const typed of ['1', '12', '120', '1200']) {
+            fireEvent.change(price, { target: { value: typed } });
+        }
+        await waitFor(() => expect((quarter as HTMLInputElement).value).toBe('300.00'));
+        expect(weights.setBranchPrice).not.toHaveBeenCalled();
     });
 });

@@ -47,7 +47,8 @@ import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
 import type { PriceReviewLevel } from '../../api/products.api';
 import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import { usePermissions } from '../../hooks/usePermissions';
-import BranchWeightPrices from '../../components/products/BranchWeightPrices';
+import { BranchWeightRows } from '../../components/products/BranchWeightPrices';
+import { saveBranchWeightPrices, useBranchWeightRows } from '../../components/products/branchWeightRows';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
@@ -141,6 +142,10 @@ const BranchInventory: React.FC = () => {
         is_active: boolean;
     }>();
 
+    // The global price of the product picked in "Add Product to Branch" (the
+    // picker's list changes with the search, so it is kept on pick).
+    const [addGlobalPrice, setAddGlobalPrice] = useState(0);
+
     // Branch options for the Super Admin branch filter (branches API is now live).
     const { data: branches = [] } = useQuery({
         queryKey: ['admin', 'branches'],
@@ -225,6 +230,9 @@ const BranchInventory: React.FC = () => {
         }) => {
             await inventoryApi.update(id, payload);
             if (commission !== undefined) await referralCommissionApi.setBranchRate(id, commission);
+            if (editing) {
+                await saveBranchWeightPrices(editing.product_id, editing.branch_id, editWeights.rows);
+            }
         },
         onSuccess: () => {
             message.success('Inventory updated.');
@@ -255,9 +263,31 @@ const BranchInventory: React.FC = () => {
         enabled: addOpen && canAdd,
     });
 
+    // Weight prices follow the branch price as it is typed, in both the Add
+    // modal and the quick-edit drawer.
+    const addProductId = Form.useWatch('product_id', addForm);
+    const addBranchPrice = Form.useWatch('branch_price', addForm);
+    const addWeights = useBranchWeightRows(
+        addProductId,
+        targetBranchId,
+        Number(addBranchPrice) || addGlobalPrice,
+        addGlobalPrice,
+    );
+    const editBranchPrice = Form.useWatch('branch_price', form);
+    const editGlobalPrice = Number(editing?.global_price) || 0;
+    const editWeights = useBranchWeightRows(
+        editing?.product_id,
+        editing?.branch_id,
+        Number(editBranchPrice) || editGlobalPrice,
+        editGlobalPrice,
+        Number(editing?.branch_price) || editGlobalPrice,
+    );
+
     const stockMutation = useMutation({
-        mutationFn: (payload: Parameters<typeof inventoryApi.stockProduct>[0]) =>
-            inventoryApi.stockProduct(payload),
+        mutationFn: async (payload: Parameters<typeof inventoryApi.stockProduct>[0]) => {
+            await inventoryApi.stockProduct(payload);
+            await saveBranchWeightPrices(payload.product_id, payload.branch_id, addWeights.rows);
+        },
         onSuccess: () => {
             message.success('Product stocked in branch.');
             setAddOpen(false);
@@ -737,7 +767,11 @@ const BranchInventory: React.FC = () => {
                                 <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                             </Form.Item>
                         </Form>
-                        <BranchWeightPrices productId={editing.product_id} branchId={editing.branch_id} />
+                        <BranchWeightRows
+                            rows={editWeights.rows}
+                            onPrice={editWeights.setPrice}
+                            onKilo={(v) => form.setFieldValue('branch_price', v)}
+                        />
                     </>
                 )}
             </Drawer>
@@ -772,6 +806,7 @@ const BranchInventory: React.FC = () => {
                                 const selected = (stockable?.products ?? []).find(
                                     (p: StockableProduct) => p.product_id === productId
                                 );
+                                setAddGlobalPrice(Number(selected?.global_price) || 0);
                                 if (selected && selected.global_price !== undefined && selected.global_price !== null) {
                                     addForm.setFieldValue(
                                         'branch_price',
@@ -845,6 +880,11 @@ const BranchInventory: React.FC = () => {
                         <Switch checkedChildren="Visible" unCheckedChildren="Hidden" />
                     </Form.Item>
                 </Form>
+                <BranchWeightRows
+                    rows={addWeights.rows}
+                    onPrice={addWeights.setPrice}
+                    onKilo={(v) => addForm.setFieldValue('branch_price', v ?? undefined)}
+                />
             </Modal>
         </div>
     );
