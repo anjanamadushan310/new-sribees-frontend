@@ -26,6 +26,25 @@ describe('ProductForm sold by weight', () => {
 
         fireEvent.click(tile);
         await waitFor(() => expect(screen.getByText('Weight options')).toBeTruthy());
-        expect(screen.getByText('Price per 1 kg. Each weight below has its own price.')).toBeTruthy();
+        expect(screen.getByText('Price per 1 kg. The weights below follow it; each can still be changed.')).toBeTruthy();
+
+        // Typing the base price reprices every weight as it is typed.
+        const base = screen.getByPlaceholderText('0.00');
+        fireEvent.change(base, { target: { value: '1' } });
+        await waitFor(() =>
+            expect((screen.getByLabelText('Price for 250g') as HTMLInputElement).value).toBe('0.25')
+        );
+        fireEvent.change(base, { target: { value: '1050' } });
+        await waitFor(() =>
+            expect((screen.getByLabelText('Price for 1kg') as HTMLInputElement).value).toBe('1050.00')
+        );
+        expect((screen.getByLabelText('Price for 250g') as HTMLInputElement).value).toBe('262.50');
+
+        // A weight changed by hand keeps its markup when the base moves again.
+        fireEvent.change(screen.getByLabelText('Price for 250g'), { target: { value: '300' } });
+        fireEvent.change(base, { target: { value: '2100' } });
+        await waitFor(() =>
+            expect((screen.getByLabelText('Price for 250g') as HTMLInputElement).value).toBe('600.00')
+        );
     }, 30000);
 });

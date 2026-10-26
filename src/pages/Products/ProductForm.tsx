@@ -6,7 +6,7 @@
  * unlinked. Images are uploaded to storage by ImageGalleryUpload as files are
  * chosen; here we only link/unlink URLs to the product.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Form,
     Input,
@@ -53,7 +53,7 @@ import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
 import WeightOptionsEditor from '../../components/products/WeightOptionsEditor';
-import { DEFAULT_WEIGHTS, proRata, weightOptionsApi } from '../../api/weightOptions.api';
+import { DEFAULT_WEIGHTS, followPricePerKg, markups, proRata, weightOptionsApi } from '../../api/weightOptions.api';
 import type { WeightOptionInput } from '../../api/weightOptions.api';
 import { useAuthStore } from '../../store/authStore';
 import { AdminRole } from '../../types/admin.types';
@@ -352,6 +352,13 @@ const ProductForm: React.FC = () => {
     const [gallery, setGallery] = useState<GalleryImage[]>([]);
     // Weight options of a sold-by-weight product, saved after the product.
     const [weightRows, setWeightRows] = useState<WeightOptionInput[]>([]);
+    // Each weight's markup over pro rata, so typing a new base price reprices
+    // every weight live and keeps a weight the admin priced by hand in step.
+    const weightMarkups = useRef<Map<number, number>>(new Map());
+    const editWeightRows = (rows: WeightOptionInput[]) => {
+        setWeightRows(rows);
+        weightMarkups.current = markups(rows, Number(form.getFieldValue('price')) || 0);
+    };
     // Snapshot of server-side images at load time, to diff removals on save.
     const [originalImages, setOriginalImages] = useState<GalleryImage[]>([]);
     const [slugTouched, setSlugTouched] = useState(false);
@@ -429,12 +436,12 @@ const ProductForm: React.FC = () => {
                 price_review_level: product.price_review_level ?? 'long',
                 sold_by_weight: product.sold_by_weight ?? false,
             });
-            setWeightRows(
-                (product.weight_options ?? []).map((o) => ({
-                    weight_grams: o.weight_grams,
-                    price: o.global_price,
-                }))
-            );
+            const loadedWeights = (product.weight_options ?? []).map((o) => ({
+                weight_grams: o.weight_grams,
+                price: o.global_price,
+            }));
+            setWeightRows(loadedWeights);
+            weightMarkups.current = markups(loadedWeights, Number(globalPrice) || 0);
             let primaryAssigned = false;
             const loaded: GalleryImage[] = (product.images || [])
                 .slice()
@@ -769,9 +776,17 @@ const ProductForm: React.FC = () => {
                     // the defaults, priced from the base price per kg.
                     if (changed.sold_by_weight && weightRows.length === 0) {
                         const perKg = Number(form.getFieldValue('price')) || 0;
-                        setWeightRows(
+                        editWeightRows(
                             DEFAULT_WEIGHTS.map((g) => ({ weight_grams: g, price: proRata(perKg, g) }))
                         );
+                    }
+                    // The base price is the price per kg: every weight follows
+                    // it as it is typed. An empty or zero price leaves them.
+                    if ('price' in changed && form.getFieldValue('sold_by_weight') && weightRows.length > 0) {
+                        const perKg = Number(changed.price) || 0;
+                        if (perKg > 0) {
+                            setWeightRows(followPricePerKg(weightRows, perKg, weightMarkups.current));
+                        }
                     }
                 }}
                 initialValues={{ is_active: true, is_featured: false, is_returnable: true, weight_unit: 'kg', price_review_level: 'long' }}
@@ -1376,7 +1391,7 @@ const ProductForm: React.FC = () => {
                                     tooltip="Global catalog base price. Branches can override this with their local price in Inventory."
                                     extra={
                                         watchedSoldByWeight
-                                            ? 'Price per 1 kg. Each weight below has its own price.'
+                                            ? 'Price per 1 kg. The weights below follow it; each can still be changed.'
                                             : 'Default master price displayed across branches.'
                                     }
                                 >
@@ -1403,7 +1418,7 @@ const ProductForm: React.FC = () => {
                                     >
                                         <WeightOptionsEditor
                                             value={weightRows}
-                                            onChange={setWeightRows}
+                                            onChange={editWeightRows}
                                             pricePerKg={Number(watchedPrice) || 0}
                                             disabled={catalogDisabled}
                                         />
