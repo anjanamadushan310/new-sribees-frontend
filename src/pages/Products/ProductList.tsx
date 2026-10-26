@@ -35,8 +35,8 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { productsApi } from '../../api/products.api';
-import type { AdminProduct, ProductMovement, StockState } from '../../api/products.api';
+import { productsApi, PRICE_REVIEW_LEVELS } from '../../api/products.api';
+import type { AdminProduct, ProductMovement, StockState, PriceReviewLevel } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuthStore } from '../../store/authStore';
@@ -276,6 +276,7 @@ const ProductList: React.FC = () => {
     const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined);
     const [isActive, setIsActive] = useState<boolean | undefined>(undefined);
+    const [priceReviewLevel, setPriceReviewLevel] = useState<PriceReviewLevel | undefined>(undefined);
     const [movementTab, setMovementTab] = useState<MovementTab>('all');
 
     // Category options for filter
@@ -297,7 +298,7 @@ const ProductList: React.FC = () => {
     const listKey = [
         'admin',
         'products',
-        { page, pageSize, search, categoryId, subcategoryId, isActive, movementTab },
+        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, isActive, movementTab },
     ];
 
     const { data, isLoading, isError } = useQuery({
@@ -310,6 +311,7 @@ const ProductList: React.FC = () => {
                 category_id: categoryId,
                 subcategory_id: subcategoryId,
                 is_active: isActive,
+                price_review_level: priceReviewLevel,
                 ...tabToParams(movementTab),
             }),
         placeholderData: keepPreviousData,
@@ -343,7 +345,7 @@ const ProductList: React.FC = () => {
     );
 
     const hasActiveFilters = Boolean(
-        search || categoryId || subcategoryId || isActive !== undefined || movementTab !== 'all'
+        search || categoryId || subcategoryId || priceReviewLevel !== undefined || isActive !== undefined || movementTab !== 'all'
     );
 
     const handleResetFilters = () => {
@@ -351,6 +353,7 @@ const ProductList: React.FC = () => {
         setSearch('');
         setCategoryId(undefined);
         setSubcategoryId(undefined);
+        setPriceReviewLevel(undefined);
         setIsActive(undefined);
         setMovementTab('all');
     };
@@ -558,7 +561,7 @@ const ProductList: React.FC = () => {
             title: 'Status',
             dataIndex: 'is_active',
             key: 'is_active',
-            width: 120,
+            width: 135,
             render: (active: boolean, record) => (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span
@@ -585,6 +588,50 @@ const ProductList: React.FC = () => {
                         />
                         {active ? 'Active' : 'Inactive'}
                     </span>
+                    {record.price_review_level && (
+                        <span
+                            style={{
+                                display: 'inline-block',
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                padding: '2px 7px',
+                                borderRadius: 6,
+                                alignSelf: 'flex-start',
+                                background:
+                                    record.price_review_level === 'daily'
+                                        ? '#fff7ed'
+                                        : record.price_review_level === 'weekly'
+                                        ? '#eff6ff'
+                                        : record.price_review_level === 'monthly'
+                                        ? '#faf5ff'
+                                        : '#f1f5f9',
+                                color:
+                                    record.price_review_level === 'daily'
+                                        ? '#c2410c'
+                                        : record.price_review_level === 'weekly'
+                                        ? '#1d4ed8'
+                                        : record.price_review_level === 'monthly'
+                                        ? '#7e22ce'
+                                        : '#475569',
+                                border:
+                                    record.price_review_level === 'daily'
+                                        ? '1px solid #ffedd5'
+                                        : record.price_review_level === 'weekly'
+                                        ? '1px solid #dbeafe'
+                                        : record.price_review_level === 'monthly'
+                                        ? '1px solid #f3e8ff'
+                                        : '1px solid #e2e8f0',
+                            }}
+                        >
+                            {record.price_review_level === 'daily'
+                                ? 'Daily Review'
+                                : record.price_review_level === 'weekly'
+                                ? 'Weekly Review'
+                                : record.price_review_level === 'monthly'
+                                ? 'Monthly Review'
+                                : 'Long Review'}
+                        </span>
+                    )}
                     {record.is_perishable && (
                         <Tag
                             color="orange"
@@ -871,6 +918,18 @@ const ProductList: React.FC = () => {
                                     setSubcategoryId(value);
                                 }}
                                 options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
+                            />
+                            <Select<PriceReviewLevel>
+                                placeholder="All price reviews"
+                                style={{ width: 195 }}
+                                allowClear
+                                popupMatchSelectWidth={false}
+                                value={priceReviewLevel}
+                                onChange={(value) => {
+                                    setPage(1);
+                                    setPriceReviewLevel(value);
+                                }}
+                                options={PRICE_REVIEW_LEVELS}
                             />
                             <Select<boolean, { label: string; value: boolean }>
                                 placeholder="All statuses"
