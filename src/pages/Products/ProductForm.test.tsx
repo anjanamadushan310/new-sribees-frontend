@@ -48,3 +48,30 @@ describe('ProductForm sold by weight', () => {
         );
     }, 30000);
 });
+
+
+describe('customer-facing size preview', () => {
+    afterEach(signOut);
+
+    it('uses only display size and unit, updates immediately, and hides when cleared', async () => {
+        signIn(AdminRole.SUPER_ADMIN);
+        renderPage(<ProductForm />, { path: '/products/new', route: '/products/new' });
+        const size = await screen.findByLabelText('Weight / Size value');
+        const unit = screen.getByLabelText('Display unit (optional)');
+        expect(screen.queryByTestId('customer-preview-size')).toBeNull();
+
+        fireEvent.change(size, { target: { value: '425' } });
+        await waitFor(() => expect(screen.getByTestId('customer-preview-size')).toHaveTextContent('425'));
+        fireEvent.change(unit, { target: { value: 'g' } });
+        await waitFor(() => expect(screen.getByTestId('customer-preview-size')).toHaveTextContent('425 g'));
+
+        // Courier weight must not change the retail size shown to customers.
+        fireEvent.change(screen.getByLabelText('Weight / Size'), { target: { value: '400' } });
+        expect(screen.getByTestId('customer-preview-size')).toHaveTextContent('425 g');
+        fireEvent.change(unit, { target: { value: '' } });
+        fireEvent.change(size, { target: { value: 'XL' } });
+        await waitFor(() => expect(screen.getByTestId('customer-preview-size').textContent).toBe('XL'));
+        fireEvent.change(size, { target: { value: '   ' } });
+        await waitFor(() => expect(screen.queryByTestId('customer-preview-size')).toBeNull());
+    }, 30000);
+});

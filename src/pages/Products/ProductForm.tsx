@@ -601,8 +601,9 @@ const ProductForm: React.FC = () => {
     const watchedNameSi = Form.useWatch('name_si', form);
     const watchedNameTa = Form.useWatch('name_ta', form);
     const watchedPrice = Form.useWatch('price', form);
-    const watchedWeight = Form.useWatch('weight', form);
-    const watchedWeightUnit = Form.useWatch('weight_unit', form);
+    const watchedDisplaySize = Form.useWatch('display_size', form);
+    const watchedDisplayUnit = Form.useWatch('display_size_unit', form);
+    const previewDisplaySize = [watchedDisplaySize?.trim(), watchedDisplayUnit?.trim()].filter(Boolean).join(' ');
     const watchedCashback = Form.useWatch('cashback_percentage', form);
     const watchedFeatured = Form.useWatch('is_featured', form);
     const watchedPerishable = Form.useWatch('is_perishable', form);
@@ -1411,7 +1412,8 @@ const ProductForm: React.FC = () => {
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                            <span
+                                            {watchedDisplaySize?.trim() && <span
+                                                data-testid="customer-preview-size"
                                                 style={{
                                                     fontSize: 10.5,
                                                     fontWeight: 700,
@@ -1421,8 +1423,8 @@ const ProductForm: React.FC = () => {
                                                     borderRadius: 4,
                                                 }}
                                             >
-                                                {watchedWeight ? `${watchedWeight} ${watchedWeightUnit || 'kg'}` : '1 kg'}
-                                            </span>
+                                                {previewDisplaySize}
+                                            </span>}
                                             {watchedPerishable && (
                                                 <span
                                                     style={{
@@ -1498,7 +1500,7 @@ const ProductForm: React.FC = () => {
                                         <Form.Item
                                             label={<span style={{ fontWeight: 600 }}>Weight / Size</span>}
                                             name="weight"
-                                            tooltip="Used for delivery fee calculation and product size display"
+                                            tooltip="Total packed weight used for delivery fee calculation only. Customer-visible size is set separately below."
                                             rules={[
                                                 { required: true, message: 'Please enter weight' },
                                                 {
