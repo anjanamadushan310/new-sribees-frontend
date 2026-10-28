@@ -1500,7 +1500,7 @@ const ProductForm: React.FC = () => {
                                         <Form.Item
                                             label={<span style={{ fontWeight: 600 }}>Weight / Size</span>}
                                             name="weight"
-                                            tooltip="Used for delivery fee calculation and product size display"
+                                            tooltip="Total packed weight used for delivery fee calculation only. Customer-visible size is set separately below."
                                             rules={[
                                                 { required: true, message: 'Please enter weight' },
                                                 {
