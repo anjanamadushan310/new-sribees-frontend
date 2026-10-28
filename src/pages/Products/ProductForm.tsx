@@ -52,6 +52,7 @@ import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
 import type { PriceReviewLevel, ProductPayload } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
+import DescriptionEditor from '../../components/products/DescriptionEditor';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
 import WeightOptionsEditor from '../../components/products/WeightOptionsEditor';
 import { DEFAULT_WEIGHTS, followPricePerKg, markups, proRata, weightOptionsApi } from '../../api/weightOptions.api';
@@ -1076,12 +1077,7 @@ const ProductForm: React.FC = () => {
                                                         label={<span style={{ fontWeight: 600 }}>Full Description</span>}
                                                         name="description"
                                                     >
-                                                        <TextArea
-                                                            disabled={catalogDisabled}
-                                                            rows={4}
-                                                            style={{ borderRadius: 10 }}
-                                                            placeholder="Detailed product specifications, nutritional information, ingredients, or usage guidelines"
-                                                        />
+                                                        <DescriptionEditor disabled={catalogDisabled} placeholder="Detailed product specifications, nutritional information, ingredients, or usage guidelines" />
                                                     </Form.Item>
                                                 </>
                                             ),
@@ -1131,12 +1127,7 @@ const ProductForm: React.FC = () => {
                                                         label={<span style={{ fontWeight: 600 }}>සම්පූර්ණ විස්තරය (Full Description)</span>}
                                                         name="description_si"
                                                     >
-                                                        <TextArea
-                                                            disabled={catalogDisabled}
-                                                            rows={4}
-                                                            style={{ borderRadius: 10 }}
-                                                            placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය"
-                                                        />
+                                                        <DescriptionEditor disabled={catalogDisabled} placeholder="සම්පූර්ණ නිෂ්පාදන විස්තරය" />
                                                     </Form.Item>
                                                 </>
                                             ),
@@ -1186,12 +1177,7 @@ const ProductForm: React.FC = () => {
                                                         label={<span style={{ fontWeight: 600 }}>முழு விவரம் (Full Description)</span>}
                                                         name="description_ta"
                                                     >
-                                                        <TextArea
-                                                            disabled={catalogDisabled}
-                                                            rows={4}
-                                                            style={{ borderRadius: 10 }}
-                                                            placeholder="முழு தயாரிப்பு விவரம்"
-                                                        />
+                                                        <DescriptionEditor disabled={catalogDisabled} placeholder="முழு தயாரிப்பு விவரம்" />
                                                     </Form.Item>
                                                 </>
                                             ),
