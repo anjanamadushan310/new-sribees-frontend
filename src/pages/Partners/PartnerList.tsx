@@ -48,6 +48,7 @@ import type {
 const { Title, Text } = Typography;
 
 const PARTNERS_KEY = ['admin', 'partners'];
+const isMasterPartner = (p: AdminPartner) => p.role ? p.role === 'master_partner' : !p.parent_partner_id;
 
 const money = (v: number) =>
     `Rs ${v.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -228,10 +229,10 @@ const PartnerList: React.FC = () => {
                 { text: 'Master Partner', value: 'master' },
                 { text: 'Partner', value: 'partner' },
             ],
-            onFilter: (value, record) => value === (((record.role ?? (record.parent_partner_id ? 'partner' : 'master_partner')) === 'master_partner' ? 'master' : 'partner')),
+            onFilter: (value, record) => value === ((isMasterPartner(record) ? 'master' : 'partner')),
             render: (_, record) => (
-                <Tag color={record.role === 'master_partner' || (!record.role && !record.parent_partner_id) ? 'magenta' : 'blue'}>
-                    {record.role === 'master_partner' || (!record.role && !record.parent_partner_id) ? 'Master Partner' : 'Partner'}
+                <Tag color={isMasterPartner(record) ? 'magenta' : 'blue'}>
+                    {isMasterPartner(record) ? 'Master Partner' : 'Partner'}
                 </Tag>
             ),
         },
@@ -410,7 +411,7 @@ const PartnerList: React.FC = () => {
             </Card>
 
             <Modal
-                title={editing ? (editing.parent_partner_id ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
+                title={editing ? (isMasterPartner(editing) ? 'Edit Master Partner' : 'Edit Partner') : 'New Master Partner'}
                 open={modalOpen}
                 onOk={handleSubmit}
                 onCancel={closeModal}
