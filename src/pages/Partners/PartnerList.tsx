@@ -221,11 +221,25 @@ const PartnerList: React.FC = () => {
             ),
         },
         {
-            title: 'Recruited by',
+            title: 'Role',
+            key: 'role',
+            filters: [
+                { text: 'Master Partner', value: 'master' },
+                { text: 'Partner', value: 'partner' },
+            ],
+            onFilter: (value, record) => value === (record.parent_partner_id ? 'partner' : 'master'),
+            render: (_, record) => (
+                <Tag color={record.parent_partner_id ? 'blue' : 'magenta'}>
+                    {record.parent_partner_id ? 'Partner' : 'Master Partner'}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Master Partner',
             dataIndex: 'recruited_by',
             key: 'recruited_by',
             render: (name: string | null) =>
-                name ? <Tag>{name}</Tag> : <Text type="secondary">Top level</Text>,
+                name ? <Tag>{name}</Tag> : <Text type="secondary">—</Text>,
         },
         {
             title: 'Code',
@@ -365,7 +379,7 @@ const PartnerList: React.FC = () => {
                     </Space>
                 </Title>
                 <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                    Add Partner
+                    Add Master Partner
                 </Button>
             </div>
 
@@ -391,7 +405,7 @@ const PartnerList: React.FC = () => {
             </Card>
 
             <Modal
-                title={editing ? 'Edit Partner' : 'New Partner (top level)'}
+                title={editing ? (editing.parent_partner_id ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
                 open={modalOpen}
                 onOk={handleSubmit}
                 onCancel={closeModal}
@@ -440,8 +454,8 @@ const PartnerList: React.FC = () => {
 
                     {!editing && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                            Created here as a top-level partner (no upline). Partners recruit
-                            their own team from the Partner Portal.
+                            Created here as a Master Partner. Master Partners add their own
+                            Partners from the Partner Portal.
                         </Text>
                     )}
                 </Form>
