@@ -10,8 +10,8 @@ const post = vi.mocked(api.post);
 function prepare() {
     get.mockImplementation(async (path) => ({ data: { data: path === '/admin/partners/applications'
         ? [{ id: 'app-1', userId: 'u-1', name: 'Kamal', email: 'test@example.test', status: 'pending' }]
-        : [{ id: 'wd-1', partnerId: 'p-1', amount: '250.00', status: 'pending', bankName: 'Test Bank', branchName: 'Test', accountName: 'Kamal', accountNumber: '123456' }] } }));
-    post.mockResolvedValue({ data: { success: true } });
+        : [{ id: 'wd-1', partnerId: 'p-1', amount: '250.00', status: 'pending', bankName: 'Test Bank', branchName: 'Test', accountName: 'Kamal', accountNumber: '123456' }] } }) as Awaited<ReturnType<typeof api.get>>);
+    post.mockResolvedValue({ data: { success: true } } as Awaited<ReturnType<typeof api.post>>);
     renderPage(<PartnerWalletAdmin partners={[]} />);
 }
 

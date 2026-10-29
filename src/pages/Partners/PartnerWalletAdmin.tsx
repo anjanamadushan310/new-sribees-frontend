@@ -57,7 +57,7 @@ export default function PartnerWalletAdmin({ partners }: { partners: AdminPartne
                 </>}
                 {decision?.kind === 'withdrawal' && decision.decision === 'paid' && <>
                     <Alert type="warning" message="This does not send a bank transfer. Confirm the bank payment has completed before saving." />
-                    <Form.Item label="Bank payment reference" name="payment_reference" rules={[{ required: true, whitespace: true }]}><Input maxLength={160} /></Form.Item>
+                    <Form.Item label="Bank payment reference" name="payment_reference" rules={[{ required: true, whitespace: true, message: 'Please enter Bank payment reference' }]}><Input maxLength={160} /></Form.Item>
                 </>}
                 <Form.Item label="Decision note" name="note" rules={decision?.decision === 'reject' ? [{ required: true, whitespace: true }] : []}><Input.TextArea maxLength={500} rows={3} /></Form.Item>
             </Form>
