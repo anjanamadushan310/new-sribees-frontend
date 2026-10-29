@@ -48,7 +48,7 @@ export default function ReferralPromotions({ partners }: { partners: AdminPartne
             ]} />
         </Space>}
         <Modal title={editing ? 'Edit referral campaign' : 'New referral campaign'} open={editing !== undefined} onCancel={() => !mutation.isPending && setEditing(undefined)} onOk={() => form.submit()} confirmLoading={mutation.isPending} width={680} destroyOnHidden>
-            <Form form={form} layout="vertical" onFinish={v => mutation.mutate(v)}>
+            <Form form={form} layout="vertical" onFinish={() => mutation.mutate(form.getFieldsValue(true))}>
                 <Alert type="info" showIcon message="Validity starts when the customer account is registered. 30 days means 30 × 24 hours. Pausing stops new enrollments; existing benefits keep their terms, subject to remaining delivery budget." />
                 <Form.Item name="name" label="Customer-facing campaign title" rules={[{ required: true, whitespace: true }]}><Input maxLength={120} /></Form.Item>
                 <Form.Item name="scope" label="Eligible Partner codes"><Select options={[{ value: 'all', label: 'All Partners and Master Partners' }, { value: 'partner', label: 'One Partner / Master code only' }, { value: 'master_team', label: 'Master code and their direct Partners' }]} /></Form.Item>

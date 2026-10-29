@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { message } from 'antd';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Insights, Pattern } from '../../api/assistantInsights.api';
 import { assistantInsightsApi } from '../../api/assistantInsights.api';
@@ -45,7 +46,10 @@ describe('AssistantInsights', () => {
         api.setRule.mockResolvedValue([]);
         api.setPattern.mockResolvedValue();
     });
-    afterEach(signOut);
+    afterEach(async () => {
+        // Static Ant Design messages own a root outside renderPage's tree.
+        await act(async () => { signOut(); message.destroy(); });
+    });
 
     it('shows the free share, cost, mode and what was learned', async () => {
         signIn(AdminRole.SUPER_ADMIN);

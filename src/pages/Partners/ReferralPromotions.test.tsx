@@ -17,6 +17,7 @@ describe('Referral promotion configuration', () => {
         fireEvent.click(screen.getByRole('button', { name: 'New referral campaign' }));
         fireEvent.change(await screen.findByLabelText('Customer-facing campaign title'), { target: { value: 'First order delivery' } });
         fireEvent.click(screen.getByLabelText('Include free delivery'));
+        await screen.findByLabelText('Free delivery orders per customer');
         fireEvent.change(screen.getByLabelText('Total delivery campaign budget (LKR)'), { target: { value: '5000' } });
         fireEvent.click(screen.getByRole('button', { name: 'OK' }));
         await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/referral-promotions', expect.objectContaining({ name: 'First order delivery', active: false, scope: 'all', partner_id: null,
