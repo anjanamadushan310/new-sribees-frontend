@@ -10,6 +10,7 @@
  * modal); the commission drawer is the one thing that page doesn't need.
  */
 import React, { useState } from 'react';
+import PartnerWalletAdmin from './PartnerWalletAdmin';
 import {
     Card,
     Table,
@@ -227,10 +228,10 @@ const PartnerList: React.FC = () => {
                 { text: 'Master Partner', value: 'master' },
                 { text: 'Partner', value: 'partner' },
             ],
-            onFilter: (value, record) => value === (record.parent_partner_id ? 'partner' : 'master'),
+            onFilter: (value, record) => value === (((record.role ?? (record.parent_partner_id ? 'partner' : 'master_partner')) === 'master_partner' ? 'master' : 'partner')),
             render: (_, record) => (
-                <Tag color={record.parent_partner_id ? 'blue' : 'magenta'}>
-                    {record.parent_partner_id ? 'Partner' : 'Master Partner'}
+                <Tag color={record.role === 'master_partner' || (!record.role && !record.parent_partner_id) ? 'magenta' : 'blue'}>
+                    {record.role === 'master_partner' || (!record.role && !record.parent_partner_id) ? 'Master Partner' : 'Partner'}
                 </Tag>
             ),
         },
@@ -289,6 +290,10 @@ const PartnerList: React.FC = () => {
                         type="link"
                         icon={<WalletOutlined />}
                         onClick={() => {
+                            if (record.linked_user_id) {
+                                message.info('Use Partner Wallet approvals below for linked accounts.');
+                                return;
+                            }
                             setLedgerPartner(record);
                             setSelectedCommissionIds([]);
                         }}
@@ -461,13 +466,15 @@ const PartnerList: React.FC = () => {
                 </Form>
             </Modal>
 
+            <PartnerWalletAdmin partners={partners} />
+
             <Drawer
                 title={ledgerPartner ? `${ledgerPartner.full_name} — Commission Ledger` : 'Ledger'}
                 open={!!ledgerPartner}
                 onClose={() => setLedgerPartner(null)}
                 width={640}
             >
-                {ledgerPartner && (
+                {ledgerPartner && !ledgerPartner.linked_user_id && (
                     <>
                         <Alert
                             type="info"
