@@ -29,8 +29,9 @@ describe('Partner Wallet approvals', () => {
         post.mockClear();
         prepare();
         fireEvent.click(screen.getByText('Open approvals'));
+        await screen.findByText('test@example.test');
         fireEvent.click(screen.getByRole('tab', { name: 'Bank withdrawals' }));
-        fireEvent.click(await screen.findByRole('button', { name: 'Mark paid' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Mark paid' }, { timeout: 10000 }));
         expect(await screen.findByText(/This does not send a bank transfer/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'OK' }));
         await screen.findByText(/Please enter Bank payment reference/);

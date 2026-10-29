@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
-import { act, cleanup } from '@testing-library/react';
+import { act, cleanup, configure } from '@testing-library/react';
+
+// Ant Design table/form updates can exceed 1s under CI coverage.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no matchMedia; Ant Design's responsive grid and tables need one.
 if (!window.matchMedia) {
