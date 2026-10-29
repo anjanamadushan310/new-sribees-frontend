@@ -10,6 +10,7 @@
  * modal); the commission drawer is the one thing that page doesn't need.
  */
 import React, { useState } from 'react';
+import PartnerWalletAdmin from './PartnerWalletAdmin';
 import {
     Card,
     Table,
@@ -47,6 +48,7 @@ import type {
 const { Title, Text } = Typography;
 
 const PARTNERS_KEY = ['admin', 'partners'];
+const isMasterPartner = (p: AdminPartner) => p.role ? p.role === 'master_partner' : !p.parent_partner_id;
 
 const money = (v: number) =>
     `Rs ${v.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -227,10 +229,10 @@ const PartnerList: React.FC = () => {
                 { text: 'Master Partner', value: 'master' },
                 { text: 'Partner', value: 'partner' },
             ],
-            onFilter: (value, record) => value === (record.parent_partner_id ? 'partner' : 'master'),
+            onFilter: (value, record) => value === ((isMasterPartner(record) ? 'master' : 'partner')),
             render: (_, record) => (
-                <Tag color={record.parent_partner_id ? 'blue' : 'magenta'}>
-                    {record.parent_partner_id ? 'Partner' : 'Master Partner'}
+                <Tag color={isMasterPartner(record) ? 'magenta' : 'blue'}>
+                    {isMasterPartner(record) ? 'Master Partner' : 'Partner'}
                 </Tag>
             ),
         },
@@ -289,6 +291,10 @@ const PartnerList: React.FC = () => {
                         type="link"
                         icon={<WalletOutlined />}
                         onClick={() => {
+                            if (record.linked_user_id) {
+                                message.info('Use Partner Wallet approvals below for linked accounts.');
+                                return;
+                            }
                             setLedgerPartner(record);
                             setSelectedCommissionIds([]);
                         }}
@@ -405,7 +411,7 @@ const PartnerList: React.FC = () => {
             </Card>
 
             <Modal
-                title={editing ? (editing.parent_partner_id ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
+                title={editing ? (isMasterPartner(editing) ? 'Edit Master Partner' : 'Edit Partner') : 'New Master Partner'}
                 open={modalOpen}
                 onOk={handleSubmit}
                 onCancel={closeModal}
@@ -461,13 +467,15 @@ const PartnerList: React.FC = () => {
                 </Form>
             </Modal>
 
+            <PartnerWalletAdmin partners={partners} />
+
             <Drawer
                 title={ledgerPartner ? `${ledgerPartner.full_name} — Commission Ledger` : 'Ledger'}
                 open={!!ledgerPartner}
                 onClose={() => setLedgerPartner(null)}
                 width={640}
             >
-                {ledgerPartner && (
+                {ledgerPartner && !ledgerPartner.linked_user_id && (
                     <>
                         <Alert
                             type="info"

@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { act, cleanup, configure } from '@testing-library/react';
+
+// Ant Design table/form updates can exceed 1s under CI coverage.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no matchMedia; Ant Design's responsive grid and tables need one.
 if (!window.matchMedia) {
@@ -40,7 +43,11 @@ if (!('ResizeObserver' in window)) {
     Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: ResizeObserverStub });
 }
 
-afterEach(() => {
-    cleanup();
-    localStorage.clear();
+afterEach(async () => {
+    // Drain React's queued unmount work before jsdom destroys its window.
+    // Otherwise late Ant Design/query updates can escape into the next file.
+    await act(async () => {
+        cleanup();
+        localStorage.clear();
+    });
 });
