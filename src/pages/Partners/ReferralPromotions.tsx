@@ -20,8 +20,11 @@ export default function ReferralPromotions({ partners }: { partners: AdminPartne
     const cache = useQueryClient();
     const query = useQuery({ queryKey: ['referral-promotions'], enabled: open, queryFn: async () => (await api.get<{ data: Campaign[]; enabled: boolean }>('/admin/referral-promotions')).data });
     const mutation = useMutation({ mutationFn: async (values: Values) => {
-        const { unlimited: timeOnly, ...body } = values;
-        const payload = { ...body, starts_at: new Date(values.starts_at).toISOString(), ends_at: new Date(values.ends_at).toISOString(),
+        const timeOnly = values.unlimited;
+        // Do not echo server-owned IDs/counters from an edited row.
+        const payload = { name: values.name, scope: values.scope, active: values.active,
+            max_customers: values.max_customers, delivery_budget: values.delivery_budget,
+            starts_at: new Date(values.starts_at).toISOString(), ends_at: new Date(values.ends_at).toISOString(),
             partner_id: values.scope === 'all' ? null : values.partner_id,
             rules: { ...values.rules, delivery_uses: timeOnly ? null : values.rules.delivery_uses } };
         return editing ? api.put(`/admin/referral-promotions/${editing.id}`, payload) : api.post('/admin/referral-promotions', payload);
