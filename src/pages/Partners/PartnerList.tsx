@@ -11,6 +11,7 @@
  */
 import React, { useState } from 'react';
 import PartnerWalletAdmin from './PartnerWalletAdmin';
+import ReferralPromotions from './ReferralPromotions';
 import {
     Card,
     Table,
@@ -468,6 +469,7 @@ const PartnerList: React.FC = () => {
             </Modal>
 
             <PartnerWalletAdmin partners={partners} />
+            <ReferralPromotions partners={partners} />
 
             <Drawer
                 title={ledgerPartner ? `${ledgerPartner.full_name} — Commission Ledger` : 'Ledger'}
