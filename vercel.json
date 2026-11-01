@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then export VITE_API_URL=https://api.sribeesonline.com/api/v1; fi; npm run build",
   "rewrites": [
     {
       "source": "/((?!api/).*)",
