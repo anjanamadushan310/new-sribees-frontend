@@ -36,6 +36,7 @@ const CouponList = lazy(() => import('./pages/Marketing/CouponList'));
 const QuickSale = lazy(() => import('./pages/Marketing/QuickSale'));
 const BannerList = lazy(() => import('./pages/Marketing/BannerList'));
 const PushCampaigns = lazy(() => import('./pages/Marketing/PushCampaigns'));
+const FreeDelivery = lazy(() => import('./pages/Marketing/FreeDelivery'));
 const AssistantBriefings = lazy(() => import('./pages/Assistant/AssistantBriefings'));
 const AssistantInsights = lazy(() => import('./pages/Assistant/AssistantInsights'));
 
@@ -300,6 +301,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard requiredPermission={{ resource: 'marketing', action: 'read' }}>
                                     <PushCampaigns />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Free delivery per branch and for chosen customers */}
+                        <Route
+                            path="free-delivery"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
+                                    <FreeDelivery />
                                 </RoleGuard>
                             }
                         />

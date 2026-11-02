@@ -144,6 +144,7 @@ export const usePermissions = () => {
             '/coupons': { resource: 'marketing', action: 'read' },
             '/quick-sale': { resource: 'marketing', action: 'read' },
             '/push-campaigns': { resource: 'marketing', action: 'read' },
+            '/free-delivery': { resource: 'users', action: 'read' },
             '/assistant-briefings': { resource: 'briefings', action: 'read' },
             '/assistant-insights': { resource: 'analytics', action: 'read' },
             '/banners': { resource: 'banners', action: 'read' },

@@ -27,6 +27,7 @@ import {
     NotificationOutlined,
     RobotOutlined,
     MessageOutlined,
+    CarOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -663,6 +664,11 @@ const AdminLayout: React.FC = () => {
                 label: 'Push Campaigns',
             },
             {
+                key: '/free-delivery',
+                icon: <CarOutlined />,
+                label: 'Free Delivery',
+            },
+            {
                 key: '/banners',
                 icon: <PictureOutlined />,
                 label: 'Home Banners',
@@ -801,6 +807,7 @@ const AdminLayout: React.FC = () => {
         if (path.startsWith('/coupons')) return '/coupons';
         if (path.startsWith('/quick-sale')) return '/quick-sale';
         if (path.startsWith('/push-campaigns')) return '/push-campaigns';
+        if (path.startsWith('/free-delivery')) return '/free-delivery';
         if (path.startsWith('/banners')) return '/banners';
         if (path.startsWith('/branches')) return '/branches';
         if (path.startsWith('/users')) return '/users';
@@ -834,6 +841,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname.startsWith('/coupons')) return 'Coupons';
         if (location.pathname.startsWith('/quick-sale')) return 'Quick Sale';
         if (location.pathname.startsWith('/push-campaigns')) return 'Push Campaigns';
+        if (location.pathname.startsWith('/free-delivery')) return 'Free Delivery';
         if (location.pathname.startsWith('/assistant-briefings')) return 'AI Briefings';
         if (location.pathname.startsWith('/assistant-insights')) return 'AI Assistant';
         if (location.pathname.startsWith('/banners')) return 'Home Banners';
