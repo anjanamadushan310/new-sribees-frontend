@@ -24,6 +24,7 @@ import {
     InputNumber,
     Tag,
     AutoComplete,
+    Radio,
 } from 'antd';
 import {
     ArrowLeftOutlined,
@@ -49,7 +50,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/products.api';
 import { referralCommissionApi, apiDetailMessage } from '../../api/referralCommission.api';
 import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
-import type { PriceReviewLevel, ProductPayload } from '../../api/products.api';
+import type { PriceReviewLevel, ProductPayload, StockMode } from '../../api/products.api';
 import { categoriesApi } from '../../api/categories.api';
 import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import DescriptionEditor from '../../components/products/DescriptionEditor';
@@ -96,6 +97,7 @@ interface ProductFormValues {
     is_perishable: boolean;
     is_returnable: boolean;
     sold_by_weight?: boolean;
+    stock_mode?: StockMode;
     price_review_level?: PriceReviewLevel;
     images?: GalleryImage[];
 }
@@ -608,6 +610,7 @@ const ProductForm: React.FC = () => {
     const watchedFeatured = Form.useWatch('is_featured', form);
     const watchedPerishable = Form.useWatch('is_perishable', form);
     const watchedSoldByWeight = Form.useWatch('sold_by_weight', form);
+    const watchedStockMode = Form.useWatch('stock_mode', form) as StockMode | undefined;
 
     const primaryThumb = gallery.find((g) => g.is_primary)?.image_url || gallery[0]?.image_url;
     const categoryObj = rootCategories.find((c) => c.category_id === selectedCategoryId);
@@ -657,6 +660,7 @@ const ProductForm: React.FC = () => {
                 is_returnable: product.is_returnable ?? true,
                 price_review_level: product.price_review_level ?? 'long',
                 sold_by_weight: product.sold_by_weight ?? false,
+                stock_mode: product.stock_mode ?? 'unit',
             });
             const loadedWeights = (product.weight_options ?? []).map((o) => ({
                 weight_grams: o.weight_grams,
@@ -785,6 +789,7 @@ const ProductForm: React.FC = () => {
                 is_returnable: values.is_returnable ?? true,
                 price_review_level: values.price_review_level ?? 'long',
                 sold_by_weight: values.sold_by_weight ?? false,
+                stock_mode: values.sold_by_weight ? (values.stock_mode ?? 'unit') : 'unit',
                 images: imagesPayload,
             };
 
@@ -1665,6 +1670,31 @@ const ProductForm: React.FC = () => {
                                             pricePerKg={Number(watchedPrice) || 0}
                                             disabled={catalogDisabled}
                                         />
+                                        <Form.Item
+                                            name="stock_mode"
+                                            label={<span style={{ fontWeight: 600 }}>Kept in the store as</span>}
+                                            style={{ marginTop: 14, marginBottom: 0 }}
+                                            extra={
+                                                isEdit && product && (product.stock_mode ?? 'unit') !== (watchedStockMode ?? 'unit')
+                                                    ? 'Changing this sets every branch\'s stock of this product to 0; count it again under Inventory → Weights.'
+                                                    : watchedStockMode === 'loose'
+                                                        ? 'Branches count it in grams; each order takes its weight.'
+                                                        : watchedStockMode === 'packed'
+                                                            ? 'Branches count the bags of each weight separately.'
+                                                            : 'Not chosen yet: counted as packs of any weight.'
+                                            }
+                                        >
+                                            <Radio.Group
+                                                disabled={catalogDisabled}
+                                                optionType="button"
+                                                buttonStyle="solid"
+                                                options={[
+                                                    { value: 'loose', label: 'Loose (weighed per order)' },
+                                                    { value: 'packed', label: 'Pre-packed bags' },
+                                                    { value: 'unit', label: 'Not chosen' },
+                                                ]}
+                                            />
+                                        </Form.Item>
                                     </div>
                                 )}
 

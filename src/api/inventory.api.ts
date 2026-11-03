@@ -6,7 +6,7 @@
  * Responses are snake_case (hand-built dicts), matching the types below.
  */
 import apiClient from './client';
-import type { PriceReviewLevel } from './products.api';
+import type { PriceReviewLevel, StockMode } from './products.api';
 
 export type InventoryStockState = 'all' | 'in' | 'low' | 'out';
 
@@ -41,6 +41,35 @@ export interface InventoryItem {
     low_stock_threshold: number;
     is_low_stock: boolean;
     is_active: boolean;
+    // How the stock is kept. For a loose product stock_quantity shows packs of
+    // its smallest weight and stock_grams is the real figure; a pre-packed
+    // product's packs per weight are under weights().
+    stock_mode?: StockMode;
+    stock_grams?: number;
+}
+
+/** One weight option's stock in a branch. */
+export interface WeightStockOption {
+    variant_id: string;
+    weight_grams: number;
+    label: string;
+    packs: number | null; // pre-packed only
+    available: number | null; // how many of this weight can still be sold
+}
+
+export interface WeightStock {
+    inventory_id: string;
+    product_id: string;
+    stock_mode: StockMode;
+    stock_grams: number;
+    stock_quantity: number;
+    options: WeightStockOption[];
+    kept_by_finance: boolean;
+}
+
+export interface WeightStockPayload {
+    stock_grams?: number;
+    packs?: { variant_id: string; stock_quantity: number }[];
 }
 
 export interface InventoryScope {
@@ -193,6 +222,22 @@ export const inventoryApi = {
             products: res.data.data.products,
             ...res.data.data.pagination,
         };
+    },
+
+    /** A weight product's stock: grams (loose) or packs of each weight (pre-packed). */
+    weights: async (inventoryId: string): Promise<WeightStock> => {
+        const res = await apiClient.get<{ success: boolean; data: WeightStock }>(
+            `/admin/inventory/${inventoryId}/weights`
+        );
+        return res.data.data;
+    },
+
+    setWeights: async (inventoryId: string, payload: WeightStockPayload): Promise<WeightStock> => {
+        const res = await apiClient.put<{ success: boolean; data: WeightStock }>(
+            `/admin/inventory/${inventoryId}/weights`,
+            payload
+        );
+        return res.data.data;
     },
 
     /** Stock a global product in a branch (creates the branch_inventory row). */
