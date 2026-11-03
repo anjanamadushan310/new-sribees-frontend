@@ -33,6 +33,7 @@ import {
     Row,
     Col,
     Badge,
+    Tooltip,
 } from 'antd';
 import {
     EditOutlined,
@@ -42,6 +43,7 @@ import {
     InboxOutlined,
     UserOutlined,
     StopOutlined,
+    LockOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -98,7 +100,10 @@ interface QuickSaleFormValues {
 const QuickSale: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
-    const { isSuperAdmin } = usePermissions();
+    const { isSuperAdmin, isBranchManager } = usePermissions();
+    // Cashback is money: Branch Manager or Super Admin only, capped at 30 %
+    // (the server enforces both). Marketing Managers see it read-only.
+    const canEditCashback = isSuperAdmin || isBranchManager;
     const [form] = Form.useForm<QuickSaleFormValues>();
 
     const [page, setPage] = useState(1);
@@ -219,7 +224,7 @@ const QuickSale: React.FC = () => {
             productId: editing.product_id,
             payload: {
                 discount_percentage: values.discount_percentage ?? null,
-                cashback_percentage: values.cashback_percentage ?? null,
+                ...(canEditCashback ? { cashback_percentage: values.cashback_percentage ?? null } : {}),
                 is_on_sale: values.is_on_sale,
             },
         });
@@ -525,8 +530,15 @@ const QuickSale: React.FC = () => {
                                     <Form.Item
                                         label={
                                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                                <span>Cashback (%)</span>
-                                                {cashbackVal != null && (
+                                                <Space size={6}>
+                                                    Cashback (%)
+                                                    {!canEditCashback && (
+                                                    <Tooltip title="Only the Branch Manager or Super Admin can change cashback.">
+                                                        <LockOutlined style={{ color: '#94a3b8' }} />
+                                                    </Tooltip>
+                                        )}
+                                                </Space>
+                                                {canEditCashback && cashbackVal != null && (
                                                     <Button
                                                         type="link"
                                                         size="small"
@@ -543,7 +555,8 @@ const QuickSale: React.FC = () => {
                                     >
                                         <InputNumber
                                             min={0}
-                                            max={100}
+                                            max={30}
+                                            disabled={!canEditCashback}
                                             style={{ width: '100%' }}
                                             placeholder={`Default: ${editing.effective_cashback}%`}
                                         />

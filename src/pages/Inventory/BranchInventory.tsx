@@ -30,6 +30,7 @@ import {
     InboxOutlined,
     PlusOutlined,
     InfoCircleOutlined,
+    LockOutlined,
     ReloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -216,6 +217,9 @@ const BranchInventory: React.FC = () => {
 
     // Prefer the server's scope; fall back to the local role before data loads.
     const showBranchColumn = data?.scope.is_super_admin ?? isSuperAdmin;
+    // Cashback follows the same owners as commission, capped by the server.
+    const canEditCashback = data?.scope.can_edit_cashback ?? canEditCommission;
+    const cashbackMax = data?.scope.cashback_branch_max_percent ?? 30;
 
     const updateMutation = useMutation({
         mutationFn: async ({
@@ -325,11 +329,12 @@ const BranchInventory: React.FC = () => {
         // Empty number inputs come back as undefined; send an explicit null so
         // the server clears the override instead of ignoring the field.
         const { referral_commission_percentage: rawCommission, ...rest } = values;
+        const { cashback_percentage: rawCashback, ...others } = rest;
         const payload: InventoryUpdatePayload = {
-            ...rest,
+            ...others,
             branch_price: values.branch_price ?? null,
             discount_percentage: values.discount_percentage ?? null,
-            cashback_percentage: values.cashback_percentage ?? null,
+            ...(canEditCashback ? { cashback_percentage: rawCashback ?? null } : {}),
         };
         const commission = rawCommission ?? null;
         const commissionChanged =
@@ -350,7 +355,7 @@ const BranchInventory: React.FC = () => {
             branch_price: values.branch_price,
             stock_quantity: values.stock_quantity,
             low_stock_threshold: values.low_stock_threshold ?? 10,
-            cashback_percentage: values.cashback_percentage ?? null,
+            ...(canEditCashback ? { cashback_percentage: values.cashback_percentage ?? null } : {}),
             is_active: values.is_active ?? false,
         });
     };
@@ -666,11 +671,25 @@ const BranchInventory: React.FC = () => {
                             </Form.Item>
 
                             <Form.Item
-                                label="Cashback (%)"
+                                label={
+                                    <Space size={6}>
+                                        Cashback (%)
+                                        {!canEditCashback && (
+                                            <Tooltip title="Only the Branch Manager or Super Admin can change cashback.">
+                                                <LockOutlined style={{ color: '#94a3b8' }} />
+                                            </Tooltip>
+                                        )}
+                                    </Space>
+                                }
                                 name="cashback_percentage"
-                                extra="Leave empty to use the platform default rate."
+                                extra="Leave empty to use the product's cashback."
                             >
-                                <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                                <InputNumber
+                                    min={0}
+                                    max={cashbackMax}
+                                    disabled={!canEditCashback}
+                                    style={{ width: '100%' }}
+                                />
                             </Form.Item>
 
                             <Form.Item label="Quick Sale" name="is_on_sale" valuePropName="checked">
@@ -857,19 +876,21 @@ const BranchInventory: React.FC = () => {
                         <InputNumber min={0} style={{ width: '100%' }} />
                     </Form.Item>
 
-                    <Form.Item
-                        label="Cashback (%)"
-                        name="cashback_percentage"
-                        extra="Leave empty to use the platform default rate."
-                    >
-                        <InputNumber
-                            min={0}
-                            max={100}
-                            style={{ width: '100%' }}
-                            placeholder="Platform default"
-                            suffix="%"
-                        />
-                    </Form.Item>
+                    {canEditCashback && (
+                        <Form.Item
+                            label="Cashback (%)"
+                            name="cashback_percentage"
+                            extra="Leave empty to use the product's cashback."
+                        >
+                            <InputNumber
+                                min={0}
+                                max={cashbackMax}
+                                style={{ width: '100%' }}
+                                placeholder="Product default"
+                                suffix="%"
+                            />
+                        </Form.Item>
+                    )}
 
                     <Form.Item
                         label="Visible in this branch"
