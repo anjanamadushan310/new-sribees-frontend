@@ -46,6 +46,10 @@ export interface InventoryItem {
 export interface InventoryScope {
     is_super_admin: boolean;
     branch_id: string | null;
+    // Cashback is money: only a Branch Manager or Super Admin may change it,
+    // never above the cap (server-enforced; these only shape the form).
+    can_edit_cashback?: boolean;
+    cashback_branch_max_percent?: number | null;
 }
 
 export interface InventoryListParams {
