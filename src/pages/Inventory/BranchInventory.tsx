@@ -36,6 +36,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { inventoryApi } from '../../api/inventory.api';
+import WeightStockModal from '../../components/inventory/WeightStockModal';
 import type {
     InventoryItem,
     InventoryUpdatePayload,
@@ -132,6 +133,7 @@ const BranchInventory: React.FC = () => {
     const [stockState, setStockState] = useState<InventoryStockState>('all');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [editing, setEditing] = useState<InventoryItem | null>(null);
+    const [weighing, setWeighing] = useState<InventoryItem | null>(null);
     const [addOpen, setAddOpen] = useState(false);
     const [addSearch, setAddSearch] = useState('');
     const [addForm] = Form.useForm<{
@@ -401,6 +403,13 @@ const BranchInventory: React.FC = () => {
             key: 'stock_quantity',
             align: 'right',
             width: 90,
+            // A loose product is counted in kilograms; a pre-packed one shows all its bags.
+            render: (v: number, record) =>
+                record.stock_mode === 'loose'
+                    ? `${((record.stock_grams ?? 0) / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`
+                    : record.stock_mode === 'packed'
+                        ? `${v} bags`
+                        : v,
         },
         {
             title: 'Reserved',
@@ -435,9 +444,16 @@ const BranchInventory: React.FC = () => {
             key: 'actions',
             width: 120,
             render: (_, record) => (
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                    Quick Edit
-                </Button>
+                <Space size={0} direction="vertical">
+                    <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                        Quick Edit
+                    </Button>
+                    {(record.stock_mode === 'loose' || record.stock_mode === 'packed') && (
+                        <Button type="link" icon={<InboxOutlined />} onClick={() => setWeighing(record)}>
+                            Weights
+                        </Button>
+                    )}
+                </Space>
             ),
         },
     ];
@@ -759,8 +775,17 @@ const BranchInventory: React.FC = () => {
                                     }),
                                 ]}
                             >
-                                <InputNumber min={0} style={{ width: '100%' }} />
+                                <InputNumber
+                                    min={0}
+                                    style={{ width: '100%' }}
+                                    disabled={!!editing && (editing.stock_mode ?? 'unit') !== 'unit'}
+                                />
                             </Form.Item>
+                            {editing && (editing.stock_mode ?? 'unit') !== 'unit' && (
+                                <Text type="secondary" style={{ display: 'block', marginTop: -12, marginBottom: 12 }}>
+                                    Kept by weight: count it with the Weights button in the table.
+                                </Text>
+                            )}
                             <Form.Item
                                 label="Reserved Quantity"
                                 name="reserved_quantity"
@@ -907,6 +932,7 @@ const BranchInventory: React.FC = () => {
                     onKilo={(v) => addForm.setFieldValue('branch_price', v ?? undefined)}
                 />
             </Modal>
+            {weighing && <WeightStockModal item={weighing} onClose={() => setWeighing(null)} />}
         </div>
     );
 };

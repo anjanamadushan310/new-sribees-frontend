@@ -30,6 +30,7 @@ import { ordersApi } from '../../api/orders.api';
 import type { OrderCourier, OrderDetail } from '../../api/orders.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import ShippingLabel from './ShippingLabel';
+import UndeliveredItemsModal from './UndeliveredItemsModal';
 import { slt } from '../../utils/datetime';
 
 const { Text } = Typography;
@@ -75,6 +76,7 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
     const queryClient = useQueryClient();
     const { isSuperAdmin, isBranchManager } = usePermissions();
     const [labelOpen, setLabelOpen] = useState(false);
+    const [undeliveredOpen, setUndeliveredOpen] = useState(false);
     const canDispatch = isSuperAdmin || isBranchManager;
 
     const courier: OrderCourier | undefined = order.courier;
@@ -305,6 +307,26 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                                 </Space>
                             </Descriptions.Item>
                         )}
+                        {/* Partial delivery: the rider collected less, so some items came back. */}
+                        {!!courier.cod_shortfall && courier.cod_shortfall > 0 && (
+                            <Descriptions.Item label="Partly Delivered">
+                                <Space wrap>
+                                    <Tag color="orange">{formatLKR(courier.cod_shortfall)} not collected</Tag>
+                                    {courier.undelivered_recorded_at ? (
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                            Items back on the shelf ({courier.undelivered_items?.length ?? 0} line
+                                            {(courier.undelivered_items?.length ?? 0) === 1 ? '' : 's'})
+                                        </Text>
+                                    ) : canDispatch ? (
+                                        <Button size="small" onClick={() => setUndeliveredOpen(true)}>
+                                            Record items that came back
+                                        </Button>
+                                    ) : (
+                                        <Text type="secondary" style={{ fontSize: 12 }}>Items not recorded yet</Text>
+                                    )}
+                                </Space>
+                            </Descriptions.Item>
+                        )}
                     </>
                 )}
             </Descriptions>
@@ -352,6 +374,17 @@ const CourierPanel: React.FC<CourierPanelProps> = ({ order, onChanged }) => {
                 open={labelOpen}
                 onClose={() => setLabelOpen(false)}
             />
+            {undeliveredOpen && !!courier?.cod_shortfall && (
+                <UndeliveredItemsModal
+                    order={order}
+                    shortfall={courier.cod_shortfall}
+                    onClose={() => setUndeliveredOpen(false)}
+                    onDone={() => {
+                        queryClient.invalidateQueries({ queryKey: ['admin', 'order', order.order_id] });
+                        onChanged();
+                    }}
+                />
+            )}
         </>
     );
 };

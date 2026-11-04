@@ -16,6 +16,9 @@ import type { WeightOption } from './weightOptions.api';
  * 'slow' is the one that matters: slow-moving stock that is also perishable is
  * money about to be thrown away, and Quick Sale is how a manager rescues it.
  */
+/** How a branch keeps stock of a product (backend migration 100). */
+export type StockMode = 'unit' | 'loose' | 'packed';
+
 export type ProductMovement = 'fast' | 'steady' | 'slow' | 'none';
 
 export type StockState = 'in' | 'low' | 'out';
@@ -103,6 +106,8 @@ export interface AdminProduct {
     price_review_level?: PriceReviewLevel;
     /** Bought by weight: the customer picks one of `weight_options`. */
     sold_by_weight?: boolean;
+    /** How branch stock is kept: unit, loose (grams) or packed (packs per weight). */
+    stock_mode?: StockMode;
     /** Present on the single-product read of a sold-by-weight product. */
     weight_options?: WeightOption[];
 
@@ -177,6 +182,7 @@ export interface ProductPayload {
     is_returnable?: boolean;
     price_review_level?: PriceReviewLevel;
     sold_by_weight?: boolean;
+    stock_mode?: StockMode;
     images?: ImageLinkPayload[];
 }
 

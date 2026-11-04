@@ -211,6 +211,14 @@ export interface OrderCourier {
     cod_collected_amount: number | null;
     /** The remittance run that paid this order's COD out to us. Null until settled. */
     remittance_id: number | null;
+    /**
+     * Partial delivery: what the rider did not collect on a delivered COD order
+     * (the customer refused some items). Null when not known or not COD.
+     */
+    cod_shortfall?: number | null;
+    /** The refused items, recorded once they were back at the shop. */
+    undelivered_items?: { order_item_id: string; quantity: number }[] | null;
+    undelivered_recorded_at?: string | null;
     /** Rider free text on a failed parcel. Never branch logic on its wording. */
     failure_note: string | null;
     /** Only meaningful while tracking_status is `failed`. */
@@ -636,6 +644,22 @@ export const ordersApi = {
             data: { order: OrderDetail; courier: OrderCourier };
             message: string;
         }>(`/admin/orders/${id}/courier/refresh`);
+        return { ...res.data.data, message: res.data.message };
+    },
+
+    /**
+     * A partially delivered COD order: record the items the customer refused,
+     * once they are back. Their stock goes back on the shelf; no refund.
+     */
+    recordUndelivered: async (
+        id: string,
+        items: { order_item_id: string; quantity: number }[]
+    ): Promise<{ order: OrderDetail; courier: OrderCourier; message: string }> => {
+        const res = await apiClient.post<{
+            success: boolean;
+            data: { order: OrderDetail; courier: OrderCourier };
+            message: string;
+        }>(`/admin/orders/${id}/undelivered-items`, { items });
         return { ...res.data.data, message: res.data.message };
     },
 
