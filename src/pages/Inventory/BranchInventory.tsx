@@ -42,7 +42,10 @@ import type {
     InventoryUpdatePayload,
     StockableProduct,
     InventoryStockState,
+    PriceFloor,
 } from '../../api/inventory.api';
+import { PriceFloorIcon } from '../../components/finance/PriceFloorIcon';
+import { usePriceFloors } from '../../components/finance/usePriceFloors';
 import { branchesApi } from '../../api/branches.api';
 import { categoriesApi } from '../../api/categories.api';
 import { PRICE_REVIEW_LEVELS } from '../../api/products.api';
@@ -54,6 +57,13 @@ import { saveBranchWeightPrices, useBranchWeightRows } from '../../components/pr
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
 
 const { Title, Text } = Typography;
+
+/** What a customer pays: the price less its Quick Sale discount (as checkout works it out). */
+const afterDiscount = (price: number | null | undefined, discount: number | null | undefined) => {
+    if (price === null || price === undefined) return null;
+    const d = Number(discount) || 0;
+    return d > 0 ? Math.round(Number(price) * (1 - d / 100) * 100) / 100 : Number(price);
+};
 
 const money = (v: number) =>
     `Rs ${v.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -70,11 +80,14 @@ const statusTag = (item: InventoryItem) => {
  * that number obvious: a local override is called out, otherwise the row is
  * quietly inheriting the global catalog price.
  */
-const priceCell = (item: InventoryItem) => {
+const priceCell = (item: InventoryItem, floor?: PriceFloor) => {
     const overridden = item.branch_price !== null;
     return (
         <Space direction="vertical" size={0} style={{ lineHeight: 1.3 }}>
-            <Text strong>{money(item.effective_price)}</Text>
+            <Space size={6}>
+                <Text strong>{money(item.effective_price)}</Text>
+                <PriceFloorIcon floor={floor} price={item.effective_price} />
+            </Space>
             {overridden ? (
                 <Space size={4}>
                     <Tag color="gold" style={{ marginInlineEnd: 0 }}>
@@ -202,6 +215,8 @@ const BranchInventory: React.FC = () => {
             }),
         placeholderData: keepPreviousData,
     });
+    // Sribees Finance's minimum prices for the rows on this page (a quiet icon by a price below it).
+    const floors = usePriceFloors(data?.items ?? []);
 
     const hasActiveFilters = Boolean(
         search || categoryId || subcategoryId || priceReviewLevel !== undefined || stockState !== 'all' || branchId !== undefined
@@ -280,6 +295,7 @@ const BranchInventory: React.FC = () => {
         addGlobalPrice,
     );
     const editBranchPrice = Form.useWatch('branch_price', form);
+    const editDiscount = Form.useWatch('discount_percentage', form);
     const editGlobalPrice = Number(editing?.global_price) || 0;
     const editWeights = useBranchWeightRows(
         editing?.product_id,
@@ -389,7 +405,7 @@ const BranchInventory: React.FC = () => {
             title: 'Price',
             key: 'price',
             width: 160,
-            render: (_, record) => priceCell(record),
+            render: (_, record) => priceCell(record, floors[`${record.branch_id}:${record.product_id}`]),
         },
         {
             title: 'Commission',
@@ -663,7 +679,18 @@ const BranchInventory: React.FC = () => {
 
                         <Form form={form} layout="vertical">
                             <Form.Item
-                                label="Branch Price (LKR)"
+                                label={
+                                    <Space size={6}>
+                                        Branch Price (LKR)
+                                        <PriceFloorIcon
+                                            floor={floors[`${editing.branch_id}:${editing.product_id}`]}
+                                            price={afterDiscount(
+                                                editBranchPrice ?? editing.global_price,
+                                                editDiscount ?? editing.global_discount_percentage,
+                                            )}
+                                        />
+                                    </Space>
+                                }
                                 name="branch_price"
                                 extra={`Leave empty to use the global price of ${money(
                                     editing.global_price

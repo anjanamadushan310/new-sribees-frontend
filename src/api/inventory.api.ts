@@ -48,6 +48,22 @@ export interface InventoryItem {
     stock_grams?: number;
 }
 
+/** Sribees Finance's minimum price for an item in a branch (advice, never a block). */
+export interface PriceFloor {
+    product_id: string;
+    variant_id: string | null; // set for a pack size of a pre-packed product
+    min_price: string | null;
+    ready_cost: string | null;
+    purchase_cost: string | null;
+    materials_cost: string | null;
+    margin_pct: string | null;
+    cashback_pct: string | null;
+    referral_pct: string | null;
+    cost_ref: string | null;
+    no_floor_reason: string | null;
+    as_of: string | null;
+}
+
 /** One weight option's stock in a branch. */
 export interface WeightStockOption {
     variant_id: string;
@@ -238,6 +254,15 @@ export const inventoryApi = {
             payload
         );
         return res.data.data;
+    },
+
+    /** Sribees Finance's minimum prices for these products in one branch. */
+    priceFloors: async (productIds: string[], branchId?: string): Promise<Record<string, PriceFloor[]>> => {
+        const res = await apiClient.get<{ success: boolean; data: { floors: Record<string, PriceFloor[]> } }>(
+            '/admin/inventory/price-floors',
+            { params: { product_ids: productIds.join(','), branch_id: branchId } }
+        );
+        return res.data.data.floors;
     },
 
     /** Stock a global product in a branch (creates the branch_inventory row). */
