@@ -65,3 +65,43 @@ export const supportApi = {
         return res.data;
     },
 };
+
+export interface WhatsAppMessage {
+    id: string;
+    incoming: string | null;
+    incoming_type: string | null;
+    received_at: string | null;
+    outgoing: string | null;
+    is_staff: boolean;
+    status: string;
+    error_code: string | null;
+    created_at: string;
+}
+
+export interface WhatsAppHistory {
+    available: boolean;
+    active: boolean;
+    staff_active: boolean;
+    assigned_admin_id: string | null;
+    reply_until: string | null;
+    enabled: boolean;
+    messages: WhatsAppMessage[];
+    next_before: string | null;
+}
+
+export const whatsAppSupportApi = {
+    history: async (ticketId: string, before?: string): Promise<WhatsAppHistory> => {
+        const res = await apiClient.get<WhatsAppHistory>(`/admin/support/tickets/${ticketId}/whatsapp`, {
+            params: { before },
+        });
+        return res.data;
+    },
+    claim: async (ticketId: string) => apiClient.post(`/admin/support/tickets/${ticketId}/whatsapp/claim`),
+    release: async (ticketId: string) => apiClient.post(`/admin/support/tickets/${ticketId}/whatsapp/release`),
+    send: async (ticketId: string, body: string, requestId: string): Promise<WhatsAppMessage> => {
+        const res = await apiClient.post<WhatsAppMessage>(`/admin/support/tickets/${ticketId}/whatsapp/messages`, {
+            body, request_id: requestId,
+        });
+        return res.data;
+    },
+};

@@ -42,6 +42,7 @@ import type { SupportTicketItem } from '../../api/support.api';
 import { branchesApi } from '../../api/branches.api';
 import type { Branch } from '../../api/branches.api';
 import { useAuthStore } from '../../store/authStore';
+import { WhatsAppTicketChat } from './WhatsAppTicketChat';
 import { AdminRole } from '../../types/admin.types';
 
 const { Title, Text, Paragraph } = Typography;
@@ -486,6 +487,8 @@ export const SupportTicketList: React.FC = () => {
                                 {selectedTicket.message}
                             </Paragraph>
                         </Card>
+
+                        {drawerOpen && <WhatsAppTicketChat key={selectedTicket.ticket_id} ticketId={selectedTicket.ticket_id} />}
 
                         <Divider titlePlacement="start" style={{ fontSize: 13 }}>Update Status & Notes</Divider>
                         <Form form={form} layout="vertical">
