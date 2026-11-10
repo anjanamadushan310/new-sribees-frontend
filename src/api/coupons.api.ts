@@ -40,6 +40,10 @@ export interface Coupon {
     per_user_limit: number | null;
     /** Listed in the mobile "Available Offers" feed (customers must collect it). */
     is_public: boolean;
+    /** Shown in the app/web "special offers" popup on opening (public coupons only). */
+    show_in_popup?: boolean;
+    /** Higher first in the popup. */
+    popup_priority?: number;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
@@ -96,6 +100,8 @@ export interface CouponPayload {
     usage_limit?: number | null;
     per_user_limit?: number | null;
     is_public?: boolean;
+    show_in_popup?: boolean;
+    popup_priority?: number;
     valid_from: string; // ISO
     valid_until: string; // ISO
     is_active?: boolean;
