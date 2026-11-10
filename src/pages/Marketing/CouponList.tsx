@@ -134,6 +134,8 @@ interface CouponFormValues {
     usage_limit?: number | null;
     per_user_limit?: number | null;
     is_public?: boolean;
+    show_in_popup?: boolean;
+    popup_priority?: number;
     validity: [Dayjs, Dayjs];
     is_active: boolean;
     budget_cap?: number | null;
@@ -282,6 +284,8 @@ const CouponList: React.FC = () => {
             min_order_value: 0,
             per_user_limit: 1,
             is_public: false,
+            show_in_popup: false,
+            popup_priority: 0,
             exclude_quick_sale: false,
             auto_stop_on_budget: true,
             first_order_only: false,
@@ -312,6 +316,8 @@ const CouponList: React.FC = () => {
             usage_limit: c.usage_limit ?? undefined,
             per_user_limit: c.per_user_limit ?? undefined,
             is_public: c.is_public,
+            show_in_popup: c.show_in_popup ?? false,
+            popup_priority: c.popup_priority ?? 0,
             validity: [slt(c.valid_from), slt(c.valid_until)],
             is_active: c.is_active,
             budget_cap: c.budget_cap ?? undefined,
@@ -516,6 +522,9 @@ const CouponList: React.FC = () => {
             usage_limit: values.usage_limit ?? null,
             per_user_limit: values.per_user_limit ?? null,
             is_public: values.is_public ?? false,
+            // The popup lists public offers only; a private code never shows.
+            show_in_popup: (values.is_public ?? false) && (values.show_in_popup ?? false),
+            popup_priority: values.popup_priority ?? 0,
             valid_from: from.startOf('day').toISOString(),
             valid_until: to.endOf('day').toISOString(),
             is_active: values.is_active ?? true,
@@ -1036,6 +1045,28 @@ const CouponList: React.FC = () => {
                     >
                         <Switch checkedChildren="Public" unCheckedChildren="Private" />
                     </Form.Item>
+
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Show in app-open popup"
+                                name="show_in_popup"
+                                valuePropName="checked"
+                                extra="Public offers only. Customers see the popup at most once a day; 'Shop Now' collects it for them."
+                            >
+                                <Switch checkedChildren="Popup" unCheckedChildren="No popup" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Popup priority"
+                                name="popup_priority"
+                                extra="Higher shows first (the popup lists 3)."
+                            >
+                                <InputNumber min={0} max={1000} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
                     {/* Targeted Promotions & Customer Eligibility */}
                     <Divider titlePlacement="start">
