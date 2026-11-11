@@ -26,6 +26,24 @@ export function WhatsAppTicketChat({ ticketId }: { ticketId: string }) {
     const user = useAuthStore((state) => state.user);
     const canUpdate = useAuthStore((state) => state.hasPermission('support', 'update'));
     const [draft, setDraft] = useState('');
+    const [attachmentLoading, setAttachmentLoading] = useState<string | null>(null);
+    const downloadAttachment = async (messageId: string) => {
+        setAttachmentLoading(messageId);
+        try {
+            const blob = await whatsAppSupportApi.attachment(ticketId, messageId);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const extension = blob.type === 'application/pdf' ? 'pdf' : blob.type === 'image/png' ? 'png' : 'jpg';
+            link.download = `support-attachment.${extension}`;
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            message.error('Attachment unavailable. Ask the customer to resend it.');
+        } finally {
+            setAttachmentLoading(null);
+        }
+    };
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
         const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -104,7 +122,9 @@ export function WhatsAppTicketChat({ ticketId }: { ticketId: string }) {
                     {row.incoming_type && <div style={{ margin: '0 32px 12px 0', padding: 12, borderRadius: 12, background: '#f5f5f5' }}>
                         <Typography.Text strong>Customer</Typography.Text>
                         <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                            {row.incoming || `[${row.incoming_type} message — media preview is unavailable]`}
+                            {row.incoming || `[${row.incoming_type} message]`}
+                            {row.has_attachment && <Button size="small" loading={attachmentLoading === row.id}
+                                onClick={() => downloadAttachment(row.id)}>Download attachment</Button>}
                         </div>
                         <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                             {new Date(row.received_at ?? row.created_at).toLocaleString()}

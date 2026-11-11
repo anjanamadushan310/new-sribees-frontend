@@ -8,7 +8,7 @@ import { AdminRole } from '../../types/admin.types';
 import { WhatsAppTicketChat } from './WhatsAppTicketChat';
 
 vi.mock('../../api/support.api', () => ({ whatsAppSupportApi: {
-    history: vi.fn(), claim: vi.fn(), release: vi.fn(), send: vi.fn(),
+    history: vi.fn(), claim: vi.fn(), release: vi.fn(), send: vi.fn(), attachment: vi.fn(),
 } }));
 const history = vi.mocked(whatsAppSupportApi.history);
 const send = vi.mocked(whatsAppSupportApi.send);
@@ -22,6 +22,29 @@ function conversation(overrides: Partial<WhatsAppHistory> = {}): WhatsAppHistory
 }
 
 describe('WhatsApp staff chat', () => {
+    it('downloads attachments through the authenticated ticket API', async () => {
+        signIn(AdminRole.SUPER_ADMIN);
+        history.mockResolvedValue(conversation({ messages: [{
+            id: 'message-1', incoming: null, incoming_type: 'image', has_attachment: true,
+            received_at: new Date().toISOString(), outgoing: null, is_staff: false,
+            status: 'ignored', error_code: null, created_at: new Date().toISOString(),
+        }] }));
+        vi.mocked(whatsAppSupportApi.attachment).mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+        const originalCreate = URL.createObjectURL;
+        const originalRevoke = URL.revokeObjectURL;
+        URL.createObjectURL = vi.fn(() => 'blob:test-image');
+        URL.revokeObjectURL = vi.fn();
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        renderPage(<WhatsAppTicketChat ticketId="ticket-1" />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Download attachment' }));
+        await waitFor(() => expect(whatsAppSupportApi.attachment).toHaveBeenCalledWith('ticket-1', 'message-1'));
+        await waitFor(() => expect(click).toHaveBeenCalled());
+        click.mockRestore();
+        URL.createObjectURL = originalCreate;
+        // The component revokes object URLs after the browser starts downloading.
+        window.setTimeout(() => { URL.revokeObjectURL = originalRevoke; }, 1100);
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         signIn(AdminRole.SUPER_ADMIN);

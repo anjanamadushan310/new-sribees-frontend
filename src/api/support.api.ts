@@ -70,6 +70,7 @@ export interface WhatsAppMessage {
     id: string;
     incoming: string | null;
     incoming_type: string | null;
+    has_attachment?: boolean;
     received_at: string | null;
     outgoing: string | null;
     is_staff: boolean;
@@ -90,6 +91,10 @@ export interface WhatsAppHistory {
 }
 
 export const whatsAppSupportApi = {
+    attachment: async (ticketId: string, messageId: string): Promise<Blob> => {
+        const res = await apiClient.get(`/admin/support/tickets/${ticketId}/whatsapp/messages/${messageId}/attachment`, { responseType: 'blob' });
+        return res.data;
+    },
     history: async (ticketId: string, before?: string): Promise<WhatsAppHistory> => {
         const res = await apiClient.get<WhatsAppHistory>(`/admin/support/tickets/${ticketId}/whatsapp`, {
             params: { before },
