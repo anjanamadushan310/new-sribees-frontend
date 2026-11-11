@@ -14,11 +14,9 @@
 # ---------------------------------------------------------------------------
 # Setup, once:
 #
-#   The backend repository is PRIVATE. This repo's BACKEND_DEPLOY_KEY secret
-#   holds the private half of a READ-ONLY deploy key on
-#   anjanamadushan610/Sribees-Online-Backend ("admin-e2e (read-only)"): it can
-#   clone that one repository and nothing else. To rotate it, make a new
-#   ed25519 pair, replace the deploy key and this secret together.
+#   The backend repository is PRIVATE. BACKEND_REPO_TOKEN must have read-only
+#   contents access to anjanamadushan610/Sribees-Online-Backend.
+#   The token remains in GitHub Secrets and is not persisted in the checkout.
 #
 #   Override BACKEND_REPO / BACKEND_REF below if either ever moves.
 # ---------------------------------------------------------------------------
@@ -75,8 +73,17 @@ jobs:
           repository: ${{ env.BACKEND_REPO }}
           ref: ${{ env.BACKEND_REF }}
           path: backend
-          # Read-only deploy key; see the setup note at the top of this file.
-          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+          token: ${{ secrets.BACKEND_REPO_TOKEN }}
+          persist-credentials: false
+
+      - name: Check out historical synthetic test fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BACKEND_REPO }}
+          ref: 8d006ba205fe45a1e45e725992f0dcfab952dac7
+          path: backend-test-fixtures
+          token: ${{ secrets.BACKEND_REPO_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -123,17 +130,32 @@ jobs:
           cat "$GITHUB_WORKSPACE/backend.log"
           exit 1
 
-      - name: Apply migrations and seed data
+      - name: Apply migrations with isolated E2E fixtures
         working-directory: backend
         env:
           PGHOST: localhost
           PGPORT: '5432'
+          PGOPTIONS: '-c sribees.demo_seed=on'
         run: |
           set -euo pipefail
+          test "$PGDATABASE" = sribees_e2e
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$ BEGIN
+            IF current_database() <> 'sribees_e2e' THEN
+              RAISE EXCEPTION 'Refusing fixtures on a non-E2E database';
+            END IF;
+          END $$;
+          SQL
           psql -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS "pgcrypto";'
           for f in $(ls -1 migrations/*.sql | sort); do
             echo "--- $(basename "$f")"
-            psql -v ON_ERROR_STOP=1 -f "$f"
+            # Keep historical fixtures in their original migration order.
+            # Later schema migrations backfill fields such as admin role_id.
+            case "$(basename "$f")" in
+              010_seed_branches.sql|021_seed_catalog.sql|025_seed_demo_data.sql|026_seed_full_dataset.sql|028_seed_partners.sql|035_multilingual_content.sql|039_seed_operations.sql)
+                psql -v ON_ERROR_STOP=1 -f "../backend-test-fixtures/$f" ;;
+              *) psql -v ON_ERROR_STOP=1 -f "$f" ;;
+            esac
           done
 
       - name: Set up Node
@@ -157,7 +179,7 @@ jobs:
 
       - name: Run end-to-end tests
         working-directory: admin
-        run: npm run test:e2e
+        run: npm run test:e2e -- --max-failures=3
 
       - name: Upload the Playwright report
         if: ${{ !cancelled() }}
