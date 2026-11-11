@@ -14,11 +14,9 @@
 # ---------------------------------------------------------------------------
 # Setup, once:
 #
-#   The backend repository is PRIVATE. This repo's BACKEND_DEPLOY_KEY secret
-#   holds the private half of a READ-ONLY deploy key on
-#   anjanamadushan610/Sribees-Online-Backend ("admin-e2e (read-only)"): it can
-#   clone that one repository and nothing else. To rotate it, make a new
-#   ed25519 pair, replace the deploy key and this secret together.
+#   The backend repository is PRIVATE. BACKEND_REPO_TOKEN must have read-only
+#   contents access to anjanamadushan610/Sribees-Online-Backend.
+#   The token remains in GitHub Secrets and is not persisted in the checkout.
 #
 #   Override BACKEND_REPO / BACKEND_REF below if either ever moves.
 # ---------------------------------------------------------------------------
@@ -75,8 +73,8 @@ jobs:
           repository: ${{ env.BACKEND_REPO }}
           ref: ${{ env.BACKEND_REF }}
           path: backend
-          # Read-only deploy key; see the setup note at the top of this file.
-          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+          token: ${{ secrets.BACKEND_REPO_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
