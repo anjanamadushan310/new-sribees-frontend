@@ -227,10 +227,10 @@ const PartnerList: React.FC = () => {
                 { text: 'Master Partner', value: 'master' },
                 { text: 'Partner', value: 'partner' },
             ],
-            onFilter: (value, record) => value === (record.parent_partner_id ? 'partner' : 'master'),
+            onFilter: (value, record) => value === ((record.role ?? (record.parent_partner_id ? 'partner' : 'master_partner')) === 'partner' ? 'partner' : 'master'),
             render: (_, record) => (
-                <Tag color={record.parent_partner_id ? 'blue' : 'magenta'}>
-                    {record.parent_partner_id ? 'Partner' : 'Master Partner'}
+                <Tag color={(record.role ?? (record.parent_partner_id ? 'partner' : 'master_partner')) === 'partner' ? 'blue' : 'magenta'}>
+                    {(record.role ?? (record.parent_partner_id ? 'partner' : 'master_partner')) === 'partner' ? 'Partner' : 'Master Partner'}
                 </Tag>
             ),
         },
@@ -405,7 +405,7 @@ const PartnerList: React.FC = () => {
             </Card>
 
             <Modal
-                title={editing ? (editing.parent_partner_id ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
+                title={editing ? ((editing.role ?? (editing.parent_partner_id ? 'partner' : 'master_partner')) === 'partner' ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
                 open={modalOpen}
                 onOk={handleSubmit}
                 onCancel={closeModal}
