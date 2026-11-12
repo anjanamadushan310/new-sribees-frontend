@@ -5,8 +5,6 @@ import type { Customer } from '../../api/customers.api';
 import { partnersApi } from '../../api/partners.api';
 
 interface UpgradeValues {
-    password: string;
-    confirmPassword: string;
     masterPartnerId?: string;
     consent: boolean;
     note: string;
@@ -23,13 +21,16 @@ export default function UpgradePartnerModal({ customer, onClose }: {
     const masters = useQuery({ queryKey: ['admin', 'partners'], queryFn: partnersApi.list });
     const upgrade = useMutation({
         mutationFn: (values: UpgradeValues) => partnersApi.upgradeCustomer(customer.user_id, {
-            password: values.password,
             master_partner_id: values.masterPartnerId ?? null,
             customer_consent_confirmed: true,
             note: values.note.trim(),
         }),
-        onSuccess: () => {
-            message.success('Customer upgraded to Partner. Share the portal login details securely.');
+        onSuccess: (result) => {
+            if (!result.invitation_sent) {
+                message.warning('Partner account is ready, but the invitation email could not be sent. Retry here to resend, or ask the customer to use Forgot Password in the Partner Portal.', 12);
+                return;
+            }
+            message.success('Partner invitation emailed. The customer can set their own password.');
             queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             onClose();
@@ -61,16 +62,7 @@ export default function UpgradePartnerModal({ customer, onClose }: {
                         .map(p => ({ value: p.partner_id, label: `${p.full_name} — ${p.email}` }))} />
             </Form.Item>
             {masters.isError && <Alert type="warning" title="Master Partners could not be loaded. Reopen this form to retry, or proceed without assigning one." />}
-            <Form.Item name="password" label="Partner Portal password" rules={[
-                { required: true, whitespace: true, message: 'Set a Partner Portal password.' },
-                { min: 8, max: 128, message: 'Use 8–128 characters.' },
-            ]}><Input.Password autoComplete="new-password" maxLength={128} /></Form.Item>
-            <Form.Item name="confirmPassword" label="Confirm password" dependencies={['password']} rules={[
-                { required: true, message: 'Confirm the password.' },
-                ({ getFieldValue }) => ({ validator(_, value) {
-                    return value === getFieldValue('password') ? Promise.resolve() : Promise.reject(new Error('Passwords must match.'));
-                } }),
-            ]}><Input.Password autoComplete="new-password" maxLength={128} /></Form.Item>
+            <Alert type="info" showIcon title="An email invitation lets the customer choose their own password. The link expires after 24 hours." style={{ marginBottom: 16 }} />
             <Form.Item name="note" label="Customer request / verification reference" rules={[
                 { required: true, whitespace: true, message: 'Record how the customer requested and authorized this upgrade.' },
             ]}><Input.TextArea maxLength={400} rows={2} placeholder="For example, support ticket reference and verification performed" /></Form.Item>

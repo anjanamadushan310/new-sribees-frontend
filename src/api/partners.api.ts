@@ -70,12 +70,12 @@ interface MarkPaidWire {
 
 export const partnersApi = {
     upgradeCustomer: async (userId: string, payload: {
-        password: string;
         master_partner_id: string | null;
         customer_consent_confirmed: true;
         note: string;
-    }): Promise<void> => {
-        await apiClient.post(`/admin/partners/customers/${userId}/upgrade`, payload);
+    }): Promise<{ invitation_sent: boolean }> => {
+        const response = await apiClient.post(`/admin/partners/customers/${userId}/upgrade`, payload);
+        return response.data;
     },
     list: async (): Promise<AdminPartner[]> => {
         const res = await apiClient.get<PartnerListWire>('/admin/partners');

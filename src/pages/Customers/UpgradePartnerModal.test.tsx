@@ -13,15 +13,11 @@ describe('customer Partner upgrade', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         api.list.mockResolvedValue([]);
-        api.upgradeCustomer.mockResolvedValue(undefined);
+        api.upgradeCustomer.mockResolvedValue({ invitation_sent: true });
     });
 
     function fill() {
-        const password = crypto.randomUUID();
-        fireEvent.change(screen.getByLabelText('Partner Portal password'), { target: { value: password } });
-        fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: password } });
         fireEvent.change(screen.getByLabelText('Customer request / verification reference'), { target: { value: 'Verified support request' } });
-        return password;
     }
 
     it('requires identity and consent confirmation before submitting', async () => {
@@ -35,11 +31,11 @@ describe('customer Partner upgrade', () => {
     it('upgrades the selected customer and allows an unassigned Partner', async () => {
         const close = vi.fn();
         renderPage(<UpgradePartnerModal customer={customer} onClose={close} />);
-        const password = fill();
+        fill();
         fireEvent.click(screen.getByText('I verified this customer’s identity and their request to become a Partner.'));
         fireEvent.click(screen.getByText('Approve Partner Upgrade'));
         await waitFor(() => expect(api.upgradeCustomer).toHaveBeenCalledWith(customer.user_id, {
-            password, master_partner_id: null, customer_consent_confirmed: true, note: 'Verified support request',
+            master_partner_id: null, customer_consent_confirmed: true, note: 'Verified support request',
         }));
         await waitFor(() => expect(close).toHaveBeenCalledOnce());
     });
