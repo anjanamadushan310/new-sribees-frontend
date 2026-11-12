@@ -58,6 +58,13 @@ describe('StaffPhones', () => {
         expect(await screen.findByText(PROBLEM_TEXT.channel_silent)).toBeInTheDocument();
     });
 
+    it('a failed load says so, not "no phones"', async () => {
+        api.list.mockRejectedValue(new Error('403'));
+        renderPage(<StaffPhones />);
+        expect(await screen.findByText('Could not load the staff phones')).toBeInTheDocument();
+        expect(screen.queryByText('No staff phone has signed in to the app yet')).not.toBeInTheDocument();
+    });
+
     it('narrows to one branch', async () => {
         renderPage(<StaffPhones />);
         await screen.findByText('Kamal Silva');

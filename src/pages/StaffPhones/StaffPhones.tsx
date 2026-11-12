@@ -8,7 +8,7 @@
  * behind a quiet ⓘ, not a warning line (owner tone).
  */
 import React, { useMemo, useState } from 'react';
-import { Card, Empty, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled, InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery } from '@tanstack/react-query';
@@ -59,7 +59,10 @@ const RingState: React.FC<{ phone: StaffPhone }> = ({ phone }) => {
 };
 
 const StaffPhones: React.FC = () => {
-    const { data, isLoading } = useQuery({ queryKey: ['staff-phones'], queryFn: staffPhonesApi.list });
+    const { data, isLoading, isError, refetch } = useQuery({
+        queryKey: ['staff-phones'],
+        queryFn: staffPhonesApi.list,
+    });
     const [branch, setBranch] = useState<string | 'all'>('all');
 
     const branches = useMemo(() => {
@@ -121,6 +124,16 @@ const StaffPhones: React.FC = () => {
                 )}
             </Space>
 
+            {isError && (
+                <Alert
+                    type="error"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Could not load the staff phones"
+                    action={<Button size="small" onClick={() => refetch()}>Try again</Button>}
+                />
+            )}
+
             <Card>
                 <Table<StaffPhone>
                     rowKey="device_id"
@@ -129,7 +142,13 @@ const StaffPhones: React.FC = () => {
                     dataSource={phones}
                     pagination={false}
                     scroll={{ x: 720 }}
-                    locale={{ emptyText: <Empty description="No staff phone has signed in to the app yet" /> }}
+                    locale={{
+                        emptyText: isError ? (
+                            <Empty description="Not loaded" />
+                        ) : (
+                            <Empty description="No staff phone has signed in to the app yet" />
+                        ),
+                    }}
                 />
             </Card>
 
