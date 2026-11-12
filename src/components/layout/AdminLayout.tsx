@@ -28,6 +28,7 @@ import {
     RobotOutlined,
     MessageOutlined,
     CarOutlined,
+    BellOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -556,6 +557,9 @@ const AdminLayout: React.FC = () => {
             if (key === '/support-tickets') {
                 return can('support', 'read') || isSuperAdmin;
             }
+            if (key === '/staff-phones') {
+                return isSuperAdmin || role === AdminRole.BRANCH_MANAGER;
+            }
             if (
                 key === '/users' ||
                 key === '/branches' ||
@@ -618,6 +622,11 @@ const AdminLayout: React.FC = () => {
                 key: '/app-users',
                 icon: <MobileOutlined />,
                 label: 'App Users',
+            },
+            {
+                key: '/staff-phones',
+                icon: <BellOutlined />,
+                label: 'Staff Phones',
             },
             {
                 key: '/sms',
@@ -785,7 +794,7 @@ const AdminLayout: React.FC = () => {
         }
 
         return items;
-    }, [can, canAccessRoute, canManageCatalog, canManageCustomers, canManageStaff, isSuperAdmin, user?.role]);
+    }, [can, canAccessRoute, canManageCatalog, canManageCustomers, canManageStaff, isSuperAdmin, role, user?.role]);
 
     // Active menu selection key
     const selectedKey = useMemo(() => {
@@ -798,6 +807,8 @@ const AdminLayout: React.FC = () => {
         if (path.startsWith('/inventory')) return '/inventory';
         if (path.startsWith('/customers')) return '/customers';
         if (path.startsWith('/app-users')) return '/app-users';
+        // Before '/staff': '/staff-phones' starts with it.
+        if (path.startsWith('/staff-phones')) return '/staff-phones';
         if (path.startsWith('/sms')) return '/sms';
         if (path.startsWith('/support-tickets')) return '/support-tickets';
         if (path.startsWith('/assistant-briefings')) return '/assistant-briefings';
@@ -836,6 +847,7 @@ const AdminLayout: React.FC = () => {
         if (location.pathname.startsWith('/orders')) return 'Orders';
         if (location.pathname.startsWith('/customers')) return 'Customers';
         if (location.pathname.startsWith('/app-users')) return 'App Users';
+        if (location.pathname.startsWith('/staff-phones')) return 'Staff Phones';
         if (location.pathname.startsWith('/sms')) return 'SMS';
         if (location.pathname.startsWith('/analytics')) return 'Analytics';
         if (location.pathname.startsWith('/coupons')) return 'Coupons';

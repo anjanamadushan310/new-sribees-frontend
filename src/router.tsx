@@ -66,6 +66,7 @@ const StaffList = lazy(() => import('./pages/Staff/StaffList'));
 // Customers & Support
 const CustomerList = lazy(() => import('./pages/Customers/CustomerList'));
 const AppUsers = lazy(() => import('./pages/AppUsers/AppUsers'));
+const StaffPhones = lazy(() => import('./pages/StaffPhones/StaffPhones'));
 const SmsSettings = lazy(() => import('./pages/Sms/SmsSettings'));
 const SupportTicketList = lazy(() => import('./pages/Support/SupportTicketList'));
 
@@ -371,6 +372,16 @@ const AppRouter: React.FC = () => {
                             element={
                                 <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN]}>
                                     <AppUsers />
+                                </RoleGuard>
+                            }
+                        />
+
+                        {/* Staff Phones — which staff phones ring for new orders (New Orders app) */}
+                        <Route
+                            path="staff-phones"
+                            element={
+                                <RoleGuard allowedRoles={[AdminRole.SUPER_ADMIN, AdminRole.BRANCH_MANAGER]}>
+                                    <StaffPhones />
                                 </RoleGuard>
                             }
                         />
