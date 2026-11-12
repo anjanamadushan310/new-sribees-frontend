@@ -7,6 +7,8 @@ import apiClient from './client';
 
 export interface AdminPartner {
     partner_id: string;
+    role?: 'master_partner' | 'partner';
+    linked_user_id?: string | null;
     email: string;
     full_name: string;
     phone: string | null;
