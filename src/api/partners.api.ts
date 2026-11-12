@@ -7,6 +7,8 @@ import apiClient from './client';
 
 export interface AdminPartner {
     partner_id: string;
+    role?: 'master_partner' | 'partner';
+    linked_user_id?: string | null;
     email: string;
     full_name: string;
     phone: string | null;
@@ -67,6 +69,14 @@ interface MarkPaidWire {
 }
 
 export const partnersApi = {
+    upgradeCustomer: async (userId: string, payload: {
+        password: string;
+        master_partner_id: string | null;
+        customer_consent_confirmed: true;
+        note: string;
+    }): Promise<void> => {
+        await apiClient.post(`/admin/partners/customers/${userId}/upgrade`, payload);
+    },
     list: async (): Promise<AdminPartner[]> => {
         const res = await apiClient.get<PartnerListWire>('/admin/partners');
         return res.data.data.partners;

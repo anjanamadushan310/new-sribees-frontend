@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import AssignPromoModal from './AssignPromoModal';
 import CustomerProfileDrawer from './CustomerProfileDrawer';
+import UpgradePartnerModal from './UpgradePartnerModal';
 import type { CustomerSegment } from '../../api/customers.api';
 import { customersApi } from '../../api/customers.api';
 import type { Customer } from '../../api/customers.api';
@@ -74,6 +75,7 @@ const CustomerList: React.FC = () => {
     const [exporting, setExporting] = useState(false);
     const [tab, setTab] = useState<FilterTab>('all');
     const [promoOpen, setPromoOpen] = useState(false);
+    const [upgradeCustomer, setUpgradeCustomer] = useState<Customer | null>(null);
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Selected customer & popup state
@@ -442,6 +444,12 @@ const CustomerList: React.FC = () => {
                     ] : []),
                     ...(isSuperAdmin && !record.is_deleted ? [
                         {
+                            key: 'upgrade-partner',
+                            label: 'Upgrade to Partner',
+                            disabled: !record.is_active || record.is_blocked || !record.email || !record.full_name,
+                            onClick: () => setUpgradeCustomer(record),
+                        },
+                        {
                             type: 'divider' as const
                         },
                         {
@@ -544,6 +552,7 @@ const CustomerList: React.FC = () => {
                 customerName={profile?.full_name || profile?.email || 'this customer'}
                 onClose={() => setPromoOpen(false)}
             />
+                {upgradeCustomer && <UpgradePartnerModal customer={upgradeCustomer} onClose={() => setUpgradeCustomer(null)} />}
                   {/* View Profile Drawer */}
             <CustomerProfileDrawer
                 customerId={selectedCustomerId}

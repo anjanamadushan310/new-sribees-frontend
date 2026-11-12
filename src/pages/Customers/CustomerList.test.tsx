@@ -111,5 +111,14 @@ describe('CustomerList', () => {
         fireEvent.click(lastButton(row));
         expect(await screen.findByText('View Profile')).toBeInTheDocument();
         expect(screen.queryByText('Edit Info')).not.toBeInTheDocument();
+        expect(screen.queryByText('Upgrade to Partner')).not.toBeInTheDocument();
+    });
+
+    it('offers Partner upgrades to Super Admins from the customer row', async () => {
+        signIn(AdminRole.SUPER_ADMIN);
+        renderPage(<CustomerList />);
+        const row = (await screen.findByText('Nimal Perera')).closest('tr')!;
+        fireEvent.click(lastButton(row));
+        expect(await screen.findByText('Upgrade to Partner')).toBeInTheDocument();
     });
 });
