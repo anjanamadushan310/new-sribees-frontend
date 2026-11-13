@@ -70,6 +70,7 @@ interface MarkPaidWire {
 
 export const partnersApi = {
     upgradeCustomer: async (userId: string, payload: {
+        invitation_channel: 'email' | 'sms';
         master_partner_id: string | null;
         customer_consent_confirmed: true;
         note: string;

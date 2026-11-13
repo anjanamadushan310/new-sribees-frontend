@@ -58,6 +58,13 @@ function watch(page: Page) {
 
 test.describe('Every admin screen opens for the Super Admin', () => {
     test.beforeEach(async ({ page }) => {
+        // Serve decorative placeholder artwork locally so smoke tests finish
+        // reliably when the external Picsum image service is unavailable.
+        await page.route('https://picsum.photos/**', route => route.fulfill({
+            status: 200,
+            contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#eee"/></svg>',
+        }));
         await login(page, ACCOUNTS.superAdmin);
     });
 
