@@ -1,9 +1,13 @@
 /**
  * App Users (Super Admin) — who has the customer app open, on which version,
- * and how long each install uses it per day since it was downloaded.
- * Targets /api/v1/admin/app-usage, fed by the app's heartbeat.
+ * and how long each install uses it per day since it was downloaded. The web
+ * store (www.sribeesonline.com) reports too, with platform 'web': one row per
+ * browser. Targets /api/v1/admin/app-usage, fed by the heartbeat.
  */
 import apiClient from './client';
+
+/** The page's filter: phone app, web store, or both (undefined). */
+export type UsageChannel = 'app' | 'web';
 
 export interface AppInstall {
     device_id: string;
@@ -12,7 +16,9 @@ export interface AppInstall {
     customer_phone: string | null;
     /** No customer has signed in on this install yet. */
     is_guest: boolean;
-    platform: 'android' | 'ios';
+    platform: 'android' | 'ios' | 'web';
+    /** Web only: "Chrome on Windows", read by the server from the browser. */
+    browser?: string | null;
     app_version: string | null;
     build_number: string | null;
     /** null when Settings → App Settings has no latest version set. */
@@ -30,7 +36,12 @@ export interface AppInstall {
 }
 
 export interface AppUsageOverview {
+    channel?: UsageChannel | null;
+    /** Online within the chosen channel. */
     online_count: number;
+    /** Online by channel, whatever the filter. */
+    online_app_count?: number;
+    online_web_count?: number;
     online: AppInstall[];
     total_installs: number;
     active_today: number;
@@ -62,12 +73,19 @@ export interface AppInstallHistory {
 }
 
 export const appUsageApi = {
-    overview: async (): Promise<AppUsageOverview> => {
-        const res = await apiClient.get<{ data: AppUsageOverview }>('/admin/app-usage');
+    overview: async (channel?: UsageChannel): Promise<AppUsageOverview> => {
+        const res = await apiClient.get<{ data: AppUsageOverview }>('/admin/app-usage', {
+            params: channel ? { channel } : undefined,
+        });
         return res.data.data;
     },
 
-    installs: async (params: { search?: string; page: number; limit: number }): Promise<AppInstallList> => {
+    installs: async (params: {
+        search?: string;
+        channel?: UsageChannel;
+        page: number;
+        limit: number;
+    }): Promise<AppInstallList> => {
         const res = await apiClient.get<{ data: AppInstallList }>('/admin/app-usage/installs', { params });
         return res.data.data;
     },
