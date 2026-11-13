@@ -35,8 +35,21 @@ describe('customer Partner upgrade', () => {
         fireEvent.click(screen.getByText('I verified this customer’s identity and their request to become a Partner.'));
         fireEvent.click(screen.getByText('Approve Partner Upgrade'));
         await waitFor(() => expect(api.upgradeCustomer).toHaveBeenCalledWith(customer.user_id, {
-            master_partner_id: null, customer_consent_confirmed: true, note: 'Verified support request',
+            invitation_channel: 'email', master_partner_id: null, customer_consent_confirmed: true, note: 'Verified support request',
         }));
         await waitFor(() => expect(close).toHaveBeenCalledOnce());
     });
+    it('sends the selected SMS channel without collecting a password', async () => {
+        renderPage(<UpgradePartnerModal customer={customer} onClose={vi.fn()} />);
+        fill();
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Send password setup link by' }));
+        fireEvent.click(await screen.findByText('SMS — +94770000000'));
+        fireEvent.click(screen.getByText('I verified this customer’s identity and their request to become a Partner.'));
+        fireEvent.click(screen.getByText('Approve Partner Upgrade'));
+        await waitFor(() => expect(api.upgradeCustomer).toHaveBeenCalledWith(customer.user_id, {
+            invitation_channel: 'sms', master_partner_id: null, customer_consent_confirmed: true, note: 'Verified support request',
+        }));
+        expect(screen.queryByLabelText('Partner Portal password')).not.toBeInTheDocument();
+    });
+
 });

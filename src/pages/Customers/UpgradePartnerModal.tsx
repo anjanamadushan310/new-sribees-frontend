@@ -5,6 +5,7 @@ import type { Customer } from '../../api/customers.api';
 import { partnersApi } from '../../api/partners.api';
 
 interface UpgradeValues {
+    invitationChannel?: 'email' | 'sms';
     masterPartnerId?: string;
     consent: boolean;
     note: string;
@@ -21,16 +22,18 @@ export default function UpgradePartnerModal({ customer, onClose }: {
     const masters = useQuery({ queryKey: ['admin', 'partners'], queryFn: partnersApi.list });
     const upgrade = useMutation({
         mutationFn: (values: UpgradeValues) => partnersApi.upgradeCustomer(customer.user_id, {
+            invitation_channel: values.invitationChannel ?? 'email',
             master_partner_id: values.masterPartnerId ?? null,
             customer_consent_confirmed: true,
             note: values.note.trim(),
         }),
-        onSuccess: (result) => {
+        onSuccess: (result, values) => {
+            const channel = values.invitationChannel === 'sms' ? 'SMS' : 'email';
             if (!result.invitation_sent) {
-                message.warning('Partner account is ready, but the invitation email could not be sent. Retry here to resend, or ask the customer to use Forgot Password in the Partner Portal.', 12);
+                message.warning(`Partner account is ready, but the ${channel} invitation could not be sent. Check delivery settings and retry here.`, 12);
                 return;
             }
-            message.success('Partner invitation emailed. The customer can set their own password.');
+            message.success(`Partner invitation sent by ${channel}. The customer can set their own password.`);
             queryClient.invalidateQueries({ queryKey: ['admin', 'partners'] });
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             onClose();
@@ -52,7 +55,7 @@ export default function UpgradePartnerModal({ customer, onClose }: {
         cancelButtonProps={{ disabled: upgrade.isPending }}>
         <p><strong>{customer.full_name}</strong><br />{customer.email}<br />{customer.phone}</p>
         <Alert type="info" showIcon title="The customer keeps their invite code and referrals. Partner earnings use a separate Partner Wallet." />
-        <Form form={form} layout="vertical" disabled={upgrade.isPending} style={{ marginTop: 16 }}>
+        <Form form={form} initialValues={{ invitationChannel: 'email' }} layout="vertical" disabled={upgrade.isPending} style={{ marginTop: 16 }}>
             <Form.Item name="masterPartnerId" label="Master Partner (optional)">
                 <Select allowClear showSearch optionFilterProp="label" loading={masters.isLoading}
                     disabled={masters.isError} placeholder="No Master Partner assigned"
@@ -62,7 +65,13 @@ export default function UpgradePartnerModal({ customer, onClose }: {
                         .map(p => ({ value: p.partner_id, label: `${p.full_name} — ${p.email}` }))} />
             </Form.Item>
             {masters.isError && <Alert type="warning" title="Master Partners could not be loaded. Reopen this form to retry, or proceed without assigning one." />}
-            <Alert type="info" showIcon title="An email invitation lets the customer choose their own password. The link expires after 24 hours." style={{ marginBottom: 16 }} />
+            <Form.Item name="invitationChannel" label="Send password setup link by">
+                <Select options={[
+                    { value: 'email', label: `Email — ${customer.email}` },
+                    { value: 'sms', label: customer.phone ? `SMS — ${customer.phone}` : 'SMS — no registered phone', disabled: !customer.phone },
+                ]} />
+            </Form.Item>
+            <Alert type="info" showIcon title="The customer chooses their own password using a single-use link valid for 24 hours. SMS is sent only to their verified primary phone number and may incur SMS charges. SMS setup does not verify their email address." style={{ marginBottom: 16 }} />
             <Form.Item name="note" label="Customer request / verification reference" rules={[
                 { required: true, whitespace: true, message: 'Record how the customer requested and authorized this upgrade.' },
             ]}><Input.TextArea maxLength={400} rows={2} placeholder="For example, support ticket reference and verification performed" /></Form.Item>
