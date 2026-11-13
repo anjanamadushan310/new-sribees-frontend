@@ -4,7 +4,8 @@
  * TanStack Query against /api/v1/admin/coupons.
  * 
  * Enhanced with Targeted Promotions (Tiers & Whitelist with CSV Import/Export/Sample),
- * Catalog Eligibility, Automated Multi-channel Dispatch Panel, and Financial Safety rules.
+ * Catalog Eligibility, an announcement push when the coupon starts (Public /
+ * Specific Customers only), and Financial Safety rules.
  */
 import React, { useState } from 'react';
 import {
@@ -28,7 +29,6 @@ import {
     Segmented,
     Divider,
     Radio,
-    Checkbox,
     Alert,
     Upload,
     Row,
@@ -52,7 +52,6 @@ import {
     UserAddOutlined,
     CrownOutlined,
     NotificationOutlined,
-    MailOutlined,
     MobileOutlined,
     InfoCircleOutlined,
     SendOutlined,
@@ -154,10 +153,8 @@ interface CouponFormValues {
     /** The loyalty level a members-only coupon starts at. */
     min_tier_id?: string;
 
-    // Dispatch Config
-    dispatch_enabled?: boolean;
-    dispatch_channels?: ('sms' | 'email' | 'push')[];
-    dispatch_template?: string;
+    /** Announcement push when the coupon starts (Public / Specific only). */
+    notify_customers?: boolean;
 }
 
 const CouponList: React.FC = () => {
@@ -169,7 +166,12 @@ const CouponList: React.FC = () => {
     const branchScope = Form.useWatch('branch_scope', form);
     const eligibility = Form.useWatch('eligibility', form);
     const targetCustomerType = Form.useWatch('target_customer_type', form);
-    const dispatchEnabled = Form.useWatch('dispatch_enabled', form);
+    const isPublic = Form.useWatch('is_public', form);
+    const notifyOn = Form.useWatch('notify_customers', form);
+    // The push carries the code, so a hidden code only goes to the customers
+    // it was made for (the server enforces the same rule).
+    const audienceType = Form.useWatch('target_customer_type', form);
+    const canNotify = !!isPublic || audienceType === 'specific';
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -281,9 +283,7 @@ const CouponList: React.FC = () => {
             branch_id: null,
             target_customer_type: 'all',
             min_tier_id: undefined,
-            dispatch_enabled: false,
-            dispatch_channels: ['sms', 'push'],
-            dispatch_template: 'Hi {customer_name}! Use promo code {coupon_code} to get {discount_value} OFF your next order. Valid until {validity_date}.',
+            notify_customers: false,
         });
         setModalOpen(true);
     };
@@ -321,9 +321,7 @@ const CouponList: React.FC = () => {
                     ? 'all'
                     : (c.target_customer_type ?? 'all'),
             min_tier_id: c.min_tier_id ?? undefined,
-            dispatch_enabled: c.dispatch_config?.enabled ?? false,
-            dispatch_channels: c.dispatch_config?.channels ?? ['sms', 'push'],
-            dispatch_template: c.dispatch_config?.template ?? 'Hi {customer_name}! Use promo code {coupon_code} to get {discount_value} OFF your next order. Valid until {validity_date}.',
+            notify_customers: c.notify_customers ?? false,
         });
         setModalOpen(true);
     };
@@ -447,30 +445,14 @@ const CouponList: React.FC = () => {
         message.success('Downloaded sample CSV template.');
     };
 
-    // Insert variable helper for notification panel
-    const insertVariable = (variable: string) => {
-        const currentText = form.getFieldValue('dispatch_template') || '';
-        const updatedText = currentText ? `${currentText} ${variable}` : variable;
-        form.setFieldsValue({ dispatch_template: updatedText });
-    };
-
-    const getLivePreview = () => {
-        const tmpl =
-            form.getFieldValue('dispatch_template') ||
-            'Hi {customer_name}! Use promo code {coupon_code} to get {discount_value} OFF your next order. Valid until {validity_date}.';
-        const code = form.getFieldValue('code') || 'SAVE20';
-        const discTypeVal = form.getFieldValue('discount_type');
-        const discValNum = form.getFieldValue('discount_value') || 10;
-        const discStr = discTypeVal === 'percentage' ? `${discValNum}%` : `LKR ${discValNum}`;
-        const validityArr = form.getFieldValue('validity');
-        const validUntilStr =
-            validityArr && validityArr[1] ? validityArr[1].format('YYYY-MM-DD') : '2026-10-31';
-
-        return tmpl
-            .replace(/\{customer_name\}/g, 'Kamal')
-            .replace(/\{coupon_code\}/g, code.toUpperCase())
-            .replace(/\{discount_value\}/g, discStr)
-            .replace(/\{validity_date\}/g, validUntilStr);
+    // What the customer will read (English; the app sends Sinhala / Tamil to
+    // customers using those languages). Mirrors the server's coupon.announce.
+    const notifyPreview = () => {
+        const code = (form.getFieldValue('code') || 'SAVE20').toUpperCase();
+        const type = form.getFieldValue('discount_type');
+        const value = form.getFieldValue('discount_value') || 10;
+        const off = type === 'percentage' ? `${value}% off` : `Rs. ${Number(value).toFixed(2)} off`;
+        return `Get ${off} with code ${code}. Tap to see it in your offers.`;
     };
 
     const executeSubmit = (payload: CouponPayload) => {
@@ -522,11 +504,9 @@ const CouponList: React.FC = () => {
             min_tier_id: values.target_customer_type === 'tier' ? (values.min_tier_id ?? null) : null,
             whitelisted_customers:
                 values.target_customer_type === 'specific' ? whitelistedCustomers : [],
-            dispatch_config: {
-                enabled: values.dispatch_enabled ?? false,
-                channels: values.dispatch_channels ?? [],
-                template: values.dispatch_template ?? '',
-            },
+            notify_customers:
+                (values.is_public || values.target_customer_type === 'specific') &&
+                (values.notify_customers ?? false),
         };
 
         if (minOrder === 0) {
@@ -560,6 +540,13 @@ const CouponList: React.FC = () => {
                             <Tag color="purple" style={{ marginInlineEnd: 0, fontSize: 11 }}>
                                 In app
                             </Tag>
+                        )}
+                        {c.notify_customers && (
+                            <Tooltip title={`Announcement push sent to ${c.notified_count ?? 0} customer(s)`}>
+                                <Tag color="green" icon={<NotificationOutlined />} style={{ marginInlineEnd: 0, fontSize: 11 }}>
+                                    Notify ({c.notified_count ?? 0})
+                                </Tag>
+                            </Tooltip>
                         )}
                         {c.min_tier_id && (
                             <Tag color="cyan" icon={<CrownOutlined />} style={{ marginInlineEnd: 0, fontSize: 11 }}>
@@ -1238,94 +1225,50 @@ const CouponList: React.FC = () => {
                         </Form.Item>
                     )}
 
-                    {/* Automated Dispatch & Notification Panel */}
+                    {/* Customer notification (app push when the coupon starts) */}
                     <Divider titlePlacement="start">
                         <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>
-                            <SendOutlined /> AUTOMATED DISPATCH &amp; NOTIFICATION PANEL
+                            <NotificationOutlined /> CUSTOMER NOTIFICATION
                         </span>
                     </Divider>
 
                     <Form.Item
-                        name="dispatch_enabled"
+                        label={
+                            <Space size={6}>
+                                Notify customers when this coupon starts
+                                {!canNotify && (
+                                    <Tooltip title="Only for a Public coupon or a Specific Customers coupon: a hidden code is never pushed to everyone.">
+                                        <InfoCircleOutlined style={{ color: '#94a3b8' }} />
+                                    </Tooltip>
+                                )}
+                            </Space>
+                        }
+                        name="notify_customers"
                         valuePropName="checked"
-                        extra="Automatically send promo details to eligible target customers when saved."
+                        extra="One app push per customer, in their app language, when the coupon starts. Customers with offer notifications off are skipped. Tapping it opens Offers."
                     >
-                        <Switch
-                            checkedChildren="Send promo code directly via SMS / Email / Push"
-                            unCheckedChildren="Manual / No auto dispatch"
-                        />
+                        <Switch disabled={!canNotify} checkedChildren="Notify" unCheckedChildren="Off" />
                     </Form.Item>
 
-                    {dispatchEnabled && (
-                        <Card size="small" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', marginBottom: 16 }}>
-                            <Form.Item
-                                label="Select Dispatch Channels"
-                                name="dispatch_channels"
-                                rules={[{ required: true, message: 'Choose at least one channel' }]}
-                            >
-                                <Checkbox.Group
-                                    options={[
-                                        { label: <span><MobileOutlined /> SMS</span>, value: 'sms' },
-                                        { label: <span><MailOutlined /> Email</span>, value: 'email' },
-                                        { label: <span><NotificationOutlined /> App Push</span>, value: 'push' },
-                                    ]}
-                                />
-                            </Form.Item>
-
-                            <Form.Item
-                                label="Notification Message Template"
-                                name="dispatch_template"
-                                rules={[{ required: true, message: 'Enter a notification template' }]}
-                                extra="Click variable chips below to insert dynamic tokens into your message."
-                            >
-                                <Input.TextArea rows={3} placeholder="Notification template text..." />
-                            </Form.Item>
-
-                            {/* Dynamic Variable Chips */}
-                            <div style={{ marginBottom: 12 }}>
-                                <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>
-                                    Insert Dynamic Variables:
-                                </Text>
-                                <Space wrap>
-                                    <Tag
-                                        color="green"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => insertVariable('{customer_name}')}
-                                    >
-                                        + {'{customer_name}'}
-                                    </Tag>
-                                    <Tag
-                                        color="green"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => insertVariable('{coupon_code}')}
-                                    >
-                                        + {'{coupon_code}'}
-                                    </Tag>
-                                    <Tag
-                                        color="green"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => insertVariable('{discount_value}')}
-                                    >
-                                        + {'{discount_value}'}
-                                    </Tag>
-                                    <Tag
-                                        color="green"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => insertVariable('{validity_date}')}
-                                    >
-                                        + {'{validity_date}'}
-                                    </Tag>
-                                </Space>
-                            </div>
-
-                            {/* Message Live Preview */}
-                            <Alert
-                                type="success"
-                                showIcon
-                                message="Message Live Preview"
-                                description={<Text style={{ fontSize: 12 }}>"{getLivePreview()}"</Text>}
-                            />
-                        </Card>
+                    {canNotify && notifyOn && (
+                        <Alert
+                            type="success"
+                            showIcon
+                            icon={<SendOutlined />}
+                            style={{ marginBottom: 16 }}
+                            message="A coupon for you 🎁"
+                            description={
+                                <>
+                                    <Text style={{ fontSize: 12 }}>{notifyPreview()}</Text>
+                                    {editing && (editing.notified_count ?? 0) > 0 && (
+                                        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+                                            Sent to {editing.notified_count} customer(s) so far. Customers added to
+                                            the list later get theirs; nobody gets it twice.
+                                        </Text>
+                                    )}
+                                </>
+                            }
+                        />
                     )}
 
                     {/* Financial Protection */}
