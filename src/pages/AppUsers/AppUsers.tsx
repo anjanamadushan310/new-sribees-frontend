@@ -4,7 +4,8 @@
  * Who has the customer app open right now, which version each phone runs,
  * and every install's daily use from the day it was downloaded. Fed by the
  * app's heartbeat: on open, every 2 minutes while on screen, and once when it
- * goes to the background.
+ * goes to the background. The web store (www.sribeesonline.com) sends the same
+ * heartbeat while its tab is on screen; the All / App / Web switch filters.
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -25,12 +26,12 @@ import {
     Tooltip,
     Typography,
 } from 'antd';
-import { MobileOutlined, ClockCircleOutlined, TeamOutlined, WifiOutlined } from '@ant-design/icons';
+import { MobileOutlined, ClockCircleOutlined, GlobalOutlined, TeamOutlined, WifiOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 import { appUsageApi } from '../../api/appUsage.api';
-import type { AppInstall, AppUsageDay } from '../../api/appUsage.api';
+import type { AppInstall, AppUsageDay, UsageChannel } from '../../api/appUsage.api';
 import { slt } from '../../utils/datetime';
 import { PRIMARY, axisProps, gridProps } from '../../utils/chartTheme';
 
@@ -48,9 +49,33 @@ function formatDuration(seconds: number): string {
 
 const when = (iso: string | null) => (iso ? slt(iso).format('D MMM YYYY, h:mm A') : '—');
 
+const isWeb = (i: AppInstall) => i.platform === 'web';
+
+/** "iPhone", "Android", or the browser for the web store. */
+function deviceLabel(i: AppInstall): string {
+    if (isWeb(i)) return i.browser || 'Web browser';
+    return i.platform === 'ios' ? 'iPhone' : 'Android';
+}
+
+const Device: React.FC<{ install: AppInstall }> = ({ install }) =>
+    isWeb(install) ? (
+        <Space size={4}>
+            <GlobalOutlined style={{ color: '#1677ff' }} />
+            <Text>{deviceLabel(install)}</Text>
+        </Space>
+    ) : (
+        <Space size={4}>
+            <MobileOutlined />
+            <Text>{deviceLabel(install)}</Text>
+        </Space>
+    );
+
+const CHANNELS = { All: undefined, 'Phone app': 'app', Web: 'web' } as const;
+type ChannelLabel = keyof typeof CHANNELS;
+
 const Customer: React.FC<{ install: AppInstall }> = ({ install }) =>
     install.is_guest ? (
-        <Tooltip title="Nobody has signed in on this phone yet">
+        <Tooltip title={isWeb(install) ? 'Nobody has signed in on this browser yet' : 'Nobody has signed in on this phone yet'}>
             <Text type="secondary">Guest</Text>
         </Tooltip>
     ) : (
@@ -61,6 +86,7 @@ const Customer: React.FC<{ install: AppInstall }> = ({ install }) =>
     );
 
 const Version: React.FC<{ install: AppInstall }> = ({ install }) => {
+    if (isWeb(install)) return <Tag color="blue">Web</Tag>;
     if (!install.app_version) return <Text type="secondary">—</Text>;
     const label = `${install.app_version}${install.build_number ? ` (${install.build_number})` : ''}`;
     if (install.is_latest_version === false) {
@@ -119,10 +145,10 @@ const InstallHistory: React.FC<{ deviceId: string }> = ({ deviceId }) => {
             <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Customer"><Customer install={i} /></Descriptions.Item>
                 <Descriptions.Item label="Version"><Version install={i} /></Descriptions.Item>
-                <Descriptions.Item label="Phone">{i.platform === 'ios' ? 'iPhone' : 'Android'}</Descriptions.Item>
-                <Descriptions.Item label="Downloaded">
+                <Descriptions.Item label={isWeb(i) ? 'Browser' : 'Phone'}><Device install={i} /></Descriptions.Item>
+                <Descriptions.Item label={isWeb(i) ? 'First visit' : 'Downloaded'}>
                     {when(i.installed_at)}
-                    {i.installed_at_is_estimate && <Text type="secondary"> (first seen)</Text>}
+                    {!isWeb(i) && i.installed_at_is_estimate && <Text type="secondary"> (first seen)</Text>}
                 </Descriptions.Item>
                 <Descriptions.Item label="Last seen">
                     {i.is_online ? <Badge status="success" text="Online now" /> : when(i.last_seen_at)}
@@ -162,27 +188,31 @@ const InstallHistory: React.FC<{ deviceId: string }> = ({ deviceId }) => {
 const AppUsers: React.FC = () => {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [channelLabel, setChannelLabel] = useState<ChannelLabel>('All');
     const [openDevice, setOpenDevice] = useState<string | null>(null);
+    const channel: UsageChannel | undefined = CHANNELS[channelLabel];
 
     // Online now is live: re-read every 30 seconds while the page is open.
     const overviewQuery = useQuery({
-        queryKey: ['app-usage', 'overview'],
-        queryFn: appUsageApi.overview,
+        queryKey: ['app-usage', 'overview', channel],
+        queryFn: () => appUsageApi.overview(channel),
         refetchInterval: 30_000,
     });
     const installsQuery = useQuery({
-        queryKey: ['app-usage', 'installs', search, page],
-        queryFn: () => appUsageApi.installs({ search: search || undefined, page, limit: 20 }),
+        queryKey: ['app-usage', 'installs', channel, search, page],
+        queryFn: () => appUsageApi.installs({ search: search || undefined, channel, page, limit: 20 }),
         refetchInterval: 60_000,
     });
 
     const o = overviewQuery.data;
     const versionTotal = (o?.versions ?? []).reduce((sum, v) => sum + v.installs, 0);
+    const webOnly = channel === 'web';
+    const where = channel === 'web' ? 'the web store' : channel === 'app' ? 'the app' : 'the app or web';
 
     const onlineColumns: ColumnsType<AppInstall> = [
         { title: 'Customer', key: 'customer', render: (_, r) => <Customer install={r} /> },
         { title: 'Version', key: 'version', render: (_, r) => <Version install={r} /> },
-        { title: 'Phone', dataIndex: 'platform', render: (p: string) => (p === 'ios' ? 'iPhone' : 'Android') },
+        { title: 'Device', key: 'device', render: (_, r) => <Device install={r} /> },
         { title: 'Today', dataIndex: 'today_seconds', align: 'right', render: formatDuration },
         { title: 'Last report', dataIndex: 'last_seen_at', render: (v: string) => slt(v).format('h:mm A') },
     ];
@@ -199,11 +229,20 @@ const AppUsers: React.FC = () => {
             ),
         },
         { title: 'Version', key: 'version', render: (_, r) => <Version install={r} /> },
+        { title: 'Device', key: 'device', render: (_, r) => <Device install={r} /> },
         {
-            title: 'Downloaded',
+            title: webOnly ? 'First visit' : 'Downloaded',
             dataIndex: 'installed_at',
             render: (v: string | null, r) => (
-                <Tooltip title={r.installed_at_is_estimate ? 'The phone gave no install date: first seen' : undefined}>
+                <Tooltip
+                    title={
+                        isWeb(r)
+                            ? 'First visit from this browser'
+                            : r.installed_at_is_estimate
+                              ? 'The phone gave no install date: first seen'
+                              : undefined
+                    }
+                >
                     {v ? slt(v).format('D MMM YYYY') : '—'}
                 </Tooltip>
             ),
@@ -225,9 +264,19 @@ const AppUsers: React.FC = () => {
                     <Space><MobileOutlined />App Users</Space>
                 </Title>
                 <Text type="secondary">
-                    Customers using the app right now, the version on each phone, and each phone's daily use since
-                    it was downloaded. Click a row for its day-by-day history.
+                    Customers using the phone app or the web store (www.sribeesonline.com) right now, the version on
+                    each phone, and each phone's or browser's daily use. Click a row for its day-by-day history.
                 </Text>
+                <div style={{ marginTop: 12 }}>
+                    <Segmented
+                        options={Object.keys(CHANNELS)}
+                        value={channelLabel}
+                        onChange={(v) => {
+                            setChannelLabel(v as ChannelLabel);
+                            setPage(1);
+                        }}
+                    />
+                </div>
             </div>
 
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -239,12 +288,17 @@ const AppUsers: React.FC = () => {
                             prefix={<WifiOutlined style={{ color: '#0ca30c' }} />}
                             loading={overviewQuery.isLoading}
                         />
+                        {o && !channel && (
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                App {o.online_app_count ?? 0} · Web {o.online_web_count ?? 0}
+                            </Text>
+                        )}
                     </Card>
                 </Col>
                 <Col xs={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Used the app today"
+                            title={webOnly ? 'Used the web today' : 'Used the app today'}
                             value={o?.active_today ?? 0}
                             prefix={<TeamOutlined />}
                             loading={overviewQuery.isLoading}
@@ -254,7 +308,7 @@ const AppUsers: React.FC = () => {
                 <Col xs={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Time in app today"
+                            title={webOnly ? 'Time on web today' : 'Time in app today'}
                             value={formatDuration(o?.seconds_today ?? 0)}
                             prefix={<ClockCircleOutlined />}
                             loading={overviewQuery.isLoading}
@@ -264,9 +318,9 @@ const AppUsers: React.FC = () => {
                 <Col xs={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Installs"
+                            title={webOnly ? 'Browsers' : channel === 'app' ? 'Installs' : 'Installs + browsers'}
                             value={o?.total_installs ?? 0}
-                            prefix={<MobileOutlined />}
+                            prefix={webOnly ? <GlobalOutlined /> : <MobileOutlined />}
                             loading={overviewQuery.isLoading}
                         />
                     </Card>
@@ -274,9 +328,9 @@ const AppUsers: React.FC = () => {
             </Row>
 
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                <Col xs={24} xl={16}>
+                <Col xs={24} xl={webOnly ? 24 : 16}>
                     <Card
-                        title={<Space><Badge status="processing" />Using the app now</Space>}
+                        title={<Space><Badge status="processing" />{`Using ${where} now`}</Space>}
                         extra={
                             <Text type="secondary" style={{ fontSize: 12 }}>
                                 Updates every 30 seconds
@@ -291,11 +345,12 @@ const AppUsers: React.FC = () => {
                             loading={overviewQuery.isLoading}
                             pagination={{ pageSize: 10, hideOnSinglePage: true }}
                             onRow={(r) => ({ onClick: () => setOpenDevice(r.device_id), style: { cursor: 'pointer' } })}
-                            locale={{ emptyText: <Empty description="Nobody has the app open right now" /> }}
+                            locale={{ emptyText: <Empty description={`Nobody is on ${where} right now`} /> }}
                             scroll={{ x: 'max-content' }}
                         />
                     </Card>
                 </Col>
+                {!webOnly && (
                 <Col xs={24} xl={8}>
                     <Card
                         title="Versions in use"
@@ -327,14 +382,15 @@ const AppUsers: React.FC = () => {
                         )}
                     </Card>
                 </Col>
+                )}
             </Row>
 
             <Card
-                title="Every phone with the app"
+                title={webOnly ? 'Every browser on the web store' : channel === 'app' ? 'Every phone with the app' : 'Every phone and browser'}
                 extra={
                     <Input.Search
                         allowClear
-                        placeholder="Name, phone or version"
+                        placeholder="Name, phone, version or browser"
                         style={{ width: 260 }}
                         onSearch={(v) => {
                             setSearch(v.trim());
@@ -361,7 +417,7 @@ const AppUsers: React.FC = () => {
             </Card>
 
             <Drawer
-                title="Daily use since download"
+                title="Daily use"
                 width={560}
                 open={openDevice !== null}
                 onClose={() => setOpenDevice(null)}

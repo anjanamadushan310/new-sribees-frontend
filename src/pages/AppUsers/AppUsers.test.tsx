@@ -49,7 +49,7 @@ describe('AppUsers', () => {
 
     it('shows who is online, the totals, and who is behind on versions', async () => {
         renderPage(<AppUsers />);
-        expect(await screen.findByText('Using the app now')).toBeInTheDocument();
+        expect(await screen.findByText('Using the app or web now')).toBeInTheDocument();
         expect(await screen.findByText('1h 05m')).toBeInTheDocument(); // time in app today
         expect(screen.getAllByText('Nimal Perera').length).toBeGreaterThan(0);
         expect(await screen.findByText('Guest')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('AppUsers', () => {
         renderPage(<AppUsers />);
         fireEvent.click((await screen.findByText('Guest')).closest('tr')!);
         await waitFor(() => expect(api.history).toHaveBeenCalledWith('guest_2'));
-        expect(await screen.findByText('Daily use since download')).toBeInTheDocument();
+        expect(await screen.findByText('Daily use')).toBeInTheDocument();
         expect(await screen.findByText('Not measured')).toBeInTheDocument();
         const drawer = document.querySelector('.ant-drawer') as HTMLElement;
         expect(within(drawer).getAllByText('25m').length).toBeGreaterThan(0);
@@ -68,12 +68,34 @@ describe('AppUsers', () => {
 
     it('searches by name, phone or version', async () => {
         renderPage(<AppUsers />);
-        await screen.findByText('Every phone with the app');
-        const box = screen.getByPlaceholderText('Name, phone or version');
+        await screen.findByText('Every phone and browser');
+        const box = screen.getByPlaceholderText('Name, phone, version or browser');
         fireEvent.change(box, { target: { value: '1.3.0' } });
         fireEvent.keyDown(box, { key: 'Enter', code: 'Enter', keyCode: 13 });
         await waitFor(() =>
-            expect(api.installs).toHaveBeenLastCalledWith({ search: '1.3.0', page: 1, limit: 20 }),
+            expect(api.installs).toHaveBeenLastCalledWith({ search: '1.3.0', channel: undefined, page: 1, limit: 20 }),
         );
+    });
+
+    it('switches to the web store: browsers, no versions card', async () => {
+        const web = install({
+            device_id: 'web_1', platform: 'web', browser: 'Chrome on Windows', app_version: null,
+            build_number: null, is_latest_version: null, installed_at_is_estimate: true,
+        });
+        api.overview.mockResolvedValue({
+            channel: 'web', online_count: 1, online_app_count: 0, online_web_count: 1, online: [web],
+            total_installs: 1, active_today: 1, seconds_today: 600, latest_version: '1.4.0', versions: [],
+            online_window_minutes: 5, generated_at: '2026-09-26T10:01:00Z',
+        });
+        api.installs.mockResolvedValue({ installs: [web], total: 1, page: 1, limit: 20 });
+        renderPage(<AppUsers />);
+        fireEvent.click(await screen.findByText('Web'));
+        await waitFor(() => expect(api.overview).toHaveBeenLastCalledWith('web'));
+        await waitFor(() =>
+            expect(api.installs).toHaveBeenLastCalledWith({ search: undefined, channel: 'web', page: 1, limit: 20 }),
+        );
+        expect(await screen.findByText('Every browser on the web store')).toBeInTheDocument();
+        expect((await screen.findAllByText('Chrome on Windows')).length).toBeGreaterThan(0);
+        expect(screen.queryByText('Versions in use')).not.toBeInTheDocument();
     });
 });
