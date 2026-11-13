@@ -8,11 +8,30 @@ export type DiscountType = 'percentage' | 'fixed';
 export type TargetCustomerType = 'all' | 'specific' | 'tier';
 export type CustomerTierOption = 'GOLD' | 'SILVER' | 'MEMBER' | 'INACTIVE';
 
+/**
+ * One customer on a "Specific Customers" coupon: a mobile number, an account,
+ * or both. Customers picked from the search carry `user_id` -- the only way to
+ * list a Google / Apple customer who has no number.
+ */
 export interface WhitelistedCustomer {
-    user_id?: string;
+    user_id?: string | null;
     name: string;
-    phone?: string;
-    email?: string;
+    phone?: string | null;
+    email?: string | null;
+    /** SB-12345, sent back by the server for listed accounts. */
+    customer_code?: string | null;
+}
+
+/** A type-ahead suggestion from /admin/coupons/customer-search. */
+export interface CustomerSuggestion {
+    user_id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    customer_code: string | null;
+    /** 'google' | 'apple' | null (phone sign-up). */
+    auth_provider: string | null;
+    is_blocked: boolean;
 }
 
 export interface DispatchConfig {
@@ -178,6 +197,19 @@ export const couponsApi = {
     update: async (id: string, payload: Partial<CouponPayload>): Promise<Coupon> => {
         const res = await apiClient.put<CouponMutationWire>(`/admin/coupons/${id}`, payload);
         return res.data.data;
+    },
+
+    /**
+     * Customers matching what has been typed so far: the start of any word of
+     * the name, the mobile number in any form, the email, the SB number or the
+     * NIC (searched, never returned).
+     */
+    searchCustomers: async (q: string, signal?: AbortSignal): Promise<CustomerSuggestion[]> => {
+        const res = await apiClient.get<{ success: boolean; data: { customers: CustomerSuggestion[] } }>(
+            '/admin/coupons/customer-search',
+            { params: { q, limit: 8 }, signal },
+        );
+        return res.data.data.customers;
     },
 
     /** Soft delete — deactivates the coupon on the server. */

@@ -75,6 +75,8 @@ import { categoriesApi } from '../../api/categories.api';
 import { branchesApi } from '../../api/branches.api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { slt } from '../../utils/datetime';
+import WhitelistCustomerSearch from './WhitelistCustomerSearch';
+import { canonicalMobile, isListed, localMobile } from './whitelist';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -158,17 +160,6 @@ interface CouponFormValues {
     dispatch_template?: string;
 }
 
-/**
- * A Sri Lankan mobile number in +94 form, or null. The same rule the server
- * uses (app/utils/identity.py), so the list shows what will actually match.
- */
-const canonicalMobile = (value?: string | null): string | null => {
-    let digits = (value ?? '').replace(/\D/g, '');
-    if (digits.startsWith('94')) digits = digits.slice(2);
-    else if (digits.startsWith('0')) digits = digits.slice(1);
-    return /^7\d{8}$/.test(digits) ? `+94${digits}` : null;
-};
-
 const CouponList: React.FC = () => {
     const { message } = App.useApp();
     const { isSuperAdmin } = usePermissions();
@@ -190,8 +181,6 @@ const CouponList: React.FC = () => {
 
     // Whitelist management state
     const [whitelistedCustomers, setWhitelistedCustomers] = useState<WhitelistedCustomer[]>([]);
-    const [custNameInput, setCustNameInput] = useState('');
-    const [custPhoneInput, setCustPhoneInput] = useState('');
 
     const { data, isLoading, isError } = useQuery({
         queryKey: [COUPONS_KEY, { page, pageSize, search, statusTab, selectedBranch }],
@@ -275,8 +264,6 @@ const CouponList: React.FC = () => {
     const openCreate = () => {
         setEditing(null);
         setWhitelistedCustomers([]);
-        setCustNameInput('');
-        setCustPhoneInput('');
         form.resetFields();
         form.setFieldsValue({
             discount_type: 'percentage',
@@ -304,8 +291,6 @@ const CouponList: React.FC = () => {
     const openEdit = (c: Coupon) => {
         setEditing(c);
         setWhitelistedCustomers(c.whitelisted_customers ?? []);
-        setCustNameInput('');
-        setCustPhoneInput('');
         form.setFieldsValue({
             code: c.code,
             description: c.description ?? undefined,
@@ -347,32 +332,19 @@ const CouponList: React.FC = () => {
         setModalOpen(false);
         setEditing(null);
         setWhitelistedCustomers([]);
-        setCustNameInput('');
-        setCustPhoneInput('');
         form.resetFields();
     };
 
-    // Whitelist chip additions & removals. The server checks the coupon
-    // against the customer's MOBILE NUMBER, so a chip without one would be a
-    // customer the coupon can never recognise.
-    const handleAddCustomerChip = () => {
-        const phone = canonicalMobile(custPhoneInput);
-        if (!phone) {
-            message.warning('Enter the customer\'s mobile number, e.g. 0771234567.');
+    // Whitelist chip additions & removals. A customer picked from the search
+    // is listed by account (and number, if any); a number typed on its own
+    // matches whoever signs up with it later.
+    const handleAddCustomer = (cust: WhitelistedCustomer) => {
+        if (isListed(whitelistedCustomers, cust)) {
+            message.info(`${cust.name} is already on the list.`);
             return;
         }
-        if (whitelistedCustomers.some((c) => canonicalMobile(c.phone) === phone)) {
-            message.info('That number is already on the list.');
-            return;
-        }
-        const newCust: WhitelistedCustomer = {
-            name: custNameInput.trim() || custPhoneInput.trim(),
-            phone,
-        };
-        setWhitelistedCustomers((prev) => [...prev, newCust]);
-        setCustNameInput('');
-        setCustPhoneInput('');
-        message.success(`Added ${newCust.name} to whitelist.`);
+        setWhitelistedCustomers((prev) => [...prev, cust]);
+        message.success(`Added ${cust.name} to the list.`);
     };
 
     const handleRemoveCustomerChip = (index: number) => {
@@ -388,6 +360,9 @@ const CouponList: React.FC = () => {
             const lines = text.split(/\r?\n/);
             const imported: WhitelistedCustomer[] = [];
             const seen = new Set(whitelistedCustomers.map((c) => canonicalMobile(c.phone)));
+            const seenEmail = new Set(
+                whitelistedCustomers.map((c) => (c.email ?? '').toLowerCase()).filter(Boolean),
+            );
             const skipped: string[] = [];
             lines.forEach((line, idx) => {
                 if (!line.trim()) return;
@@ -395,30 +370,38 @@ const CouponList: React.FC = () => {
                 if (idx === 0 && (parts[0].toLowerCase().includes('name') || parts[0].toLowerCase().includes('phone'))) {
                     return; // Skip header row
                 }
-                // Name, Phone, Email. A row without a usable mobile number is
-                // named back rather than silently kept: it could never match.
+                // Name, Phone, Email. A row with no phone but an email (a
+                // Google customer) is matched to that account by the server
+                // on save. A row with neither, or a bad number, is named back
+                // rather than silently kept: it could never match.
+                const email = (parts[2] || '').trim();
                 const phone = canonicalMobile(parts[1]);
-                if (!phone) {
+                if (!phone && (parts[1] || '').trim()) {
                     skipped.push(parts[0] || `line ${idx + 1}`);
                     return;
                 }
-                if (seen.has(phone)) return;
-                seen.add(phone);
+                if (!phone && !email.includes('@')) {
+                    skipped.push(parts[0] || `line ${idx + 1}`);
+                    return;
+                }
+                if (phone ? seen.has(phone) : seenEmail.has(email.toLowerCase())) return;
+                if (phone) seen.add(phone);
+                else seenEmail.add(email.toLowerCase());
                 imported.push({
-                    name: parts[0] || phone,
+                    name: parts[0] || (phone ? localMobile(phone) : email),
                     phone,
-                    email: parts[2] || undefined,
+                    email: email || undefined,
                 });
             });
             if (imported.length > 0) {
                 setWhitelistedCustomers((prev) => [...prev, ...imported]);
                 message.success(`Imported ${imported.length} customer(s) from CSV.`);
             } else {
-                message.error('No customers with a valid mobile number found in the CSV file.');
+                message.error('No customers with a valid mobile number or email found in the CSV file.');
             }
             if (skipped.length > 0) {
                 message.warning(
-                    `Skipped ${skipped.length} row(s) without a valid mobile number: ` +
+                    `Skipped ${skipped.length} row(s) without a valid mobile number or email: ` +
                         skipped.slice(0, 5).join(', ') +
                         (skipped.length > 5 ? '…' : ''),
                 );
@@ -435,7 +418,7 @@ const CouponList: React.FC = () => {
         }
         const headers = 'Name,Phone,Email\n';
         const rows = whitelistedCustomers
-            .map((c) => `"${c.name}","${c.phone || ''}","${c.email || ''}"`)
+            .map((c) => `"${c.name}","${localMobile(c.phone)}","${c.email || ''}"`)
             .join('\n');
         const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -1116,31 +1099,16 @@ const CouponList: React.FC = () => {
                         <Card size="small" style={{ background: '#f8fafc', marginBottom: 16 }}>
                             <div style={{ marginBottom: 12 }}>
                                 <Text strong style={{ display: 'block', marginBottom: 6 }}>
-                                    Search &amp; Add Whitelist Customers:
+                                    <UserAddOutlined /> Search &amp; Add Whitelist Customers:
                                 </Text>
-                                <Space style={{ display: 'flex', marginBottom: 8 }} wrap>
-                                    <Input
-                                        placeholder="Customer Name"
-                                        value={custNameInput}
-                                        onChange={(e) => setCustNameInput(e.target.value)}
-                                        prefix={<UserOutlined />}
-                                        style={{ width: 180 }}
-                                    />
-                                    <Input
-                                        placeholder="Phone Number"
-                                        value={custPhoneInput}
-                                        onChange={(e) => setCustPhoneInput(e.target.value)}
-                                        prefix={<MobileOutlined />}
-                                        style={{ width: 180 }}
-                                    />
-                                    <Button
-                                        type="primary"
-                                        icon={<UserAddOutlined />}
-                                        onClick={handleAddCustomerChip}
-                                    >
-                                        Add
-                                    </Button>
-                                </Space>
+                                <WhitelistCustomerSearch
+                                    listed={whitelistedCustomers}
+                                    onAdd={handleAddCustomer}
+                                />
+                                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                                    Suggestions appear as you type. Google and Apple customers without a
+                                    mobile number can be found by name or email.
+                                </Text>
                             </div>
 
                             {/* Customer Chip Tags */}
@@ -1166,17 +1134,29 @@ const CouponList: React.FC = () => {
                                             No whitelisted customers added yet. Use search/add or import CSV below.
                                         </Text>
                                     ) : (
-                                        whitelistedCustomers.map((cust, idx) => (
-                                            <Tag
-                                                key={idx}
-                                                closable
-                                                onClose={() => handleRemoveCustomerChip(idx)}
-                                                color="blue"
-                                                style={{ marginInlineEnd: 0, padding: '2px 8px' }}
-                                            >
-                                                {cust.name} {cust.phone ? `(${cust.phone})` : ''}
-                                            </Tag>
-                                        ))
+                                        whitelistedCustomers.map((cust, idx) => {
+                                            const contact = localMobile(cust.phone) || cust.email || '';
+                                            const hint = [localMobile(cust.phone), cust.email, cust.customer_code]
+                                                .filter(Boolean)
+                                                .join(' · ');
+                                            return (
+                                                <Tooltip key={cust.user_id ?? cust.phone ?? idx} title={hint || undefined}>
+                                                    <Tag
+                                                        closable
+                                                        onClose={(e) => {
+                                                            e.preventDefault();
+                                                            handleRemoveCustomerChip(idx);
+                                                        }}
+                                                        color={cust.user_id ? 'blue' : 'default'}
+                                                        icon={cust.user_id ? <UserOutlined /> : <MobileOutlined />}
+                                                        style={{ marginInlineEnd: 0, padding: '2px 8px' }}
+                                                    >
+                                                        {cust.name}
+                                                        {contact && contact !== cust.name ? ` (${contact})` : ''}
+                                                    </Tag>
+                                                </Tooltip>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>
