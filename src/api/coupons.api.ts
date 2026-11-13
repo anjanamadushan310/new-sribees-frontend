@@ -34,12 +34,6 @@ export interface CustomerSuggestion {
     is_blocked: boolean;
 }
 
-export interface DispatchConfig {
-    enabled: boolean;
-    channels: ('sms' | 'email' | 'push')[];
-    template: string;
-}
-
 export interface Coupon {
     coupon_id: string;
     code: string;
@@ -88,7 +82,13 @@ export interface Coupon {
     target_customer_type?: TargetCustomerType;
     customer_tier?: CustomerTierOption | null;
     whitelisted_customers?: WhitelistedCustomer[];
-    dispatch_config?: DispatchConfig;
+    /**
+     * Push the customers it is for when it starts (once each). Public or
+     * Specific Customers coupons only; the server refuses it otherwise.
+     */
+    notify_customers?: boolean;
+    /** Customers the announcement push has reached so far. */
+    notified_count?: number;
     /** Empty = the whole catalog. */
     category_ids: string[];
     product_ids: string[];
@@ -135,7 +135,7 @@ export interface CouponPayload {
     target_customer_type?: TargetCustomerType;
     customer_tier?: CustomerTierOption | null;
     whitelisted_customers?: WhitelistedCustomer[];
-    dispatch_config?: DispatchConfig;
+    notify_customers?: boolean;
 
     /**
      * Catalog eligibility. Omit to leave unchanged on an update; send an empty

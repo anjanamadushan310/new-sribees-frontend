@@ -60,6 +60,24 @@ describe('CouponList', () => {
         await waitFor(() => expect(api.list.mock.calls.at(-1)![0]).toMatchObject({ status: 'depleted' }));
     });
 
+    it('offers the notify switch only for a public or specific-customers coupon', async () => {
+        renderPage(<CouponList />);
+        await screen.findByText('RICE10');
+        fireEvent.click(screen.getByText('Add Coupon').closest('button')!);
+        const label = await screen.findByText('Notify customers when this coupon starts');
+        const item = label.closest('.ant-form-item') as HTMLElement;
+        const notify = item.querySelector('button.ant-switch') as HTMLButtonElement;
+        // A new coupon starts Private + All customers: a hidden code is never pushed.
+        expect(notify.disabled).toBe(true);
+        expect(screen.queryByText('AUTOMATED DISPATCH & NOTIFICATION PANEL')).toBeNull();
+
+        const pub = screen.getByText('Show in app (collectible offer)').closest('.ant-form-item') as HTMLElement;
+        fireEvent.click(pub.querySelector('button.ant-switch')!);
+        await waitFor(() => expect(notify.disabled).toBe(false));
+        fireEvent.click(notify);
+        expect(await screen.findByText('A coupon for you 🎁')).toBeInTheDocument();
+    });
+
     it('deactivates only a live coupon, after confirming', async () => {
         renderPage(<CouponList />);
         // Text queries, not role queries: a role query walks the whole table's
