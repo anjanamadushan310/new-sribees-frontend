@@ -71,6 +71,8 @@ interface PartnerFormValues {
     phone?: string;
 }
 
+import PromotePartnerModal from './PromotePartnerModal';
+
 const PartnerList: React.FC = () => {
     const { message } = App.useApp();
     const queryClient = useQueryClient();
@@ -78,6 +80,7 @@ const PartnerList: React.FC = () => {
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<AdminPartner | null>(null);
+    const [promoting, setPromoting] = useState<AdminPartner | null>(null);
     const [search, setSearch] = useState('');
     const [ledgerPartner, setLedgerPartner] = useState<AdminPartner | null>(null);
     const [selectedCommissionIds, setSelectedCommissionIds] = useState<string[]>([]);
@@ -282,7 +285,7 @@ const PartnerList: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 280,
+            width: 420,
             render: (_, record) => (
                 <Space>
                     <Button
@@ -295,6 +298,9 @@ const PartnerList: React.FC = () => {
                     >
                         Ledger
                     </Button>
+                    {record.role === 'partner' && record.is_active && (
+                        <Button type="link" onClick={() => setPromoting(record)}>Promote to Master Partner</Button>
+                    )}
                     <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
                         Edit
                     </Button>
@@ -404,6 +410,7 @@ const PartnerList: React.FC = () => {
                 />
             </Card>
 
+            {promoting && <PromotePartnerModal partner={promoting} onClose={() => setPromoting(null)} />}
             <Modal
                 title={editing ? ((editing.role ?? (editing.parent_partner_id ? 'partner' : 'master_partner')) === 'partner' ? 'Edit Partner' : 'Edit Master Partner') : 'New Master Partner'}
                 open={modalOpen}
@@ -454,8 +461,7 @@ const PartnerList: React.FC = () => {
 
                     {!editing && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                            Created here as a Master Partner. Master Partners add their own
-                            Partners from the Partner Portal.
+                            Created here as a Master Partner. Super Admins approve customers as Partners and assign them to a Master Partner.
                         </Text>
                     )}
                 </Form>

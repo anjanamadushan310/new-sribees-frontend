@@ -81,17 +81,17 @@ const ReferralProgramCard: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item
-                        label="Lead partner's share"
+                        label="Master Partner commission share"
                         name="level2_share_percent"
-                        rules={[{ required: true, message: 'Enter the lead share' }]}
-                        tooltip="What the lead who recruited an agent earns, as a share of the product's rate. 50% of a 4% product pays the lead 2%. Applies to orders placed after the change."
+                        rules={[{ required: true, message: 'Enter the Master Partner share' }]}
+                        tooltip="Share of a directly assigned Partner's customer commission. At 25%, Rs.100 customer commission earns the Master Partner Rs.25. Team commission does not cascade further. Applies to new orders."
                     >
                         <InputNumber
                             min={0}
                             max={100}
                             step={5}
                             style={{ width: 240 }}
-                            addonAfter="% of the rate"
+                            addonAfter="% of customer commission"
                         />
                     </Form.Item>
 

@@ -69,6 +69,10 @@ interface MarkPaidWire {
 }
 
 export const partnersApi = {
+    promote: async (partnerId: string, payload: { note: string }): Promise<AdminPartner> => {
+        const response = await apiClient.post<PartnerMutationWire>(`/admin/partners/${partnerId}/promote`, payload);
+        return response.data.data;
+    },
     upgradeCustomer: async (userId: string, payload: {
         invitation_channel: 'email' | 'sms';
         master_partner_id: string | null;
