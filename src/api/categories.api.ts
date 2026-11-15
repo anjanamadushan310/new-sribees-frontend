@@ -63,6 +63,9 @@ interface CategoryMutationWire {
 }
 
 export const categoriesApi = {
+    reorder: async (payload: { parent_category_id: string | null; category_ids: string[]; expected_category_ids: string[] }): Promise<void> => {
+        await apiClient.put('/admin/categories/reorder', payload);
+    },
     list: async (): Promise<Category[]> => {
         const res = await apiClient.get<CategoryListWire>('/admin/categories');
         return res.data.data.categories;

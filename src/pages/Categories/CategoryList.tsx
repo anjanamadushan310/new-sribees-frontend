@@ -32,6 +32,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriesApi } from '../../api/categories.api';
 import type { Category, CategoryPayload } from '../../api/categories.api';
+import CategoryOrderModal from './CategoryOrderModal';
 import CategoryImageUpload from '../../components/categories/CategoryImageUpload';
 import { usePermissions } from '../../hooks/usePermissions';
 import { DebouncedSearchInput } from '../../components/common/DebouncedSearchInput';
@@ -76,6 +77,7 @@ const CategoryList: React.FC = () => {
     const canWrite = canCreate('categories') || canUpdate('categories');
     const canRemove = canDelete('categories');
 
+    const [ordering, setOrdering] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Category | null>(null);
     const [search, setSearch] = useState('');
@@ -418,14 +420,20 @@ const CategoryList: React.FC = () => {
                 />
             )}
 
+            {ordering && <CategoryOrderModal categories={categories} onClose={() => setOrdering(false)} />}
             <Card>
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' }}>
                     <DebouncedSearchInput
                         placeholder="Search name, slug, description…"
                         value={search}
                         onChange={setSearch}
                         style={{ width: 320 }}
                     />
+                    {user?.role === AdminRole.SUPER_ADMIN && (
+                        <Button onClick={() => setOrdering(true)} disabled={isLoading || isError || categories.length === 0}>
+                            Arrange categories
+                        </Button>
+                    )}
                 </div>
 
                 <Table
