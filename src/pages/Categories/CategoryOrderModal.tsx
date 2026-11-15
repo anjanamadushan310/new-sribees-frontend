@@ -13,7 +13,8 @@ export default function CategoryOrderModal({ categories, onClose }: Props) {
     const { message } = App.useApp();
     const cache = useQueryClient();
     const [parentId, setParentId] = useState<string | null>(null);
-    const siblings = categories.filter(category => (category.parent_category_id ?? null) === parentId);
+    // Preserve the fetched baseline while editing, even if the query refetches.
+    const [siblings, setSiblings] = useState(() => categories.filter(category => !category.parent_category_id));
     const [draft, setDraft] = useState<string[] | null>(null);
     const [draggedId, setDraggedId] = useState<string | null>(null);
     const orderedIds = draft ?? siblings.map(category => category.category_id);
@@ -50,7 +51,9 @@ export default function CategoryOrderModal({ categories, onClose }: Props) {
 
     const changeGroup = (value: string) => {
         const change = () => {
-            setParentId(value === 'main' ? null : value);
+            const nextParent = value === 'main' ? null : value;
+            setParentId(nextParent);
+            setSiblings(categories.filter(category => (category.parent_category_id ?? null) === nextParent));
             setDraft(null);
             setDraggedId(null);
         };

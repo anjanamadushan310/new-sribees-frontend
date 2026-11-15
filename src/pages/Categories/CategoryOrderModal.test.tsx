@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { categoriesApi, type Category } from '../../api/categories.api';
@@ -39,6 +40,21 @@ describe('Category ordering', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Move Tea up' }));
         fireEvent.click(screen.getByRole('button', { name: 'Save order' }));
         await waitFor(() => expect(api.reorder).toHaveBeenCalledWith({ parent_category_id: 'beverages', category_ids: ['tea', 'coffee'], expected_category_ids: ['coffee', 'tea'] }));
+    });
+
+    it('retains the original baseline when a background refetch changes category order', async () => {
+        function RefetchHarness() {
+            const [data, setData] = useState(categories);
+            return <>
+                <button onClick={() => setData([categories[1], categories[0], ...categories.slice(2)])}>Simulate refetch</button>
+                <CategoryOrderModal categories={data} onClose={vi.fn()} />
+            </>;
+        }
+        renderPage(<RefetchHarness />);
+        fireEvent.click(screen.getByRole('button', { name: 'Move Beverages up' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Simulate refetch' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save order' }));
+        await waitFor(() => expect(api.reorder).toHaveBeenCalledWith({ parent_category_id: null, category_ids: ['beverages', 'baby'], expected_category_ids: ['baby', 'beverages'] }));
     });
 
     it('keeps a failed save open so the administrator can retry', async () => {
