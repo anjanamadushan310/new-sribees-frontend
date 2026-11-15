@@ -87,8 +87,13 @@ export default function CategoryOrderModal({ categories, onClose }: Props) {
                 return <li key={id} draggable={!save.isPending}
                     onDragStart={event => { setDraggedId(id); event.dataTransfer.setData('text/plain', id); event.dataTransfer.effectAllowed = 'move'; }}
                     onDragEnd={() => setDraggedId(null)}
-                    onDragOver={event => { if (draggedId) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
-                    onDrop={event => { event.preventDefault(); if (draggedId) move(draggedId, id); setDraggedId(null); }}
+                    onDragOver={event => { if (!save.isPending) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
+                    onDrop={event => {
+                        event.preventDefault();
+                        const source = draggedId || event.dataTransfer.getData('text/plain');
+                        if (source) move(source, id);
+                        setDraggedId(null);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px', borderBottom: '1px solid #f0f0f0', opacity: draggedId === id ? 0.5 : 1, cursor: save.isPending ? 'default' : 'grab' }}>
                     <HolderOutlined aria-hidden />
                     <Typography.Text type="secondary">{index + 1}</Typography.Text>
