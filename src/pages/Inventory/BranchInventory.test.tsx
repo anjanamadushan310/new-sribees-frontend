@@ -45,7 +45,7 @@ describe('BranchInventory commission', () => {
         vi.clearAllMocks();
         inventory.list.mockResolvedValue({
             items: [
-                row({ effective_referral_commission: 5, referral_commission_percentage: 5,
+                row({ effective_referral_commission: 2, referral_commission_percentage: 2,
                       global_referral_commission_percentage: 2 }),
                 row({ inventory_id: 'inv-2', product_id: 'p-2', product_name: 'Iodised Salt' }),
             ],
@@ -55,8 +55,8 @@ describe('BranchInventory commission', () => {
         inventory.update.mockResolvedValue(row({}));
         rates.settings.mockResolvedValue({ branch_max_percent: 10, level2_share: 0.5, highest_live_percent: 5 });
         rates.setBranchRate.mockResolvedValue({
-            product_id: 'p-1', referral_commission_percentage: 7, global_referral_commission_percentage: 2,
-            effective_referral_commission: 7,
+            product_id: 'p-1', referral_commission_percentage: 1, global_referral_commission_percentage: 2,
+            effective_referral_commission: 1,
         });
     });
     beforeEach(() => {
@@ -68,7 +68,7 @@ describe('BranchInventory commission', () => {
         signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
         renderPage(<BranchInventory />);
         const rice = (await screen.findByText('Samba Rice 5kg')).closest('tr')!;
-        expect(within(rice).getByText('5%')).toBeTruthy();
+        expect(within(rice).getByText('2%')).toBeTruthy();
         expect(within(rice).getByText('Branch')).toBeTruthy();
         const salt = screen.getByText('Iodised Salt').closest('tr')!;
         expect(within(salt).getByText('Off')).toBeTruthy();
@@ -92,9 +92,10 @@ describe('BranchInventory commission', () => {
 
         fireEvent.click(within(rice).getByText('Quick Edit'));
         const field = await screen.findByPlaceholderText('2 (default)');
-        fireEvent.change(field, { target: { value: '7' } });
+        expect(field.getAttribute('aria-valuemax')).toBe('2');
+        fireEvent.change(field, { target: { value: '1' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-        await waitFor(() => expect(rates.setBranchRate).toHaveBeenCalledWith('inv-1', 7));
+        await waitFor(() => expect(rates.setBranchRate).toHaveBeenCalledWith('inv-1', 1));
         const payload = inventory.update.mock.calls.at(-1)![1];
         expect(payload).not.toHaveProperty('referral_commission_percentage');
     });

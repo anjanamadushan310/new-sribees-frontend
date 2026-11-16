@@ -190,8 +190,10 @@ const BranchInventory: React.FC = () => {
         queryFn: referralCommissionApi.settings,
         enabled: canEditCommission,
     });
-    // Super Admins are not capped; the cap catches a Branch Manager's typo.
-    const commissionMax = isSuperAdmin ? 100 : programme?.branch_max_percent ?? 0;
+    const commissionMax = Math.min(
+        editing?.global_referral_commission_percentage ?? 0,
+        isSuperAdmin ? 100 : programme?.branch_max_percent ?? 0,
+    );
 
     const queryKey = [
         'admin',
@@ -747,9 +749,9 @@ const BranchInventory: React.FC = () => {
                                             <Tooltip
                                                 title={
                                                     <>
-                                                        Paid to whoever referred the customer, on
-                                                        what they paid for this product. Leave empty
-                                                        to use the product default
+                                                        Total commission pool shared by the Partner and Master Partner.
+                                                        The product maximum applies. Leave empty
+                                                        to use the product rate
                                                         {editing.global_referral_commission_percentage !== null
                                                             ? ` (${editing.global_referral_commission_percentage}%)`
                                                             : ' (none, so 0%)'}

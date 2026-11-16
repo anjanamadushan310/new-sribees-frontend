@@ -1717,7 +1717,8 @@ const ProductForm: React.FC = () => {
                                 <Form.Item
                                     label={<span style={{ fontWeight: 600 }}>Referral Commission (%)</span>}
                                     name="referral_commission_percentage"
-                                    tooltip="Paid to whoever referred the customer on this product. Leave empty for no commission."
+                                    tooltip="Maximum total referral commission for this product. The commission pool is shared between the Partner and their Master Partner using Referral Programme settings. Leave empty for no commission."
+                                    extra="Combined Partner and Master Partner commission budget."
                                 >
                                     <InputNumber
                                         disabled={catalogDisabled}
