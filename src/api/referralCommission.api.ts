@@ -13,7 +13,7 @@ import apiClient from './client';
 export interface ReferralProgramSettings {
     /** Highest % a Branch Manager may set. Super Admins are not capped. */
     branch_max_percent: number;
-    /** Fraction of a product's rate paid to the partner's upline (0.5 = half). */
+    /** Fraction of the total product commission pool paid to the immediate Master Partner. */
     level2_share: number;
     /** The best rate on any product on sale right now. */
     highest_live_percent: number;
@@ -27,7 +27,7 @@ export interface RateResult {
     referral_commission_percentage: number | null;
     /** The product default, or null when there is none (earns 0). */
     global_referral_commission_percentage: number | null;
-    /** What an order placed now earns: override -> default -> 0. */
+    /** Total pool rate for a new order, capped by the product maximum. */
     effective_referral_commission: number;
 }
 

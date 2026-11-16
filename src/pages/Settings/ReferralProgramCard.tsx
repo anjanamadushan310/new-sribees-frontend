@@ -64,7 +64,7 @@ const ReferralProgramCard: React.FC = () => {
             ) : (
                 <Form form={form} layout="vertical" requiredMark={false} onFinish={save.mutate}>
                     <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                        Commission is set per product (Products) and per branch (Branch Inventory).
+                        Product rates set the total commission budget. Branch Inventory can set a lower rate.
                         A product with no rate earns nothing.
                         {data && data.highest_live_percent > 0 && (
                             <> The best rate on sale right now is {data.highest_live_percent}%.</>
@@ -75,23 +75,23 @@ const ReferralProgramCard: React.FC = () => {
                         label="Highest rate a branch can set"
                         name="branch_max_percent"
                         rules={[{ required: true, message: 'Enter the branch limit' }]}
-                        tooltip="Stops a typo like 50% instead of 5% on a branch. Super Admins are not limited by it. Rates already set above a new limit stay until someone changes them."
+                        tooltip="Stops a typo like 50% instead of 5% on a branch. Each product maximum also applies to branch rates. Super Admins configure the product maximum."
                     >
                         <InputNumber min={0} max={100} step={0.5} style={{ width: 240 }} addonAfter="%" />
                     </Form.Item>
 
                     <Form.Item
-                        label="Master Partner commission share"
+                        label="Master Partner share of total commission"
                         name="level2_share_percent"
                         rules={[{ required: true, message: 'Enter the Master Partner share' }]}
-                        tooltip="Share of a directly assigned Partner's customer commission. At 25%, Rs.100 customer commission earns the Master Partner Rs.25. Team commission does not cascade further. Applies to new orders."
+                        tooltip="Share of the total product commission pool. At 25%, a Rs.100 pool gives the Partner Rs.75 and the Master Partner Rs.25. Applies to new commissions."
                     >
                         <InputNumber
                             min={0}
                             max={100}
                             step={5}
                             style={{ width: 240 }}
-                            addonAfter="% of customer commission"
+                            addonAfter="% of total commission"
                         />
                     </Form.Item>
 
