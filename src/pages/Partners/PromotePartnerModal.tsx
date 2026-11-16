@@ -28,7 +28,7 @@ export default function PromotePartnerModal({ partner, onClose }: Props) {
             <Typography.Title level={5}>{partner.full_name}</Typography.Title>
             <Typography.Paragraph>This Partner will be eligible to have Partners assigned to their team by a Super Admin.</Typography.Paragraph>
             <Alert type="info" showIcon title="Commission attribution" description={partner.parent_partner_id
-                ? 'The product commission pool from their direct customer orders is split with their existing Master Partner at the configured ratio. Their team commissions accrue to this account.'
+                ? 'For direct customer orders, the existing Master Partner receives the configured percentage of this Partner’s commission. This Partner receives the rest of the product commission pool. Their team commissions accrue to this account.'
                 : 'They earn customer commission from direct customers and Partner commission from Partners assigned to their team.'} />
             <Form form={form} layout="vertical" onFinish={values => promote.mutate(values)} style={{ marginTop: 20 }}>
                 <Form.Item label="Reason for promotion" name="note" rules={[{
