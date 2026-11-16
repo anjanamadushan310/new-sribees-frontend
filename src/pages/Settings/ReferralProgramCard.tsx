@@ -1,6 +1,7 @@
 /**
  * Referral programme settings (Super Admin): the highest commission a Branch
- * Manager may set on a product, and the upline's share of each rate.
+ * Manager may set on a product, and the Master Partner's share of the
+ * direct Partner's commission.
  *
  * Saved on its own endpoint (/admin/referral-commission/settings), so it has
  * its own button rather than riding on Platform Settings' save.
@@ -15,7 +16,7 @@ const { Text } = Typography;
 
 interface Values {
     branch_max_percent: number;
-    // Shown as a percentage of the product's rate (50 = half); stored as 0.5.
+    // Shown as a percentage of Partner earnings (25 = 25%); stored as 0.25.
     level2_share_percent: number;
 }
 
@@ -81,17 +82,17 @@ const ReferralProgramCard: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item
-                        label="Master Partner share of total commission"
+                        label="Master Partner share of Partner commission"
                         name="level2_share_percent"
                         rules={[{ required: true, message: 'Enter the Master Partner share' }]}
-                        tooltip="Share of the total product commission pool. At 25%, a Rs.100 pool gives the Partner Rs.75 and the Master Partner Rs.25. Applies to new commissions."
+                        tooltip="The Master Partner receives this percentage of the direct Partner's commission. At 25%, a Rs.10 product pool gives the Partner Rs.8 and the Master Partner Rs.2. Applies to new commissions."
                     >
                         <InputNumber
                             min={0}
                             max={100}
                             step={5}
                             style={{ width: 240 }}
-                            addonAfter="% of total commission"
+                            addonAfter="% of Partner commission"
                         />
                     </Form.Item>
 

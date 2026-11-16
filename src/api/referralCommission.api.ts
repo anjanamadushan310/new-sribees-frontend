@@ -13,7 +13,7 @@ import apiClient from './client';
 export interface ReferralProgramSettings {
     /** Highest % a Branch Manager may set. Super Admins are not capped. */
     branch_max_percent: number;
-    /** Fraction of the total product commission pool paid to the immediate Master Partner. */
+    /** Fraction of direct Partner earnings paid to the immediate Master Partner. */
     level2_share: number;
     /** The best rate on any product on sale right now. */
     highest_live_percent: number;
