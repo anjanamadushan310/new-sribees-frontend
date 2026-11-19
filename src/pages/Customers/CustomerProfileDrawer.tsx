@@ -39,6 +39,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { CustomerOrder, CustomerSegment } from '../../api/customers.api';
 import { customersApi } from '../../api/customers.api';
 import { slt } from '../../utils/datetime';
+import { useAuthStore } from '../../store/authStore';
+import ActivityTimeline from '../../components/common/ActivityTimeline';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -96,6 +98,10 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [datePreset, setDatePreset] = useState<DatePreset>('all');
     const [customDateRange, setCustomDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+    const isSuperAdmin = useAuthStore((state) => state.user?.role === 'super_admin');
+    // Loaded on request: a long history is many rows.
+    const [showActivity, setShowActivity] = useState(false);
+    React.useEffect(() => setShowActivity(false), [customerId]);
 
     // Profile query
     const { data: profile, isLoading: isProfileLoading } = useQuery({
@@ -816,6 +822,26 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
                                     </List.Item>
                                 )}
                             />
+                        </div>
+                    )}
+
+                    {/* What they did in the app / on the web store (Super Admin only) */}
+                    {isSuperAdmin && customerId && (
+                        <div
+                            style={{
+                                background: '#ffffff',
+                                padding: '18px 20px',
+                                borderRadius: 12,
+                                border: '1px solid #eaedf1',
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <Title level={5} style={{ margin: 0 }}>Activity (app &amp; web)</Title>
+                                <Button size="small" onClick={() => setShowActivity((v) => !v)}>
+                                    {showActivity ? 'Hide' : 'Show activity'}
+                                </Button>
+                            </div>
+                            {showActivity && <ActivityTimeline who={{ userId: customerId }} />}
                         </div>
                     )}
                 </Space>

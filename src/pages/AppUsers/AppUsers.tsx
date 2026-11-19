@@ -34,6 +34,7 @@ import { appUsageApi } from '../../api/appUsage.api';
 import type { AppInstall, AppUsageDay, UsageChannel } from '../../api/appUsage.api';
 import { slt } from '../../utils/datetime';
 import { PRIMARY, axisProps, gridProps } from '../../utils/chartTheme';
+import ActivityTimeline from '../../components/common/ActivityTimeline';
 
 const { Title, Text } = Typography;
 
@@ -424,6 +425,11 @@ const AppUsers: React.FC = () => {
                 destroyOnHidden
             >
                 {openDevice && <InstallHistory deviceId={openDevice} />}
+                {openDevice && (
+                    <Card title="Activity on this install" size="small" style={{ marginTop: 16 }}>
+                        <ActivityTimeline who={{ deviceId: openDevice }} />
+                    </Card>
+                )}
             </Drawer>
         </div>
     );

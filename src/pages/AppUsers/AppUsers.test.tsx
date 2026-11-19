@@ -11,6 +11,9 @@ vi.mock('../../api/appUsage.api', () => ({
     appUsageApi: { overview: vi.fn(), installs: vi.fn(), history: vi.fn() },
 }));
 const api = vi.mocked(appUsageApi);
+vi.mock('../../api/activity.api', () => ({
+    activityApi: { timeline: vi.fn().mockResolvedValue({ events: [], has_more: false, next_before_id: null }) },
+}));
 
 function install(over: Partial<AppInstall>): AppInstall {
     return {
