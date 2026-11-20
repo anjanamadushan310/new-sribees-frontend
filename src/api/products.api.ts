@@ -140,6 +140,7 @@ export interface AdminProduct {
     referral_commission_percentage?: number | null;
     category_id: string | null;
     subcategory_id: string | null;
+    extra_category_ids?: string[];
     category: ProductCategoryRef | null;
     subcategory: ProductCategoryRef | null;
     images: ProductImage[];
@@ -171,6 +172,7 @@ export interface ProductPayload {
     category_id?: string | null;
     // Must be a child of category_id — the backend rejects a mismatched pair.
     subcategory_id?: string | null;
+    extra_category_ids?: string[];
     low_stock_threshold?: number;
     weight?: number | null;
     weight_unit?: string | null;
