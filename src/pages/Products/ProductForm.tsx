@@ -81,6 +81,7 @@ interface ProductFormValues {
     referral_commission_percentage?: number | null;
     category_id?: string;
     subcategory_id?: string;
+    extra_category_ids?: string[];
     description?: string;
     description_si?: string;
     description_ta?: string;
@@ -643,6 +644,7 @@ const ProductForm: React.FC = () => {
                         : undefined,
                 category_id: product.category_id ?? undefined,
                 subcategory_id: product.subcategory_id ?? undefined,
+                extra_category_ids: product.extra_category_ids ?? [],
                 description: product.description ?? undefined,
                 description_si: product.description_si ?? undefined,
                 description_ta: product.description_ta ?? undefined,
@@ -770,6 +772,7 @@ const ProductForm: React.FC = () => {
                 sku: values.sku?.trim() || null,
                 category_id: values.category_id || null,
                 subcategory_id: values.subcategory_id || null,
+                extra_category_ids: values.extra_category_ids ?? [],
                 description: values.description?.trim() || null,
                 description_si: values.description_si?.trim() || null,
                 description_ta: values.description_ta?.trim() || null,
@@ -1788,6 +1791,31 @@ const ProductForm: React.FC = () => {
                                         options={subcategories.map((c) => ({
                                             label: c.name,
                                             value: c.category_id,
+                                        }))}
+                                    />
+                                </Form.Item>
+
+                                <Form.Item
+                                    label={<span style={{ fontWeight: 600 }}>Additional categories & sub-categories</span>}
+                                    name="extra_category_ids"
+                                    extra="Select every other place this product belongs. Selecting a sub-category also includes its parent category. Stock and price stay the same across all categories."
+                                >
+                                    <Select
+                                        mode="multiple"
+                                        disabled={catalogDisabled}
+                                        placeholder="Select additional categories or sub-categories"
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        options={rootCategories.map((parent) => ({
+                                            label: parent.name,
+                                            options: [
+                                                { label: `${parent.name} (category)`, value: parent.category_id },
+                                                ...categories.filter((child) => child.parent_category_id === parent.category_id).map((child) => ({
+                                                    label: `${parent.name} / ${child.name}`,
+                                                    value: child.category_id,
+                                                })),
+                                            ],
                                         }))}
                                     />
                                 </Form.Item>

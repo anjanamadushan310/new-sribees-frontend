@@ -75,3 +75,28 @@ describe('customer-facing size preview', () => {
         await waitFor(() => expect(screen.queryByTestId('customer-preview-size')).toBeNull());
     }, 30000);
 });
+
+describe('additional product categories', () => {
+    afterEach(signOut);
+
+    it('allows categories and sub-categories from different parents together', async () => {
+        const { categoriesApi } = await import('../../api/categories.api');
+        vi.mocked(categoriesApi.list).mockResolvedValueOnce([
+            { category_id: 'baby', name: 'Baby & Kids', parent_category_id: null },
+            { category_id: 'care', name: 'Personal Care', parent_category_id: null },
+            { category_id: 'soap', name: 'Soap', parent_category_id: 'care' },
+        ] as Awaited<ReturnType<typeof categoriesApi.list>>);
+        signIn(AdminRole.SUPER_ADMIN);
+        renderPage(<ProductForm />, { path: '/products/new', route: '/products/new' });
+        const additional = await screen.findByLabelText('Additional categories & sub-categories');
+        fireEvent.mouseDown(additional);
+        fireEvent.click(await screen.findByText('Baby & Kids (category)'));
+        fireEvent.click(await screen.findByText('Personal Care / Soap'));
+        const selector = additional.closest('.ant-select');
+        await waitFor(() => {
+            expect(selector?.querySelectorAll('.ant-select-selection-item')).toHaveLength(2);
+        });
+        expect(selector).toHaveTextContent('Baby & Kids (category)');
+        expect(selector).toHaveTextContent('Personal Care / Soap');
+    }, 30000);
+});
