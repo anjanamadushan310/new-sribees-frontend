@@ -44,6 +44,8 @@ import type {
     PartnerCommission,
 } from '../../api/partners.api';
 
+import ReferralCampaigns from './ReferralCampaigns';
+
 const { Title, Text } = Typography;
 
 const PARTNERS_KEY = ['admin', 'partners'];
@@ -384,9 +386,12 @@ const PartnerList: React.FC = () => {
                         Partners
                     </Space>
                 </Title>
-                <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                    Add Master Partner
-                </Button>
+                <Space wrap>
+                    <ReferralCampaigns partners={partners} />
+                    <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                        Add Master Partner
+                    </Button>
+                </Space>
             </div>
 
             <Card>
