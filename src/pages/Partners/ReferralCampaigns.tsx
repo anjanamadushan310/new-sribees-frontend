@@ -1,4 +1,4 @@
-import { Alert, App, Button, DatePicker, Drawer, Form, Input, InputNumber, Select, Space, Switch } from 'antd';
+import { Alert, App, Button, DatePicker, Drawer, Form, Input, InputNumber, Modal, Select, Space, Switch } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +40,8 @@ const defaults = {
 
 export default function ReferralCampaigns({ partners }: { partners: AdminPartner[] }) {
     const [open, setOpen] = useState(false);
+    const [extending, setExtending] = useState<Campaign | null>(null);
+    const [newEnd, setNewEnd] = useState<Dayjs | null>(null);
     const [editing, setEditing] = useState<string | null>(null);
     const [form] = Form.useForm<Values>();
     const scope = Form.useWatch('scope', form);
@@ -73,6 +75,18 @@ export default function ReferralCampaigns({ partners }: { partners: AdminPartner
             message.error(typeof detail === 'string' ? detail : 'Could not save the campaign. Check the dates, offer and limits.');
         },
     });
+    const extension = useMutation({
+        mutationFn: ({ id, end }: { id: string; end: Dayjs }) =>
+            apiClient.patch(path + '/' + id + '/extend', { ends_at: end.toISOString() }),
+        onSuccess: async (_, { id, end }) => {
+            const dates = form.getFieldValue('dates');
+            if (editing === id && dates?.[0]) form.setFieldValue('dates', [dates[0], end]);
+            setExtending(null);
+            message.success('Campaign enrollment extended');
+            await client.invalidateQueries({ queryKey: key });
+        },
+        onError: () => message.error('Could not extend the campaign. Reload and check the current end date.'),
+    });
     function reset() {
         setEditing(null);
         form.resetFields();
@@ -89,9 +103,12 @@ export default function ReferralCampaigns({ partners }: { partners: AdminPartner
                 <Alert type="info" message="Referral offers are disabled on the server. You can save drafts." />}
             <Space direction="vertical" style={{ marginBlock: 16 }}>
                 {campaigns.data?.data.map(campaign => (
-                    <Button key={campaign.id} onClick={() => edit(campaign)}>
-                        {campaign.name} · {campaign.active ? 'Enabled' : 'Draft or paused'}
-                    </Button>
+                    <Space key={campaign.id} wrap>
+                        <Button onClick={() => edit(campaign)}>
+                            {campaign.name} · {campaign.active ? 'Enabled' : 'Draft or paused'}
+                        </Button>
+                        <Button onClick={() => { setNewEnd(null); setExtending(campaign); }}>Extend</Button>
+                    </Space>
                 ))}
                 {editing && <Button onClick={reset}>New campaign</Button>}
             </Space>
@@ -131,5 +148,16 @@ export default function ReferralCampaigns({ partners }: { partners: AdminPartner
                 <Button type="primary" htmlType="submit" loading={save.isPending} disabled={!campaigns.data}>Save campaign</Button>
             </Form>
         </Drawer>
+        <Modal title="Extend campaign enrollment" open={!!extending}
+            onCancel={() => setExtending(null)} confirmLoading={extension.isPending}
+            okText="Extend" okButtonProps={{ disabled: !extending || !newEnd ||
+                !newEnd.isAfter(dayjs(extending.ends_at)) || !newEnd.isAfter(dayjs()) }}
+            onOk={() => { if (extending && newEnd) extension.mutate({ id: extending.id, end: newEnd }); }}>
+            <p>{extending?.name}</p>
+            <p>Current end: {extending && dayjs(extending.ends_at).format('DD MMM YYYY, HH:mm')} (local time)</p>
+            <label htmlFor="referral-extension-end">New enrollment end (local time)</label>
+            <DatePicker id="referral-extension-end" showTime value={newEnd} onChange={setNewEnd}
+                style={{ display: 'block', marginTop: 8 }} />
+        </Modal>
     </>;
 }
