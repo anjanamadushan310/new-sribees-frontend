@@ -45,6 +45,8 @@ export interface InventoryItem {
     // its smallest weight and stock_grams is the real figure; a pre-packed
     // product's packs per weight are under weights().
     stock_mode?: StockMode;
+    /** "Shade" / "Colour": counted per shade under weights() (migration 123). */
+    option_label?: string | null;
     stock_grams?: number;
 }
 
@@ -67,7 +69,8 @@ export interface PriceFloor {
 /** One weight option's stock in a branch. */
 export interface WeightStockOption {
     variant_id: string;
-    weight_grams: number;
+    /** null for a shade / colour (backend migration 123). */
+    weight_grams: number | null;
     label: string;
     packs: number | null; // pre-packed only
     available: number | null; // how many of this weight can still be sold
@@ -81,6 +84,8 @@ export interface WeightStock {
     stock_quantity: number;
     options: WeightStockOption[];
     kept_by_finance: boolean;
+    /** "Shade" / "Colour": the options are shades, counted one by one. */
+    option_label?: string | null;
 }
 
 export interface WeightStockPayload {

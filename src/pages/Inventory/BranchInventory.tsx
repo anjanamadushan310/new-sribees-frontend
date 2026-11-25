@@ -424,7 +424,7 @@ const BranchInventory: React.FC = () => {
                 record.stock_mode === 'loose'
                     ? `${((record.stock_grams ?? 0) / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`
                     : record.stock_mode === 'packed'
-                        ? `${v} bags`
+                        ? record.option_label ? `${v} pcs` : `${v} bags`
                         : v,
         },
         {
@@ -466,7 +466,7 @@ const BranchInventory: React.FC = () => {
                     </Button>
                     {(record.stock_mode === 'loose' || record.stock_mode === 'packed') && (
                         <Button type="link" icon={<InboxOutlined />} onClick={() => setWeighing(record)}>
-                            Weights
+                            {record.option_label ? `${record.option_label}s` : 'Weights'}
                         </Button>
                     )}
                 </Space>

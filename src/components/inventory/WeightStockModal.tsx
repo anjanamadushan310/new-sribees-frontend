@@ -56,12 +56,14 @@ const WeightStockModal: React.FC<Props> = ({ item, onClose }) => {
 
     const data = stock.data;
     const loose = data?.stock_mode === 'loose';
+    // A product in shades / colours (migration 123) is counted the same way, one row per shade.
+    const shade = data?.option_label || item.option_label || null;
     const locked = data?.kept_by_finance ?? false;
 
     return (
         <Modal
             open
-            title={`${item.product_name} — stock by weight`}
+            title={`${item.product_name} — stock by ${shade ? shade.toLowerCase() : 'weight'}`}
             okText="Save"
             onCancel={onClose}
             onOk={() => save.mutate()}
@@ -90,7 +92,11 @@ const WeightStockModal: React.FC<Props> = ({ item, onClose }) => {
                             <Text type="secondary">weighed into the bag per order</Text>
                         </Space>
                     ) : (
-                        <Text type="secondary">Count the bags of each weight on the shelf.</Text>
+                        <Text type="secondary">
+                            {shade
+                                ? `Count the pieces of each ${shade.toLowerCase()} on the shelf.`
+                                : 'Count the bags of each weight on the shelf.'}
+                        </Text>
                     )}
                     <Table<WeightStockOption>
                         rowKey="variant_id"
@@ -98,11 +104,11 @@ const WeightStockModal: React.FC<Props> = ({ item, onClose }) => {
                         pagination={false}
                         dataSource={data.options}
                         columns={[
-                            { title: 'Weight', dataIndex: 'label', width: 100 },
+                            { title: shade ?? 'Weight', dataIndex: 'label', width: 140 },
                             ...(!loose
                                 ? [
                                       {
-                                          title: 'Bags on the shelf',
+                                          title: shade ? 'On the shelf' : 'Bags on the shelf',
                                           key: 'packs',
                                           render: (_: unknown, o: WeightStockOption) => (
                                               <InputNumber
