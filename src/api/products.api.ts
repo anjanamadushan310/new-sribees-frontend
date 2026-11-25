@@ -91,6 +91,7 @@ export interface AdminProduct {
     stock_quantity: number;
     weight?: number | null;
     weight_unit?: string | null;
+    delivery_fee_per_kg?: number | null;
     display_size?: string | null;
     display_size_unit?: string | null;
     is_active: boolean;
@@ -176,6 +177,7 @@ export interface ProductPayload {
     low_stock_threshold?: number;
     weight?: number | null;
     weight_unit?: string | null;
+    delivery_fee_per_kg?: number | null;
     display_size?: string | null;
     display_size_unit?: string | null;
     is_active?: boolean;
