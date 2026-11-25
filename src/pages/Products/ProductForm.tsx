@@ -91,6 +91,7 @@ interface ProductFormValues {
     search_keywords?: string;
     weight?: number | null;
     weight_unit?: string;
+    delivery_fee_per_kg?: number | null;
     display_size?: string;
     display_size_unit?: string;
     is_active: boolean;
@@ -654,6 +655,7 @@ const ProductForm: React.FC = () => {
                 search_keywords: product.search_keywords ?? undefined,
                 weight: product.weight !== null && product.weight !== undefined ? Number(product.weight) : undefined,
                 weight_unit: product.weight_unit || 'kg',
+                delivery_fee_per_kg: product.delivery_fee_per_kg ?? null,
                 display_size: product.display_size || undefined,
                 display_size_unit: product.display_size_unit || undefined,
                 is_active: product.is_active,
@@ -784,6 +786,7 @@ const ProductForm: React.FC = () => {
                 cashback_percentage: values.cashback_percentage ?? null,
                 weight: Number(values.weight),
                 weight_unit: values.weight_unit || 'kg',
+                delivery_fee_per_kg: values.delivery_fee_per_kg ?? null,
                 display_size: values.display_size?.trim() || null,
                 display_size_unit: values.display_size?.trim() ? (values.display_size_unit?.trim() || null) : null,
                 is_active: values.is_active,
@@ -1732,6 +1735,21 @@ const ProductForm: React.FC = () => {
                                         style={{ width: '100%', borderRadius: 10, height: 40 }}
                                         suffix="%"
                                         placeholder="No commission"
+                                    />
+                                </Form.Item>
+                                <Form.Item
+                                    label="Product delivery rate (LKR/kg)"
+                                    name="delivery_fee_per_kg"
+                                    extra="Applies by shipping weight on every order, including free delivery orders. Leave blank to use standard courier pricing."
+                                    rules={[{ type: 'number', min: 0.01, max: 99999999.99 }]}
+                                >
+                                    <InputNumber
+                                        disabled={catalogDisabled}
+                                        min={0.01}
+                                        max={99999999.99}
+                                        precision={2}
+                                        style={{ width: '100%' }}
+                                        placeholder="Standard courier rate"
                                     />
                                 </Form.Item>
                             </div>

@@ -44,6 +44,8 @@ export interface Customer extends CustomerPurchaseStats, CustomerClosure {
      *  can correct it from the edit form below. */
     nic: string | null;
     alternate_phone: string | null;
+    display_primary_phone?: string | null;
+    display_alternate_phone?: string | null;
     role: string;
     is_active: boolean;
     is_blocked?: boolean;

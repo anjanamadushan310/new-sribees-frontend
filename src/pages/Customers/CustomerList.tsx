@@ -324,9 +324,11 @@ const CustomerList: React.FC = () => {
             title: 'Phone',
             dataIndex: 'phone',
             key: 'phone',
-            render: (phone: string | null, record) => (
-                <>
-                    {phone ||
+            render: (phone: string | null, record) => {
+                const primary = record.display_primary_phone === undefined ? phone : record.display_primary_phone;
+                const alternate = record.display_alternate_phone === undefined ? record.alternate_phone : record.display_alternate_phone;
+                return <>
+                    {(primary && <div><Text type="secondary">Primary: </Text><span>{primary}</span></div>) ||
                         (record.deleted_phone ? (
                             <Tooltip title="Held when the account was closed; released since.">
                                 <Text type="secondary" delete>{record.deleted_phone}</Text>
@@ -334,11 +336,11 @@ const CustomerList: React.FC = () => {
                         ) : (
                             <span style={{ color: '#bbb' }}>—</span>
                         ))}
-                    {record.alternate_phone ? (
-                        <div style={{ color: '#888', fontSize: 12 }}>{record.alternate_phone}</div>
+                    {alternate ? (
+                        <div style={{ color: '#888', fontSize: 12 }}>Alternate: <span>{alternate}</span></div>
                     ) : null}
-                </>
-            ),
+                </>;
+            },
         },
         {
             title: 'Joined',
