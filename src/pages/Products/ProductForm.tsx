@@ -56,6 +56,7 @@ import ImageGalleryUpload from '../../components/products/ImageGalleryUpload';
 import DescriptionEditor from '../../components/products/DescriptionEditor';
 import type { GalleryImage } from '../../components/products/ImageGalleryUpload';
 import WeightOptionsEditor from '../../components/products/WeightOptionsEditor';
+import ProductOptionsEditor from '../../components/products/ProductOptionsEditor';
 import { DEFAULT_WEIGHTS, followPricePerKg, markups, proRata, weightOptionsApi } from '../../api/weightOptions.api';
 import type { WeightOptionInput } from '../../api/weightOptions.api';
 import { useAuthStore } from '../../store/authStore';
@@ -1701,6 +1702,34 @@ const ProductForm: React.FC = () => {
                                                 ]}
                                             />
                                         </Form.Item>
+                                    </div>
+                                )}
+
+                                {/* Shades / colours (backend migration 123): a product sold by
+                                    weight has weight options instead. */}
+                                {!watchedSoldByWeight && isSuperAdmin && (
+                                    <div
+                                        data-testid="product-options"
+                                        style={{
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: 12,
+                                            padding: 14,
+                                            marginBottom: 20,
+                                            background: '#fafbfc',
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 600, marginBottom: 8 }}>Shades / colours</div>
+                                        {isEdit && id ? (
+                                            <ProductOptionsEditor
+                                                productId={id}
+                                                productPrice={Number(watchedPrice) || undefined}
+                                                disabled={catalogDisabled}
+                                            />
+                                        ) : (
+                                            <span style={{ color: '#64748b' }}>
+                                                Save the product first, then add its shades or colours here.
+                                            </span>
+                                        )}
                                     </div>
                                 )}
 
