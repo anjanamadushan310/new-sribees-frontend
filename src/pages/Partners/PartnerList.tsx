@@ -425,12 +425,15 @@ const PartnerList: React.FC = () => {
                     <Form.Item
                         label="Email"
                         name="email"
+                        // Pasted or autofilled emails often carry a trailing tab/space, which
+                        // fails the email rule with no visible cause.
+                        normalize={(v) => (typeof v === 'string' ? v.trim() : v)}
                         rules={[
                             { required: true, message: 'Email is required' },
                             { type: 'email', message: 'Enter a valid email' },
                         ]}
                     >
-                        <Input placeholder="partner@sribeesonline.lk" disabled={!!editing} />
+                        <Input autoComplete="off" placeholder="partner@sribeesonline.lk" disabled={!!editing} />
                     </Form.Item>
 
                     <Form.Item label="Phone" name="phone">
@@ -449,7 +452,7 @@ const PartnerList: React.FC = () => {
                                   ]
                         }
                     >
-                        <Input.Password placeholder={editing ? '••••••••' : 'Min 8 characters'} />
+                        <Input.Password autoComplete="new-password" placeholder={editing ? '••••••••' : 'Min 8 characters'} />
                     </Form.Item>
 
                     {!editing && (
