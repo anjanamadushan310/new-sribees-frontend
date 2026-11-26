@@ -71,6 +71,7 @@ export interface OrderItem {
     product_id: string;
     product_name: string;
     product_sku: string | null;
+    inventory_batch_label?: string | null;
     product_image: string | null;
     quantity: number;
     unit_price: number;
