@@ -355,6 +355,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, open, onClose }) =
                     )}
                     <Space direction="vertical" size={0}>
                         <Text strong style={{ fontSize: 13 }}>{r.product_name}</Text>
+                        {r.inventory_batch_label && (
+                            <Text type="secondary">Stock lot {r.inventory_batch_label}</Text>
+                        )}
                         {r.product_sku && (
                             <Text type="secondary" style={{ fontSize: 12 }}>
                                 {r.product_sku}

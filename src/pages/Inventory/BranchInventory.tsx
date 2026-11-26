@@ -36,6 +36,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { inventoryApi } from '../../api/inventory.api';
+import StockBatchesModal from '../../components/inventory/StockBatchesModal';
 import WeightStockModal from '../../components/inventory/WeightStockModal';
 import type {
     InventoryItem,
@@ -145,6 +146,7 @@ const BranchInventory: React.FC = () => {
     const [priceReviewLevel, setPriceReviewLevel] = useState<PriceReviewLevel | undefined>(undefined);
     const [stockState, setStockState] = useState<InventoryStockState>('all');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
+    const [batchInventory, setBatchInventory] = useState<InventoryItem | null>(null);
     const [editing, setEditing] = useState<InventoryItem | null>(null);
     const [weighing, setWeighing] = useState<InventoryItem | null>(null);
     const [addOpen, setAddOpen] = useState(false);
@@ -466,6 +468,11 @@ const BranchInventory: React.FC = () => {
                     <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
                         Quick Edit
                     </Button>
+                    {(record.stock_mode ?? 'unit') === 'unit' && (
+                        <Button type="link" icon={<InboxOutlined />} onClick={() => setBatchInventory(record)}>
+                            Stock batches
+                        </Button>
+                    )}
                     {(record.stock_mode === 'loose' || record.stock_mode === 'packed') && (
                         <Button type="link" icon={<InboxOutlined />} onClick={() => setWeighing(record)}>
                             {record.option_label ? `${record.option_label}s` : 'Weights'}
@@ -643,6 +650,9 @@ const BranchInventory: React.FC = () => {
                 />
             </Card>
 
+            {batchInventory && (
+                <StockBatchesModal item={batchInventory} onClose={() => setBatchInventory(null)} />
+            )}
             <Drawer
                 title="Quick Edit — Inventory"
                 open={!!editing}
