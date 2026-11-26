@@ -229,6 +229,85 @@ const productFormStyles = `
     transform: translateY(-1px);
     box-shadow: 0 6px 18px rgba(216, 27, 96, 0.35) !important;
 }
+.pf-create .pf-header {
+    margin-bottom: 18px;
+}
+.pf-create .pf-create-heading {
+    display: grid;
+    gap: 10px;
+}
+.pf-create .pf-create-heading .pf-back-btn {
+    justify-self: start;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    padding-inline: 0 8px;
+}
+.pf-create .pf-create-heading h1 {
+    margin: 0;
+    color: #0f172a;
+    font-size: clamp(25px, 3vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+}
+.pf-create-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #eceaf0;
+    border-radius: 14px;
+}
+.pf-create-nav a {
+    padding: 7px 10px;
+    border-radius: 8px;
+    color: #475569;
+    font-weight: 600;
+}
+.pf-create-nav a:hover,
+.pf-create-nav a:focus-visible {
+    background: #fce7f0;
+    color: #9d174d;
+}
+.pf-create .pf-card {
+    scroll-margin-top: 88px;
+    border-radius: 14px;
+}
+.pf-create .pf-card-head {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    background: #fff;
+}
+.pf-create .pf-floating-dock {
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pf-create .pf-dock-hint {
+    font-size: 13px;
+    color: #475569;
+}
+.pf-floating-dock[hidden] {
+    display: none;
+}
+@media (max-width: 575px) {
+    .pf-create .pf-card-head,
+    .pf-create .pf-card-body {
+        padding: 14px;
+    }
+    .pf-create .pf-floating-dock {
+        bottom: 8px;
+        padding: 10px;
+        justify-content: flex-end;
+    }
+    .pf-create .pf-floating-dock .pf-save-btn {
+        padding-inline: 12px !important;
+    }
+    .pf-create .pf-dock-hint {
+        margin-right: auto;
+    }
+}
 .pf-lang-tabs .ant-tabs-nav {
     margin-bottom: 20px;
 }
@@ -910,11 +989,27 @@ const ProductForm: React.FC = () => {
         );
     }
 
+    const isCreate = !isEdit && !readOnly && !isBranchScoped;
+
     return (
-        <div className="product-form-container">
+        <div className={isCreate ? 'product-form-container pf-create' : 'product-form-container'}>
             <style>{productFormStyles}</style>
 
-            {/* Header Row */}
+            {isCreate ? (
+                <header className="pf-header">
+                    <div className="pf-create-heading">
+                        <Button
+                            className="pf-back-btn"
+                            icon={<ArrowLeftOutlined />}
+                            onClick={() => navigate('/products')}
+                        >
+                            Back to Products
+                        </Button>
+                        <h1>Add Product</h1>
+                    </div>
+                </header>
+            ) : (
+            <>
             <div className="pf-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                     <Button
@@ -1003,8 +1098,21 @@ const ProductForm: React.FC = () => {
                 </Tag>
             </div>
 
+            </>
+            )}
+            {isCreate && (
+                <nav className="pf-create-nav" aria-label="Product form sections">
+                    <a href="#product-details">Details</a>
+                    <a href="#product-images">Images</a>
+                    <a href="#product-delivery">Delivery weight</a>
+                    <a href="#product-size">Display size</a>
+                    <a href="#product-pricing">Pricing</a>
+                    <a href="#product-category">Category &amp; SKU</a>
+                </nav>
+            )}
             <Form
                 form={form}
+                scrollToFirstError={isCreate ? { focus: true } : false}
                 layout="vertical"
                 onFinish={(values) => saveMutation.mutate(values)}
                 onValuesChange={(changed: Partial<ProductFormValues>) => {
@@ -1031,7 +1139,7 @@ const ProductForm: React.FC = () => {
                     {/* Left Column: Core Details, Multi-Language Copy, Media */}
                     <Col xs={24} lg={15}>
                         {/* 1. Details & Translations Card */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-details" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <ShoppingOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -1252,7 +1360,7 @@ const ProductForm: React.FC = () => {
                         </div>
 
                         {/* 2. Product Images Card */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-images" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <PictureOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -1498,7 +1606,7 @@ const ProductForm: React.FC = () => {
                         </div>
 
                         {/* 2. Weight & Measurement Card */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-delivery" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <InboxOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -1584,7 +1692,7 @@ const ProductForm: React.FC = () => {
                         </div>
 
                         {/* 2b. Customer-facing display size (not the delivery weight) */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-size" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <InboxOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -1617,7 +1725,7 @@ const ProductForm: React.FC = () => {
                         </div>
 
                         {/* 3. Pricing & Incentives Card */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-pricing" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <DollarOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -1785,7 +1893,7 @@ const ProductForm: React.FC = () => {
                         </div>
 
                         {/* 4. Categorization, SKU & Attributes Card */}
-                        <div className="pf-card">
+                        <div className="pf-card" id="product-category" tabIndex={-1}>
                             <div className="pf-card-head">
                                 <div className="pf-card-title">
                                     <AppstoreOutlined style={{ color: '#D81B60', fontSize: 17 }} />
@@ -2003,6 +2111,9 @@ const ProductForm: React.FC = () => {
 
                 {/* Floating Bottom Sticky Action Dock */}
                 <div className="pf-floating-dock" hidden={readOnly}>
+                    {isCreate ? (
+                        <span className="pf-dock-hint">* Required fields</span>
+                    ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Tag
                             color={isEdit ? 'blue' : 'green'}
@@ -2014,6 +2125,7 @@ const ProductForm: React.FC = () => {
                             Tip: Press <kbd style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, padding: '2px 6px', fontSize: 11, fontWeight: 700 }}>Ctrl + S</kbd> to quick save
                         </span>
                     </div>
+                    )}
                     <Space size={12}>
                         <Button
                             size="large"
