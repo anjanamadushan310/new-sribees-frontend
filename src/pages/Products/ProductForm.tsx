@@ -1105,7 +1105,6 @@ const ProductForm: React.FC = () => {
                     <a href="#product-details">Details</a>
                     <a href="#product-images">Images</a>
                     <a href="#product-delivery">Delivery weight</a>
-                    <a href="#product-size">Display size</a>
                     <a href="#product-pricing">Pricing</a>
                     <a href="#product-category">Category &amp; SKU</a>
                 </nav>
@@ -1166,22 +1165,57 @@ const ProductForm: React.FC = () => {
                                             ),
                                             children: (
                                                 <>
-                                                    <Form.Item
-                                                        label={<span style={{ fontWeight: 600 }}>Product Name (English)</span>}
-                                                        name="name"
-                                                        rules={[{ required: true, message: 'Name is required' }]}
-                                                    >
-                                                        <Input
-                                                            disabled={catalogDisabled}
-                                                            placeholder="e.g. Organic Whole Milk 1L"
-                                                            style={{ borderRadius: 10, height: 40 }}
-                                                            onChange={(e) => {
-                                                                if (!slugTouched) {
-                                                                    form.setFieldValue('slug', slugify(e.target.value));
-                                                                }
-                                                            }}
-                                                        />
-                                                    </Form.Item>
+                                                    <Row gutter={12}>
+                                                        <Col xs={24} xl={11}>
+                                                            <Form.Item
+                                                                label={<span style={{ fontWeight: 600 }}>Product Name (English)</span>}
+                                                                name="name"
+                                                                rules={[{ required: true, message: 'Name is required' }]}
+                                                            >
+                                                                <Input
+                                                                    disabled={catalogDisabled}
+                                                                    placeholder="e.g. Organic Whole Milk"
+                                                                    style={{ borderRadius: 10, height: 40 }}
+                                                                    onChange={(e) => {
+                                                                        if (!slugTouched) {
+                                                                            form.setFieldValue('slug', slugify(e.target.value));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={14} xl={7}>
+                                                            <Form.Item
+                                                                label={<span style={{ fontWeight: 600 }}>Display Weight / Size</span>}
+                                                                name="display_size"
+                                                                tooltip="Shown below the product name in the app. Leave blank to hide it."
+                                                                rules={[{ max: 80 }]}
+                                                            >
+                                                                <Input
+                                                                    disabled={catalogDisabled}
+                                                                    maxLength={80}
+                                                                    placeholder="e.g. 400 or XL"
+                                                                    style={{ borderRadius: 10, height: 40 }}
+                                                                />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={10} xl={6}>
+                                                            <Form.Item
+                                                                label={<span style={{ fontWeight: 600 }}>Display unit (optional)</span>}
+                                                                name="display_size_unit"
+                                                                tooltip="Pick a common unit or type your own. Leave blank for sizes such as XL."
+                                                                rules={[{ max: 32 }]}
+                                                            >
+                                                                <AutoComplete
+                                                                    disabled={catalogDisabled}
+                                                                    allowClear
+                                                                    placeholder="e.g. g, ml, pcs"
+                                                                    options={displayUnitGroups}
+                                                                    style={{ height: 40 }}
+                                                                />
+                                                            </Form.Item>
+                                                        </Col>
+                                                    </Row>
                                                     <Form.Item
                                                         label={<span style={{ fontWeight: 600 }}>Short Description</span>}
                                                         name="short_description"
@@ -1688,39 +1722,6 @@ const ProductForm: React.FC = () => {
                                 <Typography.Text type="secondary" style={{ fontSize: 11.5, display: 'block', marginTop: -4 }}>
                                     💡 1kg ට අඩු භාණ්ඩ සඳහා <strong>Grams (g)</strong> ද, 1kg හෝ ඊට වැඩි නම් <strong>Kilograms (kg)</strong> ද තෝරන්න.
                                 </Typography.Text>
-                            </div>
-                        </div>
-
-                        {/* 2b. Customer-facing display size (not the delivery weight) */}
-                        <div className="pf-card" id="product-size" tabIndex={-1}>
-                            <div className="pf-card-head">
-                                <div className="pf-card-title">
-                                    <InboxOutlined style={{ color: '#D81B60', fontSize: 17 }} />
-                                    <span>Display Weight / Size (Customer-facing)</span>
-                                </div>
-                            </div>
-                            <div className="pf-card-body">
-                                <Typography.Paragraph type="secondary" style={{ fontSize: 12.5 }}>
-                                    Shown below the product name in the app. This does not change delivery weight or delivery charges. Leave the size blank to hide it.
-                                </Typography.Paragraph>
-                                <Row gutter={12}>
-                                    <Col xs={14}>
-                                        <Form.Item label={<span style={{ fontWeight: 600 }}>Weight / Size value</span>} name="display_size"
-                                            extra="Examples: 400, 1.5, 2 × 100, 30 × 40, XL, or 6–12 months."
-                                            rules={[{ max: 80 }]}>
-                                            <Input disabled={catalogDisabled} maxLength={80} placeholder="e.g. 400" style={{ borderRadius: 10, height: 40 }} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={10}>
-                                        <Form.Item label={<span style={{ fontWeight: 600 }}>Display unit (optional)</span>} name="display_size_unit"
-                                            extra="Pick a common unit or type another. Leave blank for sizes such as XL."
-                                            rules={[{ max: 32 }]}>
-                                            <AutoComplete disabled={catalogDisabled} allowClear
-                                                placeholder="e.g. g, ml, pcs"
-                                                options={displayUnitGroups} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
                             </div>
                         </div>
 
