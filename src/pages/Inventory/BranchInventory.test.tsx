@@ -64,6 +64,26 @@ describe('BranchInventory commission', () => {
     });
     afterEach(() => signOut());
 
+    it('filters the branch inventory by sourcing group and review priority', async () => {
+        signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
+        renderPage(<BranchInventory />);
+        await screen.findByText('Samba Rice 5kg');
+
+        fireEvent.click(screen.getByRole('radio', { name: 'Our Store' }));
+        await waitFor(() => expect(inventory.list).toHaveBeenLastCalledWith(
+            expect.objectContaining({ page: 1, sourcing_group: 'store' }),
+        ));
+        fireEvent.click(screen.getByRole('radio', { name: 'Other Products' }));
+        await waitFor(() => expect(inventory.list).toHaveBeenLastCalledWith(
+            expect.objectContaining({ page: 1, sourcing_group: 'external' }),
+        ));
+        fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Other products review group' }));
+        fireEvent.click(await screen.findByText('Daily Check'));
+        await waitFor(() => expect(inventory.list).toHaveBeenLastCalledWith(
+            expect.objectContaining({ page: 1, sourcing_group: 'external_daily' }),
+        ));
+    });
+
     it('shows what each product earns and where the rate comes from', async () => {
         signIn(AdminRole.BRANCH_MANAGER, { branch_id: 'b-1' });
         renderPage(<BranchInventory />);
