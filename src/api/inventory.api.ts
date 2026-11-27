@@ -10,10 +10,14 @@ import type { PriceReviewLevel, StockMode } from './products.api';
 
 export type InventoryStockState = 'all' | 'in' | 'low' | 'out';
 
+export type SourcingGroup = 'store' | 'external_daily' | 'external_slow';
+export type SourcingFilter = SourcingGroup | 'external' | 'unclassified';
+
 export interface InventoryItem {
     inventory_id: string;
     product_id: string;
     product_name: string;
+    sourcing_group?: SourcingGroup | null;
     sku: string | null;
     branch_id: string;
     branch_name: string;
@@ -110,6 +114,7 @@ export interface InventoryListParams {
     subcategory_id?: string;
     price_review_level?: PriceReviewLevel;
     stock_state?: InventoryStockState;
+    sourcing_group?: SourcingFilter;
     low_stock_only?: boolean;
     branch_id?: string; // super admin only
 }
@@ -124,6 +129,7 @@ export interface InventoryListResult {
 }
 
 export interface InventoryUpdatePayload {
+    sourcing_group?: SourcingGroup | null;
     // null clears the local override → the product reverts to global_price.
     branch_price?: number | null;
     stock_quantity?: number;
@@ -161,6 +167,7 @@ export interface StockableListResult {
  * cannot set one), so this is the only place they get set.
  */
 export interface BranchOverridePayload {
+    sourcing_group?: SourcingGroup | null;
     product_id: string;
     branch_id?: string; // super admin only; ignored for scoped admins
     branch_price: number;

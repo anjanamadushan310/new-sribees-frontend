@@ -20,6 +20,7 @@ import {
     Modal,
     Switch,
     Select,
+    Segmented,
     Tooltip,
     App,
     Typography,
@@ -43,6 +44,8 @@ import type {
     InventoryUpdatePayload,
     StockableProduct,
     InventoryStockState,
+    SourcingGroup,
+    SourcingFilter,
     PriceFloor,
 } from '../../api/inventory.api';
 import { PriceFloorIcon } from '../../components/finance/PriceFloorIcon';
@@ -127,6 +130,25 @@ const commissionCell = (item: InventoryItem) => {
     );
 };
 
+const sourcingLabels: Record<SourcingGroup, string> = {
+    store: 'Our Store',
+    external_daily: 'Other Products · Daily Check',
+    external_slow: 'Other Products · Slow-Moving',
+};
+
+const sourcingOptions = [
+    { label: sourcingLabels.store, value: 'store' },
+    { label: sourcingLabels.external_daily, value: 'external_daily' },
+    { label: sourcingLabels.external_slow, value: 'external_slow' },
+];
+
+const sourcingSections = [
+    { label: 'All Products', value: 'all' },
+    { label: 'Our Store', value: 'store' },
+    { label: 'Other Products', value: 'external' },
+    { label: 'Unclassified', value: 'unclassified' },
+] as const;
+
 type EditValues = InventoryUpdatePayload & { referral_commission_percentage?: number | null };
 
 const BranchInventory: React.FC = () => {
@@ -144,6 +166,11 @@ const BranchInventory: React.FC = () => {
     const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined);
     const [priceReviewLevel, setPriceReviewLevel] = useState<PriceReviewLevel | undefined>(undefined);
+    const [sourcingSection, setSourcingSection] = useState<(typeof sourcingSections)[number]['value']>('all');
+    const [externalGroup, setExternalGroup] = useState<'external_daily' | 'external_slow'>();
+    const sourcingFilter: SourcingFilter | undefined =
+        sourcingSection === 'all' ? undefined :
+            sourcingSection === 'external' ? externalGroup ?? 'external' : sourcingSection;
     const [stockState, setStockState] = useState<InventoryStockState>('all');
     const [branchId, setBranchId] = useState<string | undefined>(undefined);
     const [batchInventory, setBatchInventory] = useState<InventoryItem | null>(null);
@@ -154,6 +181,7 @@ const BranchInventory: React.FC = () => {
     const [addForm] = Form.useForm<{
         product_id: string;
         branch_price: number;
+        sourcing_group?: SourcingGroup;
         stock_quantity: number;
         low_stock_threshold: number;
         cashback_percentage?: number | null;
@@ -200,7 +228,7 @@ const BranchInventory: React.FC = () => {
     const queryKey = [
         'admin',
         'inventory',
-        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, stockState, branchId },
+        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, stockState, branchId, sourcingFilter },
     ];
 
     const { data, isLoading, isError } = useQuery({
@@ -213,6 +241,7 @@ const BranchInventory: React.FC = () => {
                 category_id: categoryId,
                 subcategory_id: subcategoryId,
                 price_review_level: priceReviewLevel,
+                sourcing_group: sourcingFilter,
                 stock_state: stockState !== 'all' ? stockState : undefined,
                 low_stock_only: stockState === 'low' ? true : undefined,
                 branch_id: branchId, // ignored by the server for non-super admins
@@ -223,7 +252,7 @@ const BranchInventory: React.FC = () => {
     const floors = usePriceFloors(data?.items ?? []);
 
     const hasActiveFilters = Boolean(
-        search || categoryId || subcategoryId || priceReviewLevel !== undefined || stockState !== 'all' || branchId !== undefined
+        search || categoryId || subcategoryId || priceReviewLevel !== undefined || stockState !== 'all' || branchId !== undefined || sourcingFilter
     );
 
     const handleResetFilters = () => {
@@ -233,6 +262,8 @@ const BranchInventory: React.FC = () => {
         setSubcategoryId(undefined);
         setPriceReviewLevel(undefined);
         setStockState('all');
+        setSourcingSection('all');
+        setExternalGroup(undefined);
         setBranchId(undefined);
     };
 
@@ -328,6 +359,7 @@ const BranchInventory: React.FC = () => {
         setEditing(item);
         form.setFieldsValue({
             branch_price: item.branch_price,
+            sourcing_group: item.sourcing_group ?? undefined,
             stock_quantity: item.stock_quantity,
             reserved_quantity: item.reserved_quantity,
             low_stock_threshold: item.low_stock_threshold,
@@ -351,9 +383,12 @@ const BranchInventory: React.FC = () => {
         // Empty number inputs come back as undefined; send an explicit null so
         // the server clears the override instead of ignoring the field.
         const { referral_commission_percentage: rawCommission, ...rest } = values;
-        const { cashback_percentage: rawCashback, ...others } = rest;
+        const { cashback_percentage: rawCashback, sourcing_group, ...others } = rest;
         const payload: InventoryUpdatePayload = {
             ...others,
+            ...((sourcing_group ?? null) !== (editing.sourcing_group ?? null)
+                ? { sourcing_group: sourcing_group ?? null }
+                : {}),
             branch_price: values.branch_price ?? null,
             discount_percentage: values.discount_percentage ?? null,
             ...(canEditCashback ? { cashback_percentage: rawCashback ?? null } : {}),
@@ -375,6 +410,7 @@ const BranchInventory: React.FC = () => {
             product_id: values.product_id,
             branch_id: targetBranchId,
             branch_price: values.branch_price,
+            sourcing_group: values.sourcing_group,
             stock_quantity: values.stock_quantity,
             low_stock_threshold: values.low_stock_threshold ?? 10,
             ...(canEditCashback ? { cashback_percentage: values.cashback_percentage ?? null } : {}),
@@ -387,7 +423,12 @@ const BranchInventory: React.FC = () => {
             title: 'Product',
             dataIndex: 'product_name',
             key: 'product_name',
-            render: (name: string) => <Text strong>{name}</Text>,
+            render: (name: string, item) => (
+                <Space orientation="vertical" size={4}>
+                    <Text strong>{name}</Text>
+                    <Tag>{item.sourcing_group ? sourcingLabels[item.sourcing_group] : 'Unclassified'}</Tag>
+                </Space>
+            ),
         },
         {
             title: 'SKU',
@@ -533,6 +574,32 @@ const BranchInventory: React.FC = () => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                 }}
             >
+                <Space wrap style={{ marginBottom: 12 }}>
+                    <Segmented
+                        aria-label="Inventory sourcing section"
+                        options={[...sourcingSections]}
+                        value={sourcingSection}
+                        onChange={(value) => {
+                            setPage(1);
+                            setSourcingSection(value);
+                            setExternalGroup(undefined);
+                        }}
+                    />
+                    {sourcingSection === 'external' && (
+                        <Select<'external_daily' | 'external_slow'>
+                            aria-label="Other products review group"
+                            placeholder="All other products"
+                            allowClear
+                            value={externalGroup}
+                            style={{ width: 190 }}
+                            onChange={(value) => { setPage(1); setExternalGroup(value); }}
+                            options={[
+                                { label: 'Daily Check', value: 'external_daily' },
+                                { label: 'Slow-Moving', value: 'external_slow' },
+                            ]}
+                        />
+                    )}
+                </Space>
                 <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
                     <Space wrap size={12}>
                         <DebouncedSearchInput
@@ -690,6 +757,14 @@ const BranchInventory: React.FC = () => {
                         </Descriptions>
 
                         <Form form={form} layout="vertical">
+                            <Form.Item
+                                label="Sourcing group"
+                                name="sourcing_group"
+                                extra="Use this group to organize branch inventory checks."
+                            >
+                                <Select allowClear placeholder="Unclassified" options={sourcingOptions} />
+                            </Form.Item>
+
                             <Form.Item
                                 label={
                                     <Space size={6}>
@@ -925,6 +1000,14 @@ const BranchInventory: React.FC = () => {
                             prefix="LKR"
                             placeholder="0.00"
                         />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Sourcing group"
+                        name="sourcing_group"
+                        extra="Use this group to organize branch inventory checks."
+                    >
+                        <Select allowClear placeholder="Unclassified" options={sourcingOptions} />
                     </Form.Item>
 
                     <Form.Item
