@@ -197,7 +197,7 @@ export interface ProductListParams {
     category_id?: string;
     subcategory_id?: string;
     is_active?: boolean;
-    sort_by?: 'created_at' | 'price' | 'name' | 'view_count';
+    sort_by?: 'created_at' | 'price' | 'name' | 'view_count' | 'units_sold_30d';
     sort_order?: 'asc' | 'desc';
     /**
      * Branch-derived filters. The server applies these to the requested PAGE
@@ -206,7 +206,7 @@ export interface ProductListParams {
      * unfiltered count.
      */
     movement?: ProductMovement;
-    stock_state?: StockState;
+    stock_state?: StockState | 'low_or_out';
     on_quick_sale?: boolean;
     perishable_only?: boolean;
     price_review_level?: PriceReviewLevel;

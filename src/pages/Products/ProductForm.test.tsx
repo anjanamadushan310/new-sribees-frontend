@@ -56,7 +56,7 @@ describe('customer-facing size preview', () => {
     it('uses only display size and unit, updates immediately, and hides when cleared', async () => {
         signIn(AdminRole.SUPER_ADMIN);
         renderPage(<ProductForm />, { path: '/products/new', route: '/products/new' });
-        const size = await screen.findByLabelText('Weight / Size value');
+        const size = await screen.findByLabelText('Display Weight / Size');
         const unit = screen.getByLabelText('Display unit (optional)');
         expect(screen.queryByTestId('customer-preview-size')).toBeNull();
 

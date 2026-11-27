@@ -14,7 +14,7 @@ import {
     Image,
     Popconfirm,
     App,
-    Segmented,
+    Checkbox,
     Tooltip,
     Row,
     Col,
@@ -66,7 +66,7 @@ const MOVEMENT_META: Record<ProductMovement, { label: string; color: string; bg:
         bg: '#fffbeb',
         hint: 'Barely moving. If also perishable, consider a Quick Sale deal.',
     },
-    none: { label: '0 Orders', color: '#dc2626', bg: '#fef2f2', hint: 'No units sold from this branch in the last 30 days' },
+    none: { label: 'No Sales', color: '#dc2626', bg: '#fef2f2', hint: 'No units sold in the last 30 days' },
 };
 
 const STOCK_META: Record<StockState, { color: string; bg: string; label: (q: number) => string }> = {
@@ -75,29 +75,8 @@ const STOCK_META: Record<StockState, { color: string; bg: string; label: (q: num
     out: { color: '#dc2626', bg: '#fef2f2', label: () => 'Out of Stock (0)' },
 };
 
-type MovementTab = 'all' | ProductMovement | StockState | 'quick_sale' | 'perishable';
-
-const MOVEMENT_TABS: { label: string; value: MovementTab }[] = [
-    { label: 'All Products', value: 'all' },
-    { label: '🚀 Fast-Moving', value: 'fast' },
-    { label: '❄️ Slow-Moving', value: 'slow' },
-    { label: 'In Stock', value: 'in' },
-    { label: 'Low Stock', value: 'low' },
-    { label: 'Out of Stock', value: 'out' },
-    { label: '⚡ On Quick Sale', value: 'quick_sale' },
-    { label: 'Perishable', value: 'perishable' },
-];
-
-/** Translate movement tab into query params */
-const tabToParams = (tab: MovementTab) => {
-    if (tab === 'fast' || tab === 'slow' || tab === 'steady' || tab === 'none')
-        return { movement: tab as ProductMovement };
-    if (tab === 'in' || tab === 'low' || tab === 'out')
-        return { stock_state: tab as StockState };
-    if (tab === 'quick_sale') return { on_quick_sale: true };
-    if (tab === 'perishable') return { perishable_only: true };
-    return {};
-};
+type StockFilter = StockState | 'low_or_out';
+type SalesSort = 'asc' | 'desc';
 
 const productListStyles = `
 .product-page-container {
@@ -261,10 +240,11 @@ const ProductList: React.FC = () => {
 
     const { canCreate, canUpdate, canDelete } = usePermissions();
     const role = useAuthStore((state) => state.user?.role);
+    const branchId = useAuthStore((state) => state.user?.branch_id);
     const isBranchScoped =
         role !== undefined &&
         role !== AdminRole.SUPER_ADMIN &&
-        role !== AdminRole.CUSTOMER_SUPPORT;
+        (role !== AdminRole.CUSTOMER_SUPPORT || Boolean(branchId));
 
     const canAddProduct = canCreate('products');
     const canEditProduct = canUpdate('products');
@@ -277,7 +257,11 @@ const ProductList: React.FC = () => {
     const [subcategoryId, setSubcategoryId] = useState<string | undefined>(undefined);
     const [isActive, setIsActive] = useState<boolean | undefined>(undefined);
     const [priceReviewLevel, setPriceReviewLevel] = useState<PriceReviewLevel | undefined>(undefined);
-    const [movementTab, setMovementTab] = useState<MovementTab>('all');
+    const [stockFilter, setStockFilter] = useState<StockFilter>();
+    const [movement, setMovement] = useState<ProductMovement>();
+    const [salesSort, setSalesSort] = useState<SalesSort>();
+    const [quickSale, setQuickSale] = useState(false);
+    const [perishable, setPerishable] = useState(false);
 
     // Category options for filter
     const { data: categories = [] } = useQuery({
@@ -298,7 +282,7 @@ const ProductList: React.FC = () => {
     const listKey = [
         'admin',
         'products',
-        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, isActive, movementTab },
+        { page, pageSize, search, categoryId, subcategoryId, priceReviewLevel, isActive, stockFilter, movement, salesSort, quickSale, perishable },
     ];
 
     const { data, isLoading, isError } = useQuery({
@@ -312,7 +296,12 @@ const ProductList: React.FC = () => {
                 subcategory_id: subcategoryId,
                 is_active: isActive,
                 price_review_level: priceReviewLevel,
-                ...tabToParams(movementTab),
+                stock_state: stockFilter,
+                movement,
+                sort_by: salesSort ? 'units_sold_30d' : undefined,
+                sort_order: salesSort,
+                on_quick_sale: quickSale || undefined,
+                perishable_only: perishable || undefined,
             }),
         placeholderData: keepPreviousData,
     });
@@ -340,12 +329,12 @@ const ProductList: React.FC = () => {
         [data?.products]
     );
     const dealsCount = useMemo(
-        () => (data?.products ?? []).filter((p) => p.is_on_quick_sale || p.movement === 'fast').length,
+        () => (data?.products ?? []).filter((p) => p.is_on_quick_sale).length,
         [data?.products]
     );
 
     const hasActiveFilters = Boolean(
-        search || categoryId || subcategoryId || priceReviewLevel !== undefined || isActive !== undefined || movementTab !== 'all'
+        search || categoryId || subcategoryId || priceReviewLevel !== undefined || isActive !== undefined || stockFilter || movement || salesSort || quickSale || perishable
     );
 
     const handleResetFilters = () => {
@@ -355,7 +344,11 @@ const ProductList: React.FC = () => {
         setSubcategoryId(undefined);
         setPriceReviewLevel(undefined);
         setIsActive(undefined);
-        setMovementTab('all');
+        setStockFilter(undefined);
+        setMovement(undefined);
+        setSalesSort(undefined);
+        setQuickSale(false);
+        setPerishable(false);
     };
 
     const columns: ColumnsType<AdminProduct> = [
@@ -469,74 +462,68 @@ const ProductList: React.FC = () => {
                 return <span style={{ color: '#cbd5e1' }}>—</span>;
             },
         },
-        ...(isBranchScoped
-            ? ([
-                  {
-                      title: 'Branch Stock',
-                      key: 'stock',
-                      width: 145,
-                      render: (_: unknown, record: AdminProduct) => {
-                          const state = record.stock_state ?? 'in';
-                          const meta = STOCK_META[state];
-                          return (
-                              <div
-                                  className="product-stock-badge"
-                                  style={{ background: meta.bg, color: meta.color }}
-                              >
-                                  <span
-                                      style={{
-                                          width: 6,
-                                          height: 6,
-                                          borderRadius: '50%',
-                                          background: meta.color,
-                                      }}
-                                  />
-                                  <span>{meta.label(record.stock_quantity)}</span>
-                              </div>
-                          );
-                      },
-                      sorter: (a: AdminProduct, b: AdminProduct) =>
-                          a.stock_quantity - b.stock_quantity,
-                  },
-                  {
-                      title: (
-                          <Tooltip title="Units delivered from your branch in the last 30 days. Cancelled orders do not count.">
-                              <span>Sales (30 Days)</span>
-                          </Tooltip>
-                      ),
-                      key: 'velocity',
-                      width: 165,
-                      render: (_: unknown, record: AdminProduct) => {
-                          const meta = MOVEMENT_META[record.movement ?? 'none'];
-                          return (
-                              <div>
-                                  <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
-                                      {record.units_sold_30d ?? 0} sold
-                                  </div>
-                                  <Tooltip title={meta.hint}>
-                                      <span
-                                          style={{
-                                              display: 'inline-block',
-                                              fontSize: 11,
-                                              fontWeight: 600,
-                                              color: meta.color,
-                                              background: meta.bg,
-                                              padding: '1px 8px',
-                                              borderRadius: 12,
-                                              marginTop: 2,
-                                          }}
-                                      >
-                                          {meta.label}
-                                      </span>
-                                  </Tooltip>
-                              </div>
-                          );
-                      },
-                      sorter: (a: AdminProduct, b: AdminProduct) =>
-                          (a.units_sold_30d ?? 0) - (b.units_sold_30d ?? 0),
-                  },
-              ] as ColumnsType<AdminProduct>)
-            : []),
+        {
+            title: isBranchScoped ? 'Branch Stock' : 'Stock Across Branches',
+            key: 'stock',
+            width: 145,
+            render: (_: unknown, record: AdminProduct) => {
+                if (!record.stock_state) return '—';
+                const meta = STOCK_META[record.stock_state];
+                return (
+                    <div
+                        className="product-stock-badge"
+                        style={{ background: meta.bg, color: meta.color }}
+                    >
+                        <span
+                            style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: meta.color,
+                            }}
+                        />
+                        <span>{meta.label(record.stock_quantity)}</span>
+                    </div>
+                );
+            },
+            sorter: (a: AdminProduct, b: AdminProduct) =>
+                a.stock_quantity - b.stock_quantity,
+        },
+        {
+            title: (
+                <Tooltip title="Units sold on delivered orders placed within the last 30 days.">
+                    <span>Sales (30 Days)</span>
+                </Tooltip>
+            ),
+            key: 'velocity',
+            width: 165,
+            render: (_: unknown, record: AdminProduct) => {
+                const meta = MOVEMENT_META[record.movement ?? 'none'];
+                return (
+                    <div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+                            {record.units_sold_30d ?? 0} sold
+                        </div>
+                        <Tooltip title={meta.hint}>
+                            <span
+                                style={{
+                                    display: 'inline-block',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: meta.color,
+                                    background: meta.bg,
+                                    padding: '1px 8px',
+                                    borderRadius: 12,
+                                    marginTop: 2,
+                                }}
+                            >
+                                {meta.label}
+                            </span>
+                        </Tooltip>
+                    </div>
+                );
+            },
+        },
         {
             title: isBranchScoped ? 'Selling Price' : 'Base Price',
             key: 'price',
@@ -632,6 +619,7 @@ const ProductList: React.FC = () => {
                                 : 'Long Review'}
                         </span>
                     )}
+                    {record.is_on_quick_sale && <Tag color="purple">Quick Sale</Tag>}
                     {record.is_perishable && (
                         <Tag
                             color="orange"
@@ -820,7 +808,7 @@ const ProductList: React.FC = () => {
                         </div>
                         <div>
                             <div className="product-kpi-value">{totalCount.toLocaleString()}</div>
-                            <div className="product-kpi-label">Total Products</div>
+                            <div className="product-kpi-label">Matching Products</div>
                         </div>
                     </div>
                 </Col>
@@ -831,7 +819,7 @@ const ProductList: React.FC = () => {
                         </div>
                         <div>
                             <div className="product-kpi-value">{activeCount}</div>
-                            <div className="product-kpi-label">Active / Live</div>
+                            <div className="product-kpi-label">Active on this page</div>
                         </div>
                     </div>
                 </Col>
@@ -842,7 +830,7 @@ const ProductList: React.FC = () => {
                         </div>
                         <div>
                             <div className="product-kpi-value">{stockAlertCount}</div>
-                            <div className="product-kpi-label">Low / Out of Stock</div>
+                            <div className="product-kpi-label">Low / Out on this page</div>
                         </div>
                     </div>
                 </Col>
@@ -853,7 +841,7 @@ const ProductList: React.FC = () => {
                         </div>
                         <div>
                             <div className="product-kpi-value">{dealsCount}</div>
-                            <div className="product-kpi-label">Fast / Deals</div>
+                            <div className="product-kpi-label">Quick Sales on this page</div>
                         </div>
                     </div>
                 </Col>
@@ -861,26 +849,6 @@ const ProductList: React.FC = () => {
 
             {/* Main Table Card with Filters */}
             <div className="product-table-card">
-                {/* Branch-derived Velocity Tabs */}
-                {isBranchScoped && (
-                    <div style={{ padding: '16px 24px 0 24px', background: '#ffffff' }}>
-                        <Segmented
-                            value={movementTab}
-                            onChange={(value) => {
-                                setPage(1);
-                                setMovementTab(value as MovementTab);
-                            }}
-                            options={MOVEMENT_TABS}
-                            style={{
-                                background: '#f1f5f9',
-                                padding: 3,
-                                borderRadius: 12,
-                                fontWeight: 600,
-                            }}
-                        />
-                    </div>
-                )}
-
                 {/* Filter and Search Bar */}
                 <div className="product-filter-bar">
                     <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -919,6 +887,47 @@ const ProductList: React.FC = () => {
                                 }}
                                 options={subcategories.map((c) => ({ label: c.name, value: c.category_id }))}
                             />
+                            <Select<StockFilter>
+                                aria-label="Stock level"
+                                placeholder="All stock levels"
+                                style={{ width: 170 }}
+                                allowClear
+                                value={stockFilter}
+                                onChange={(value) => { setPage(1); setStockFilter(value); }}
+                                options={[
+                                    { label: 'Low / Out of Stock', value: 'low_or_out' },
+                                    { label: 'Low Stock', value: 'low' },
+                                    { label: 'Out of Stock', value: 'out' },
+                                    { label: 'In Stock', value: 'in' },
+                                ]}
+                            />
+                            <Select<SalesSort>
+                                aria-label="Sort by sales in the last 30 days"
+                                placeholder="Sort by sales (30 days)"
+                                style={{ width: 215 }}
+                                allowClear
+                                value={salesSort}
+                                onChange={(value) => { setPage(1); setSalesSort(value); }}
+                                options={[
+                                    { label: 'Best selling first', value: 'desc' },
+                                    { label: 'Least selling first', value: 'asc' },
+                                ]}
+                            />
+                            <Select<ProductMovement>
+                                aria-label="Sales activity"
+                                placeholder="All sales activity"
+                                style={{ width: 175 }}
+                                allowClear
+                                value={movement}
+                                onChange={(value) => { setPage(1); setMovement(value); }}
+                                options={Object.entries(MOVEMENT_META).map(([value, meta]) => ({ value, label: meta.label }))}
+                            />
+                            <Checkbox checked={quickSale} onChange={(event) => { setPage(1); setQuickSale(event.target.checked); }}>
+                                On Quick Sale
+                            </Checkbox>
+                            <Checkbox checked={perishable} onChange={(event) => { setPage(1); setPerishable(event.target.checked); }}>
+                                Perishable
+                            </Checkbox>
                             <Select<PriceReviewLevel>
                                 placeholder="All price reviews"
                                 style={{ width: 195 }}
